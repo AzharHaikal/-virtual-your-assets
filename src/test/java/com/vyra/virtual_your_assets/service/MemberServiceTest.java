@@ -64,6 +64,7 @@ class MemberServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 memberService.resetPassword(request)
         );
+
         assertEquals(ErrorConstant.MEMBER_NOT_FOUND, ex.getErrorConstant());
         verify(memberRepository, never()).save(any(Member.class));
     }
