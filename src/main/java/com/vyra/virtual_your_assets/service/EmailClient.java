@@ -1,6 +1,8 @@
 package com.vyra.virtual_your_assets.service;
 
+import com.vyra.virtual_your_assets.constant.ErrorConstant;
 import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
+import com.vyra.virtual_your_assets.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.mail.internet.MimeMessage;
@@ -27,8 +29,7 @@ public class EmailClient {
             helper.setText(htmlContent, true);
             mailSender.send(message);
         } catch (Exception e) {
-            // Handle exception (log error)
-            e.printStackTrace();
+            throw new BusinessException(ErrorConstant.INTERNAL_SERVER_ERROR);
         }
     }
 

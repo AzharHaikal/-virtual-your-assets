@@ -212,6 +212,28 @@ class AuthenticationServiceTest {
     }
 
     @Test
+    void verifyOtpFailedOneTimes() {
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setPhoneNumber("62812345678");
+        request.setOtpCode("wrong-code");
+        request.setOtpType(OtpType.REGISTER);
+
+        MemberOtp memberOtp = new MemberOtp();
+        memberOtp.setOtpCode("hashedOtp");
+        memberOtp.setAttempts(1); // Simulation: wrong 1 times
+        memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
+
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(anyString(), any())).thenReturn(Optional.of(memberOtp));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                authenticationService.verifyOtp(request)
+        );
+
+        assertEquals(ErrorConstant.OTP_INVALID, ex.getErrorConstant());
+    }
+
+    @Test
     void verifyOtpFailedMaxAttempts() {
         VerifyOtpRequest request = new VerifyOtpRequest();
         request.setPhoneNumber("62812345678");
