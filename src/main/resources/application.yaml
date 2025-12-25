@@ -1,0 +1,23 @@
+spring:
+  jpa:
+    show-sql: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: viraasst@gmail.com
+    password: rzrg qodc gfmd xspk
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+logging:
+  level:
+    org:
+      hibernate:
+        SQL: off
+        type:
+          descriptor:
+            sql:
+              BasicBinder: off
