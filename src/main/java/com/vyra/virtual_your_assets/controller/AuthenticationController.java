@@ -34,7 +34,7 @@ public class AuthenticationController {
 
     @PostMapping("/verify-otp")
     public ResponseEntity<BaseResponse<Void>> verifyOtp(@RequestBody VerifyOtpRequest request) {
-        return ResponseEntity.ok(otpService.verifyOtp(request));
+        return ResponseEntity.ok(authenticationService.verifyOtp(request));
     }
 
     @PostMapping("/login")

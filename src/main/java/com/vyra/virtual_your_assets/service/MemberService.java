@@ -7,10 +7,8 @@ import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.register.ForgotPasswordRequest;
 import com.vyra.virtual_your_assets.dto.register.ResetPasswordRequest;
 import com.vyra.virtual_your_assets.entity.Member;
-import com.vyra.virtual_your_assets.entity.MemberActivity;
 import com.vyra.virtual_your_assets.entity.MemberOtp;
 import com.vyra.virtual_your_assets.exception.BusinessException;
-import com.vyra.virtual_your_assets.repository.MemberActivityRepository;
 import com.vyra.virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.virtual_your_assets.repository.MemberRepository;
 import com.vyra.virtual_your_assets.util.OtpUtil;
@@ -26,6 +24,7 @@ import java.time.LocalDateTime;
 @Slf4j
 public class MemberService {
     private final MemberRepository memberRepository;
+    private final MemberOtpRepository memberOtpRepository;
 
     private final BCryptPasswordEncoder passwordEncoder;
     private final MemberActivityService memberActivityService;
@@ -52,4 +51,34 @@ public class MemberService {
         );
     }
 
+    public BaseResponse<Void> forgotPassword(ForgotPasswordRequest request) {
+        log.info("[START] otpService.verifyForgotPasswordOtp request : {} ", request);
+
+        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PASSWORD);
+
+        Member member = memberRepository.findByPhoneNumber(request.getPhoneNumber())
+                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+
+        // TODO: send OTP via SMS gateway
+        String otp = OtpUtil.generateOtp();
+
+        MemberOtp memberOtp = new MemberOtp();
+        memberOtp.setPhoneNumber(member.getPhoneNumber());
+        memberOtp.setOtpCode(otp);
+        memberOtp.setOtpType(OtpType.FORGOT_PASSWORD);
+        memberOtp.setExpiredAt(OtpUtil.getExpiredTime());
+        memberOtp.setCreatedAt(LocalDateTime.now());
+
+        memberOtpRepository.save(memberOtp);
+        log.info("FORGOT PASSWORD OTP: {}, phoneNumber: {}", otp, request.getPhoneNumber());
+
+        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PASSWORD);
+        log.info("[END] otpService.verifyForgotPasswordOtp successfully request : {} ", request);
+
+        return new BaseResponse<>(
+                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(),
+                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getMessage(),
+                null
+        );
+    }
 }

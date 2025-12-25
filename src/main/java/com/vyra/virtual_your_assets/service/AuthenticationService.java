@@ -10,8 +10,8 @@ import com.vyra.virtual_your_assets.dto.login.LoginResponse;
 import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
 import com.vyra.virtual_your_assets.dto.register.RegisterResponse;
 import com.vyra.virtual_your_assets.dto.register.ResendOtpRequest;
+import com.vyra.virtual_your_assets.dto.register.VerifyOtpRequest;
 import com.vyra.virtual_your_assets.entity.Member;
-import com.vyra.virtual_your_assets.entity.MemberActivity;
 import com.vyra.virtual_your_assets.entity.MemberOtp;
 import com.vyra.virtual_your_assets.entity.MemberToken;
 import com.vyra.virtual_your_assets.exception.BusinessException;
@@ -21,7 +21,6 @@ import com.vyra.virtual_your_assets.repository.MemberRepository;
 import com.vyra.virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.virtual_your_assets.util.OtpUtil;
 import com.vyra.virtual_your_assets.util.TokenUtil;
-import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -29,7 +28,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -39,6 +37,7 @@ public class AuthenticationService {
     private final MemberRepository memberRepository;
     private final MemberOtpRepository memberOtpRepository;
     private final MemberTokenRepository memberTokenRepository;
+    private final MemberActivityRepository memberActivityRepository;
 
     private final MemberActivityService memberActivityService;
     private final OtpService otpService;
@@ -139,6 +138,50 @@ public class AuthenticationService {
         );
     }
 
+    @Transactional
+    public BaseResponse<Void> verifyOtp(VerifyOtpRequest request) {
+        log.info("[START] otpService.verifyOtp request: {} ", request);
+        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_VERIFY_OTP);
+
+        MemberOtp memberOtp = memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(request.getPhoneNumber(), request.getOtpType())
+                .orElseThrow(() -> new BusinessException(ErrorConstant.OTP_NOT_FOUND));
+
+        if (memberOtp.getExpiredAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ErrorConstant.OTP_EXPIRED);
+        }
+
+        if (!passwordEncoder.matches(request.getOtpCode(), memberOtp.getOtpCode())) {
+            int currentAttempts = (memberOtp.getAttempts() == null ? 0 : memberOtp.getAttempts()) + 1;
+            memberOtp.setAttempts(currentAttempts);
+
+            if (currentAttempts >= 3) {
+                memberOtpRepository.deleteByPhoneNumber(request.getPhoneNumber());
+                memberRepository.deleteByPhoneNumber(request.getPhoneNumber());
+                memberActivityRepository.deleteByPhoneNumber(request.getPhoneNumber());
+
+                log.warn("Max attempts reached for {}. Data deleted.", request.getPhoneNumber());
+                throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED);
+            } else {
+                memberOtpRepository.save(memberOtp);
+                throw new BusinessException(ErrorConstant.OTP_INVALID);
+            }
+        }
+
+        Member member = memberRepository.findByPhoneNumber(request.getPhoneNumber())
+                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+
+        member.setStatus(MemberStatus.ACTIVE);
+        member.setUpdatedAt(LocalDateTime.now());
+        memberRepository.save(member);
+        memberOtpRepository.delete(memberOtp);
+
+        return new BaseResponse<>(
+                ErrorConstant.VERIFY_OTP_SUCCESS.getCode(),
+                ErrorConstant.VERIFY_OTP_SUCCESS.getMessage(),
+                null
+        );
+    }
+
     public BaseResponse<LoginResponse> login(LoginRequest request) {
         log.info("[START] authenticationService.login phoneNumber : {} ", request.getIdentifier());
 
@@ -179,6 +222,4 @@ public class AuthenticationService {
                 response
         );
     }
-
-
 }
