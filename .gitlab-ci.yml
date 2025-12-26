@@ -1,0 +1,57 @@
+stages:
+  - preparation
+  - check-branch
+  - unit-test
+  - code-build
+
+cache:
+  paths:
+    - .m2/repository
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+prep-work:
+  stage: preparation
+  image: maven:3.9.6-eclipse-temurin-17
+  script:
+    - mvn --version
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+branch-check:
+  stage: check-branch
+  image: alpine:latest
+  script:
+    - echo "Running pipeline for branch $CI_COMMIT_REF_NAME"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+run-tests:
+  stage: unit-test
+  image: maven:3.9.6-eclipse-temurin-17
+  script:
+    - mvn test
+  artifacts:
+    paths:
+      - target/surefire-reports/
+    expire_in: 1 hour
+    when: always
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+build-jar:
+  stage: code-build
+  image: maven:3.9.6-eclipse-temurin-17
+  script:
+    - mvn package -DskipTests=true
+  artifacts:
+    paths:
+      - target/*.jar
+    expire_in: 1 hour
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
