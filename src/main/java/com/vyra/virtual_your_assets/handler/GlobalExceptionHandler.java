@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok(
                 new BaseResponse<>(
                         ex.getErrorConstant().getCode(),
-                        ex.getErrorConstant().getMessage(),
+                        ex.getMessage(),
                         null
                 )
         );

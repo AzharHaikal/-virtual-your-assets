@@ -11,4 +11,9 @@ public class BusinessException extends RuntimeException {
         super(errorConstant.getMessage());
         this.errorConstant = errorConstant;
     }
+
+    public BusinessException(ErrorConstant errorConstant, String additionalMessage) {
+        super(errorConstant.getMessage() + additionalMessage);
+        this.errorConstant = errorConstant;
+    }
 }

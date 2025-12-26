@@ -7,15 +7,15 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ErrorConstant {
 
-    REGISTER_SUCCESS("VYRA-REG-000", "Registration completed successfully"),
+    REGISTER_SUCCESS("VYRA-REG-000", "Your registration was successful"),
 
-    LOGIN_SUCCESS("VYRA-LGN-000", "Login successful"),
+    LOGIN_SUCCESS("VYRA-LGN-000", "You've successfully logged in"),
 
-    FORGOT_PASSWORD_OTP_SENT("VYRA-FP-001", "Success generate, an OTP has been sent"),
-    RESET_PIN_SUCCESS("VYRA-FP-002", "PIN has been reset successfully"),
+    FORGOT_PASSWORD_OTP_SENT("VYRA-FP-001", "An OTP has been sent"),
+    RESET_PIN_SUCCESS("VYRA-FP-002", "Your PIN has been successfully updated"),
 
-    TOKEN_CREATED("VYRA-TKN-001", "Session token created successfully"),
-    TOKEN_EXPIRED("VYRA-TKN-002", "Session token is no longer valid"),
+    TOKEN_CREATED("VYRA-TKN-001", "Your session has been created"),
+    TOKEN_EXPIRED("VYRA-TKN-002", "Your session has expired. Please log in again"),
 
     // Invalid
     INVALID_PIN("VYRA-INV-001", "Invalid PIN. Please try again"),
@@ -27,21 +27,21 @@ public enum ErrorConstant {
     MEMBER_NOT_ACTIVE("VYRA-DNF-004", "Invalid account. Please check your account status"),
 
     // Exists (generic)
-    PHONE_NUMBER_ALREADY_EXIST("VYRA-EXS-001", "Account already exists"),
-    EMAIL_ALREADY_EXIST("VYRA-EXS-002", "Account already exists"),
+    PHONE_NUMBER_ALREADY_EXIST("VYRA-EXS-001", "Your account already exists. Please use a different account"),
+    EMAIL_ALREADY_EXIST("VYRA-EXS-002", "Your account already exists. Please use a different account"),
 
     // OTP
-    VERIFY_OTP_SUCCESS("VYRA-OTP-000", "OTP verified successfully"),
-    RESEND_OTP("VYRA-OTP-001", "If the account exists, an OTP has been sent"),
+    VERIFY_OTP_SUCCESS("VYRA-OTP-000", "OTP verification successful"),
+    RESEND_OTP("VYRA-OTP-001", "If the account exists, a new OTP has been sent"),
     OTP_NOT_FOUND("VYRA-OTP-002", "Invalid or expired OTP"),
-    OTP_EXPIRED("VYRA-OTP-003", "Invalid or expired OTP"),
-    OTP_INVALID("VYRA-OTP-004", "Invalid or expired OTP"),
-    MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "Maximum verification attempts reached. Your registration data has been cleared. Please register again."),
+    OTP_EXPIRED("VYRA-OTP-003", "The OTP has expired. Please request a new one"),
+    OTP_INVALID("VYRA-OTP-004", "Invalid OTP. Please enter the OTP correctly. Remaining attempts - "),
+    MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "You've reached the maximum attempts. Please register again"),
 
     // Exception
-    BAD_REQUEST("VYRA-ERR400", "Invalid request"),
-    DATA_NOT_FOUND("VYRA-ERR404", "Requested data could not be found"),
-    INTERNAL_SERVER_ERROR("VYRA-ERR500", "An unexpected error occurred");
+    BAD_REQUEST("VYRA-ERR400", "Something went wrong with your request"),
+    DATA_NOT_FOUND("VYRA-ERR404", "The requested data could not be found"),
+    INTERNAL_SERVER_ERROR("VYRA-ERR500", "We are experiencing a system issue. Please try again later");
 
     private final String code;
     private final String message;
