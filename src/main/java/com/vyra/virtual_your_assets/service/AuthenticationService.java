@@ -134,12 +134,14 @@ public class AuthenticationService {
         );
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public BaseResponse<Void> verifyOtp(VerifyOtpRequest request) {
         log.info("[START] authenticationService.verifyOtp request: {} ", request);
 
         Member member = memberRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+
+        memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_VERIFY_OTP);
 
         MemberOtp memberOtp = memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), request.getOtpType())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.OTP_NOT_FOUND));
@@ -152,16 +154,19 @@ public class AuthenticationService {
             int currentAttempts = (memberOtp.getAttempts() == null ? 0 : memberOtp.getAttempts()) + 1;
             memberOtp.setAttempts(currentAttempts);
 
-            if (currentAttempts >= 3) {
+            int maxAttempts = 4;
+            int remainingAttempts = maxAttempts - currentAttempts;
+
+            if (currentAttempts >= maxAttempts) {
                 memberOtpRepository.deleteByPhoneNumber(member.getPhoneNumber());
                 memberRepository.deleteByPhoneNumber(member.getPhoneNumber());
                 memberActivityRepository.deleteByPhoneNumber(member.getPhoneNumber());
 
-                log.warn("Max attempts reached for {}. Data deleted.", request.getEmail());
+                log.warn("Max attempts {} reached for {}. Data deleted.", currentAttempts, request.getEmail());
                 throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED);
             } else {
                 memberOtpRepository.save(memberOtp);
-                throw new BusinessException(ErrorConstant.OTP_INVALID);
+                throw new BusinessException(ErrorConstant.OTP_INVALID, String.valueOf(remainingAttempts));
             }
         }
 
@@ -169,6 +174,7 @@ public class AuthenticationService {
         member.setUpdatedAt(LocalDateTime.now());
         memberRepository.save(member);
         memberOtpRepository.delete(memberOtp);
+        memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_VERIFY_OTP);
 
         return new BaseResponse<>(
                 ErrorConstant.VERIFY_OTP_SUCCESS.getCode(),
