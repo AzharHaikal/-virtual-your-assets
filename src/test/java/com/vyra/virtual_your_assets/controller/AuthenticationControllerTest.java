@@ -81,7 +81,7 @@ class AuthenticationControllerTest {
     @Test
     void verifyOtpSuccess() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setPhoneNumber("62811111111");
+        request.setEmail("62811111111");
         request.setOtpCode("123456");
 
         BaseResponse<Void> mockResponse = new BaseResponse<>(

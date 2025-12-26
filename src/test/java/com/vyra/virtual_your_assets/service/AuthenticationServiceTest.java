@@ -164,7 +164,7 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpSuccess() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setPhoneNumber("62812345678");
+        request.setEmail("62812345678");
         request.setOtpCode("123456");
         request.setOtpType(OtpType.REGISTER);
 
@@ -173,12 +173,12 @@ class AuthenticationServiceTest {
         memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
 
         Member member = new Member();
-        member.setPhoneNumber(request.getPhoneNumber());
+        member.setPhoneNumber(request.getEmail());
         member.setStatus(MemberStatus.INACTIVE);
 
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(anyString(), any())).thenReturn(Optional.of(memberOtp));
         when(passwordEncoder.matches(request.getOtpCode(), memberOtp.getOtpCode())).thenReturn(true);
-        when(memberRepository.findByPhoneNumber(request.getPhoneNumber())).thenReturn(Optional.of(member));
+        when(memberRepository.findByPhoneNumber(request.getEmail())).thenReturn(Optional.of(member));
 
         BaseResponse<Void> response = authenticationService.verifyOtp(request);
 
@@ -199,7 +199,7 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedOtpExpired() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setPhoneNumber("62812345678");
+        request.setEmail("62812345678");
         request.setOtpCode("123456");
 
         MemberOtp memberOtp = new MemberOtp();
@@ -214,7 +214,7 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedOneTimes() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setPhoneNumber("62812345678");
+        request.setEmail("62812345678");
         request.setOtpCode("wrong-code");
         request.setOtpType(OtpType.REGISTER);
 
@@ -236,7 +236,7 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedMaxAttempts() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setPhoneNumber("62812345678");
+        request.setEmail("62812345678");
         request.setOtpCode("wrong-code");
         request.setOtpType(OtpType.REGISTER);
 
@@ -254,9 +254,9 @@ class AuthenticationServiceTest {
 
         assertEquals(ErrorConstant.MAX_ATTEMPTS_REACHED, ex.getErrorConstant());
 
-        verify(memberOtpRepository).deleteByPhoneNumber(request.getPhoneNumber());
-        verify(memberRepository).deleteByPhoneNumber(request.getPhoneNumber());
-        verify(memberActivityRepository).deleteByPhoneNumber(request.getPhoneNumber());
+        verify(memberOtpRepository).deleteByPhoneNumber(request.getEmail());
+        verify(memberRepository).deleteByPhoneNumber(request.getEmail());
+        verify(memberActivityRepository).deleteByPhoneNumber(request.getEmail());
     }
 
     @Test

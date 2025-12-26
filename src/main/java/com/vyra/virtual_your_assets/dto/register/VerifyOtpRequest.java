@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class VerifyOtpRequest {
     @NotBlank
-    private String phoneNumber;
+    private String email;
     @NotNull
     private String otpCode;
     @NotNull

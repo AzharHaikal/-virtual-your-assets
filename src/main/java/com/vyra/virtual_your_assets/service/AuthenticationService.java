@@ -141,9 +141,10 @@ public class AuthenticationService {
     @Transactional
     public BaseResponse<Void> verifyOtp(VerifyOtpRequest request) {
         log.info("[START] otpService.verifyOtp request: {} ", request);
-        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_VERIFY_OTP);
+        Member member = memberRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
-        MemberOtp memberOtp = memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(request.getPhoneNumber(), request.getOtpType())
+        MemberOtp memberOtp = memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), request.getOtpType())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.OTP_NOT_FOUND));
 
         if (memberOtp.getExpiredAt().isBefore(LocalDateTime.now())) {
@@ -155,20 +156,17 @@ public class AuthenticationService {
             memberOtp.setAttempts(currentAttempts);
 
             if (currentAttempts >= 3) {
-                memberOtpRepository.deleteByPhoneNumber(request.getPhoneNumber());
-                memberRepository.deleteByPhoneNumber(request.getPhoneNumber());
-                memberActivityRepository.deleteByPhoneNumber(request.getPhoneNumber());
+                memberOtpRepository.deleteByPhoneNumber(request.getEmail());
+                memberRepository.deleteByPhoneNumber(request.getEmail());
+                memberActivityRepository.deleteByPhoneNumber(request.getEmail());
 
-                log.warn("Max attempts reached for {}. Data deleted.", request.getPhoneNumber());
+                log.warn("Max attempts reached for {}. Data deleted.", request.getEmail());
                 throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED);
             } else {
                 memberOtpRepository.save(memberOtp);
                 throw new BusinessException(ErrorConstant.OTP_INVALID);
             }
         }
-
-        Member member = memberRepository.findByPhoneNumber(request.getPhoneNumber())
-                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
         member.setStatus(MemberStatus.ACTIVE);
         member.setUpdatedAt(LocalDateTime.now());
