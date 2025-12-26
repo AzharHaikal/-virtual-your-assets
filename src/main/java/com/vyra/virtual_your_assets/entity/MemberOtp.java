@@ -15,7 +15,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MemberOtp {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String memberOtpId;

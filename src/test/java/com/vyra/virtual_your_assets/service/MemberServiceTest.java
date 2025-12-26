@@ -32,6 +32,8 @@ class MemberServiceTest {
     private BCryptPasswordEncoder passwordEncoder;
     @Mock
     private MemberActivityService memberActivityService;
+    @Mock
+    private OtpService otpService;
     @InjectMocks
     private MemberService memberService;
 
@@ -72,25 +74,29 @@ class MemberServiceTest {
     @Test
     void forgotPasswordSuccess() {
         ForgotPasswordRequest request = new ForgotPasswordRequest();
-        request.setPhoneNumber("62812345678");
+        request.setEmail("email");
 
         Member member = new Member();
-        member.setPhoneNumber(request.getPhoneNumber());
+        member.setFirstName("firstName");
+        member.setLastName("lastName");
+        member.setPhoneNumber("62812345678");
+        member.setEmail(request.getEmail());
 
-        when(memberRepository.findByPhoneNumber(request.getPhoneNumber())).thenReturn(Optional.of(member));
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
 
         BaseResponse<Void> response = memberService.forgotPassword(request);
 
         assertEquals(ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(), response.getResponseStatus());
+        verify(otpService, times(1)).sendOtp(anyString(), anyString(), anyString());
         verify(memberOtpRepository, times(1)).save(any(MemberOtp.class));
     }
 
     @Test
     void forgotPasswordFailedMemberNotFound() {
         ForgotPasswordRequest request = new ForgotPasswordRequest();
-        request.setPhoneNumber("62800000000");
+        request.setEmail("email");
 
-        when(memberRepository.findByPhoneNumber(anyString())).thenReturn(Optional.empty());
+        when(memberRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 memberService.forgotPassword(request)

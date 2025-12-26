@@ -1,7 +1,6 @@
 package com.vyra.virtual_your_assets.service;
 
 import com.vyra.virtual_your_assets.constant.ErrorConstant;
-import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
 import com.vyra.virtual_your_assets.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

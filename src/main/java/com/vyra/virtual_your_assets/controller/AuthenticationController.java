@@ -8,7 +8,6 @@ import com.vyra.virtual_your_assets.dto.register.RegisterResponse;
 import com.vyra.virtual_your_assets.dto.register.ResendOtpRequest;
 import com.vyra.virtual_your_assets.dto.register.VerifyOtpRequest;
 import com.vyra.virtual_your_assets.service.AuthenticationService;
-import com.vyra.virtual_your_assets.service.OtpService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

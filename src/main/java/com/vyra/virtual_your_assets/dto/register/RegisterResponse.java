@@ -1,6 +1,5 @@
 package com.vyra.virtual_your_assets.dto.register;
 
-import lombok.Builder;
 import lombok.Data;
 
 import java.util.UUID;

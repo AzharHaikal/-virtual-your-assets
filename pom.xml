@@ -35,11 +35,12 @@
 		<sonar.language>java</sonar.language>
 
 		<sonar.exclusions>
+			**/config/**,
+			**/constant/**,
 			**/dto/**,
 			**/entity/**,
-			**/constant/**,
-			**/config/**,
 			**/exception/**,
+			**/handler/**,
 			**/VirtualYourAssetApplication.java,
 			**/handler/GlobalExceptionHandler.java
 		</sonar.exclusions>
@@ -117,6 +118,17 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
+						<configuration>
+							<excludes>
+								<exclude>**/config/**</exclude>
+								<exclude>**/constant/**</exclude>
+								<exclude>**/dto/**</exclude>
+								<exclude>**/entity/**</exclude>
+								<exclude>**/exception/**</exclude>
+								<exclude>**/handler/**</exclude>
+								<exclude>**/VirtualYourAssetApplication.class</exclude>
+							</excludes>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>

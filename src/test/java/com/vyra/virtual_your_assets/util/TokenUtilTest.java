@@ -3,8 +3,21 @@ package com.vyra.virtual_your_assets.util;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 
 class TokenUtilTest {
+
+    @Test
+    void testConstructorIsPrivate() throws NoSuchMethodException {
+        Constructor<TokenUtil> constructor = TokenUtil.class.getDeclaredConstructor();
+        assertTrue(Modifier.isPrivate(constructor.getModifiers()), "Constructor harus private");
+
+        constructor.setAccessible(true);
+        assertThrows(InvocationTargetException.class, constructor::newInstance,
+                "Constructor harus melempar exception saat dipanggil");
+    }
 
     @Test
     void generateTokenSuccess() {

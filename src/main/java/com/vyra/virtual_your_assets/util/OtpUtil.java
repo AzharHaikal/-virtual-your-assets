@@ -5,6 +5,10 @@ import java.time.LocalDateTime;
 
 public class OtpUtil {
 
+    private OtpUtil() {
+        throw new IllegalStateException("Utility class");
+    }
+
     public static String generateOtp() {
         return String.valueOf(100000 + new SecureRandom().nextInt(900000));
     }

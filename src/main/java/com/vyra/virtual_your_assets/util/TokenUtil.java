@@ -4,6 +4,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public class TokenUtil {
+
+    private TokenUtil() {
+        throw new IllegalStateException("Utility class");
+    }
+
     public static String generateToken() {
         return UUID.randomUUID().toString().replace("-", "");
     }

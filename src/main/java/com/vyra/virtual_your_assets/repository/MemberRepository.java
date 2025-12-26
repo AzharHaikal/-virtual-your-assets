@@ -10,7 +10,8 @@ import java.util.UUID;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
     Optional<Member> findByPhoneNumber(String phoneNumber);
-    Optional<Member> findByEmail(String email);
+
+    Optional<Member> findByEmailIgnoreCase(String email);
 
     @Query("""
         SELECT m FROM Member m

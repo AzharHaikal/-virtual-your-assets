@@ -62,7 +62,7 @@ class AuthenticationServiceTest {
         request.setPin("123456");
 
         when(memberRepository.findByPhoneNumber(request.getPhoneNumber())).thenReturn(Optional.empty());
-        when(memberRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("hashedPin");
 
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> {
@@ -103,7 +103,7 @@ class AuthenticationServiceTest {
         request.setEmail("existing@mail.com");
 
         when(memberRepository.findByPhoneNumber(request.getPhoneNumber())).thenReturn(Optional.empty());
-        when(memberRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(new Member()));
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(new Member()));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> {
             authenticationService.register(request);
@@ -125,7 +125,7 @@ class AuthenticationServiceTest {
         member.setEmail("azhar@mail.com");
         member.setPhoneNumber("62812345678");
 
-        when(memberRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(member));
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
         when(passwordEncoder.encode(anyString())).thenReturn("hashedOtpCode");
 
         BaseResponse<Void> response = authenticationService.resendOtp(request);
@@ -148,7 +148,7 @@ class AuthenticationServiceTest {
         ResendOtpRequest request = new ResendOtpRequest();
         request.setEmail("unknown@mail.com");
 
-        when(memberRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(BusinessException.class, () -> {
             authenticationService.resendOtp(request);
@@ -164,7 +164,7 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpSuccess() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setEmail("62812345678");
+        request.setEmail("email");
         request.setOtpCode("123456");
         request.setOtpType(OtpType.REGISTER);
 
@@ -173,12 +173,13 @@ class AuthenticationServiceTest {
         memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
 
         Member member = new Member();
-        member.setPhoneNumber(request.getEmail());
+        member.setPhoneNumber("1324567989");
+        member.setEmail(request.getEmail());
         member.setStatus(MemberStatus.INACTIVE);
 
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(anyString(), any())).thenReturn(Optional.of(memberOtp));
         when(passwordEncoder.matches(request.getOtpCode(), memberOtp.getOtpCode())).thenReturn(true);
-        when(memberRepository.findByPhoneNumber(request.getEmail())).thenReturn(Optional.of(member));
 
         BaseResponse<Void> response = authenticationService.verifyOtp(request);
 
@@ -190,6 +191,13 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedOtpNotFound() {
         VerifyOtpRequest request = new VerifyOtpRequest();
+
+        Member member = new Member();
+        member.setPhoneNumber("1324567989");
+        member.setEmail(request.getEmail());
+        member.setStatus(MemberStatus.INACTIVE);
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
+
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(any(), any())).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.verifyOtp(request));
@@ -199,12 +207,18 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedOtpExpired() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setEmail("62812345678");
+        request.setEmail("email");
         request.setOtpCode("123456");
+
+        Member member = new Member();
+        member.setPhoneNumber("1324567989");
+        member.setEmail(request.getEmail());
+        member.setStatus(MemberStatus.INACTIVE);
 
         MemberOtp memberOtp = new MemberOtp();
         memberOtp.setExpiredAt(LocalDateTime.parse("2000-12-25T20:09:45.072")); // set old date
 
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(any(), any())).thenReturn(Optional.of(memberOtp));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.verifyOtp(request));
@@ -214,15 +228,49 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedOneTimes() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setEmail("62812345678");
+        request.setEmail("email");
         request.setOtpCode("wrong-code");
         request.setOtpType(OtpType.REGISTER);
+
+        Member member = new Member();
+        member.setPhoneNumber("1324567989");
+        member.setEmail(request.getEmail());
+        member.setStatus(MemberStatus.INACTIVE);
 
         MemberOtp memberOtp = new MemberOtp();
         memberOtp.setOtpCode("hashedOtp");
         memberOtp.setAttempts(1); // Simulation: wrong 1 times
         memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
 
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(anyString(), any())).thenReturn(Optional.of(memberOtp));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                authenticationService.verifyOtp(request)
+        );
+
+        assertEquals(ErrorConstant.OTP_INVALID, ex.getErrorConstant());
+    }
+
+    @Test
+    void verifyOtpFailedNullAttempts() {
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("email");
+        request.setOtpCode("wrong-code");
+        request.setOtpType(OtpType.REGISTER);
+
+        Member member = new Member();
+        member.setPhoneNumber("1324567989");
+        member.setEmail(request.getEmail());
+        member.setStatus(MemberStatus.INACTIVE);
+
+        MemberOtp memberOtp = new MemberOtp();
+        memberOtp.setOtpCode("hashedOtp");
+        memberOtp.setAttempts(null); // Simulation: null
+        memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
+
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(anyString(), any())).thenReturn(Optional.of(memberOtp));
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
@@ -236,15 +284,21 @@ class AuthenticationServiceTest {
     @Test
     void verifyOtpFailedMaxAttempts() {
         VerifyOtpRequest request = new VerifyOtpRequest();
-        request.setEmail("62812345678");
+        request.setEmail("email");
         request.setOtpCode("wrong-code");
         request.setOtpType(OtpType.REGISTER);
+
+        Member member = new Member();
+        member.setPhoneNumber("1324567989");
+        member.setEmail(request.getEmail());
+        member.setStatus(MemberStatus.INACTIVE);
 
         MemberOtp memberOtp = new MemberOtp();
         memberOtp.setOtpCode("hashedOtp");
         memberOtp.setAttempts(2); // Simulation: wrong 2 times
         memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
 
+        when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(anyString(), any())).thenReturn(Optional.of(memberOtp));
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
@@ -254,9 +308,9 @@ class AuthenticationServiceTest {
 
         assertEquals(ErrorConstant.MAX_ATTEMPTS_REACHED, ex.getErrorConstant());
 
-        verify(memberOtpRepository).deleteByPhoneNumber(request.getEmail());
-        verify(memberRepository).deleteByPhoneNumber(request.getEmail());
-        verify(memberActivityRepository).deleteByPhoneNumber(request.getEmail());
+        verify(memberOtpRepository).deleteByPhoneNumber(member.getPhoneNumber());
+        verify(memberRepository).deleteByPhoneNumber(member.getPhoneNumber());
+        verify(memberActivityRepository).deleteByPhoneNumber(member.getPhoneNumber());
     }
 
     @Test
@@ -264,13 +318,7 @@ class AuthenticationServiceTest {
         VerifyOtpRequest request = new VerifyOtpRequest();
         request.setOtpCode("123456");
 
-        MemberOtp memberOtp = new MemberOtp();
-        memberOtp.setOtpCode("hashedOtp");
-        memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
-
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(any(), any())).thenReturn(Optional.of(memberOtp));
-        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-        when(memberRepository.findByPhoneNumber(any())).thenReturn(Optional.empty());
+        when(memberRepository.findByEmailIgnoreCase(any())).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.verifyOtp(request));
         assertEquals(ErrorConstant.MEMBER_NOT_FOUND, ex.getErrorConstant());

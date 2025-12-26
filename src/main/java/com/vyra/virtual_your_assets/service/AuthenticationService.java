@@ -44,9 +44,7 @@ public class AuthenticationService {
     private final BCryptPasswordEncoder passwordEncoder;
 
     public BaseResponse<RegisterResponse> register(RegisterRequest request) {
-        /* TODO:
-            - Send OTP via WhatsApp
-         */
+        // TODO: Send OTP via WhatsApp
         log.info("[START] authenticationService.register request : {} ", request);
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_REGISTER);
 
@@ -54,7 +52,7 @@ public class AuthenticationService {
             throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST);
         }
 
-        if (memberRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (memberRepository.findByEmailIgnoreCase(request.getEmail()).isPresent()) {
             throw new BusinessException(ErrorConstant.EMAIL_ALREADY_EXIST);
         }
 
@@ -68,7 +66,6 @@ public class AuthenticationService {
         member.setCreatedAt(LocalDateTime.now());
         memberRepository.save(member);
 
-        // Generate OTP
         String otp = OtpUtil.generateOtp();
 
         MemberOtp memberOtp = new MemberOtp();
@@ -104,9 +101,9 @@ public class AuthenticationService {
     @Transactional
     public BaseResponse<Void> resendOtp(ResendOtpRequest request) {
         // TODO : Try testing delete
-        log.info("[START] otpService.resendOtp request : {} ", request);
+        log.info("[START] authenticationService.resendOtp request : {} ", request);
 
-        Member member = memberRepository.findByEmail(request.getEmail())
+        Member member = memberRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
         memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESEND_OTP);
@@ -114,15 +111,14 @@ public class AuthenticationService {
         memberOtpRepository.deleteByPhoneNumberAndOtpType(member.getPhoneNumber(), request.getOtpType());
 
         String otp = OtpUtil.generateOtp();
-        MemberOtp memberOtp = MemberOtp.builder()
-                .phoneNumber(member.getPhoneNumber())
-                .otpCode(passwordEncoder.encode(otp))
-                .otpType(request.getOtpType())
-                .attempts(0)
-                .createdAt(LocalDateTime.now())
-                .expiredAt(LocalDateTime.now().plusMinutes(5))
-                .build();
 
+        MemberOtp memberOtp = new MemberOtp();
+        memberOtp.setPhoneNumber(member.getPhoneNumber());
+        memberOtp.setOtpCode(passwordEncoder.encode(otp));
+        memberOtp.setOtpType(request.getOtpType());
+        memberOtp.setAttempts(0);
+        memberOtp.setCreatedAt(LocalDateTime.now());
+        memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
         memberOtpRepository.save(memberOtp);
 
         String fullName = member.getFirstName().trim() + member.getLastName().trim();
@@ -130,7 +126,7 @@ public class AuthenticationService {
 
         memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_RESEND_OTP);
 
-        log.info("[END] otpService.resendOtp successfully request : {} ", request);
+        log.info("[END] authenticationService.resendOtp successfully request : {} ", request);
         return new BaseResponse<>(
                 ErrorConstant.RESEND_OTP.getCode(),
                 ErrorConstant.RESEND_OTP.getMessage(),
@@ -140,8 +136,9 @@ public class AuthenticationService {
 
     @Transactional
     public BaseResponse<Void> verifyOtp(VerifyOtpRequest request) {
-        log.info("[START] otpService.verifyOtp request: {} ", request);
-        Member member = memberRepository.findByEmail(request.getEmail())
+        log.info("[START] authenticationService.verifyOtp request: {} ", request);
+
+        Member member = memberRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
         MemberOtp memberOtp = memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), request.getOtpType())
@@ -156,9 +153,9 @@ public class AuthenticationService {
             memberOtp.setAttempts(currentAttempts);
 
             if (currentAttempts >= 3) {
-                memberOtpRepository.deleteByPhoneNumber(request.getEmail());
-                memberRepository.deleteByPhoneNumber(request.getEmail());
-                memberActivityRepository.deleteByPhoneNumber(request.getEmail());
+                memberOtpRepository.deleteByPhoneNumber(member.getPhoneNumber());
+                memberRepository.deleteByPhoneNumber(member.getPhoneNumber());
+                memberActivityRepository.deleteByPhoneNumber(member.getPhoneNumber());
 
                 log.warn("Max attempts reached for {}. Data deleted.", request.getEmail());
                 throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED);
@@ -182,7 +179,6 @@ public class AuthenticationService {
 
     public BaseResponse<LoginResponse> login(LoginRequest request) {
         log.info("[START] authenticationService.login phoneNumber : {} ", request.getIdentifier());
-
         memberActivityService.createMemberActivity(request.getIdentifier(), MemberActivityEvent.ATTEMPT_LOGIN);
 
         Member member = memberRepository.findByIdentifier(request.getIdentifier())
