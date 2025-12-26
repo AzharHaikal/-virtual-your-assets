@@ -2,12 +2,15 @@ package com.vyra.virtual_your_assets;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 class VirtualYourAssetApplicationTests {
 
 	@Test
-	void contextLoads() {
+	void contextLoads(ApplicationContext context) {
+		assertNotNull(context);
 	}
 
 }
