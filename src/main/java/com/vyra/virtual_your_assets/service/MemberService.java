@@ -30,7 +30,7 @@ public class MemberService {
     private final MemberActivityService memberActivityService;
     private final OtpService otpService;
 
-    public BaseResponse<Void> resetPassword(ResetPasswordRequest request) {
+    public BaseResponse<Void> resetPin(ResetPasswordRequest request) {
         log.info("[START] memberService.resetPassword request : {} ", request);
 
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESET_PASSWORD);
@@ -52,7 +52,7 @@ public class MemberService {
         );
     }
 
-    public BaseResponse<Void> forgotPassword(ForgotPasswordRequest request) {
+    public BaseResponse<Void> forgotPin(ForgotPasswordRequest request) {
         // TODO: send OTP via WhatsApp gateway
 
         log.info("[START] otpService.verifyForgotPasswordOtp request : {} ", request);

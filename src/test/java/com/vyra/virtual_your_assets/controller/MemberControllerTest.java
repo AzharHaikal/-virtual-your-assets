@@ -36,9 +36,9 @@ class MemberControllerTest {
                 null
         );
 
-        when(service.forgotPassword(any(ForgotPasswordRequest.class))).thenReturn(mockResponse);
+        when(service.forgotPin(any(ForgotPasswordRequest.class))).thenReturn(mockResponse);
 
-        ResponseEntity<BaseResponse<Void>> responseEntity = controller.forgotPassword(request);
+        ResponseEntity<BaseResponse<Void>> responseEntity = controller.forgotPin(request);
 
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
         assertNotNull(responseEntity.getBody());
@@ -56,9 +56,9 @@ class MemberControllerTest {
                 null
         );
 
-        when(service.resetPassword(any(ResetPasswordRequest.class))).thenReturn(mockResponse);
+        when(service.resetPin(any(ResetPasswordRequest.class))).thenReturn(mockResponse);
 
-        ResponseEntity<BaseResponse<Void>> responseEntity = controller.resetPassword(request);
+        ResponseEntity<BaseResponse<Void>> responseEntity = controller.resetPin(request);
 
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
         assertNotNull(responseEntity.getBody());

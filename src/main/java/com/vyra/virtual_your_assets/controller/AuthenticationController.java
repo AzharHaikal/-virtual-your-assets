@@ -1,5 +1,6 @@
 package com.vyra.virtual_your_assets.controller;
 
+import com.vyra.virtual_your_assets.constant.ApiPath;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.login.LoginRequest;
 import com.vyra.virtual_your_assets.dto.login.LoginResponse;
@@ -13,28 +14,30 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import static com.vyra.virtual_your_assets.constant.ApiPath.*;
+
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/auth")
+@RequestMapping(ApiPath.V1_AUTH)
 public class AuthenticationController {
     private final AuthenticationService authenticationService;
 
-    @PostMapping("/register")
+    @PostMapping(REGISTER)
     public ResponseEntity<BaseResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authenticationService.register(request));
     }
 
-    @PostMapping("/resend-otp")
+    @PostMapping(RESEND_OTP)
     public ResponseEntity<BaseResponse<Void>> resendOtp(@RequestBody @Valid ResendOtpRequest request) {
         return ResponseEntity.ok(authenticationService.resendOtp(request));
     }
 
-    @PostMapping("/verify-otp")
+    @PostMapping(VERIFY_OTP)
     public ResponseEntity<BaseResponse<Void>> verifyOtp(@RequestBody VerifyOtpRequest request) {
         return ResponseEntity.ok(authenticationService.verifyOtp(request));
     }
 
-    @PostMapping("/login")
+    @PostMapping(LOGIN)
     public ResponseEntity<BaseResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(authenticationService.login(request));
     }

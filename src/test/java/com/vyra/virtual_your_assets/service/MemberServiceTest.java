@@ -49,7 +49,7 @@ class MemberServiceTest {
         when(memberRepository.findByPhoneNumber(request.getPhoneNumber())).thenReturn(Optional.of(member));
         when(passwordEncoder.encode(request.getNewPin())).thenReturn("hashedNewPin");
 
-        BaseResponse<Void> response = memberService.resetPassword(request);
+        BaseResponse<Void> response = memberService.resetPin(request);
 
         assertEquals(ErrorConstant.RESET_PIN_SUCCESS.getCode(), response.getResponseStatus());
         assertEquals("hashedNewPin", member.getPin());
@@ -64,7 +64,7 @@ class MemberServiceTest {
         when(memberRepository.findByPhoneNumber(anyString())).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                memberService.resetPassword(request)
+                memberService.resetPin(request)
         );
 
         assertEquals(ErrorConstant.MEMBER_NOT_FOUND, ex.getErrorConstant());
@@ -84,7 +84,7 @@ class MemberServiceTest {
 
         when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
 
-        BaseResponse<Void> response = memberService.forgotPassword(request);
+        BaseResponse<Void> response = memberService.forgotPin(request);
 
         assertEquals(ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(), response.getResponseStatus());
         verify(otpService, times(1)).sendOtp(anyString(), anyString(), anyString());
@@ -99,7 +99,7 @@ class MemberServiceTest {
         when(memberRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                memberService.forgotPassword(request)
+                memberService.forgotPin(request)
         );
         assertEquals(ErrorConstant.MEMBER_NOT_FOUND, ex.getErrorConstant());
         verify(memberOtpRepository, never()).save(any(MemberOtp.class));
