@@ -28,7 +28,7 @@ class MemberControllerTest {
     @Test
     void forgotPasswordSuccess() {
         ForgotPasswordRequest request = new ForgotPasswordRequest();
-        request.setPhoneNumber("62811111111");
+        request.setEmail("62811111111");
 
         BaseResponse<Void> mockResponse = new BaseResponse<>(
                 ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(),

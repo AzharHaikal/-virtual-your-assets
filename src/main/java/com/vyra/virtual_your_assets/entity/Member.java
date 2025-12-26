@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Member {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String memberId;

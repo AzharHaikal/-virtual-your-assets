@@ -3,8 +3,20 @@ package com.vyra.virtual_your_assets.util;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 class OtpUtilTest {
+
+    @Test
+    void testConstructorIsPrivate() throws NoSuchMethodException {
+        Constructor<OtpUtil> constructor = OtpUtil.class.getDeclaredConstructor();
+
+        assertTrue(java.lang.reflect.Modifier.isPrivate(constructor.getModifiers()));
+
+        constructor.setAccessible(true);
+        assertThrows(InvocationTargetException.class, constructor::newInstance);
+    }
 
     @Test
     void generateOtpSuccess() {

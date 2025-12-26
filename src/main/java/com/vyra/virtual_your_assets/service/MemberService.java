@@ -28,6 +28,7 @@ public class MemberService {
 
     private final BCryptPasswordEncoder passwordEncoder;
     private final MemberActivityService memberActivityService;
+    private final OtpService otpService;
 
     public BaseResponse<Void> resetPassword(ResetPasswordRequest request) {
         log.info("[START] memberService.resetPassword request : {} ", request);
@@ -52,14 +53,14 @@ public class MemberService {
     }
 
     public BaseResponse<Void> forgotPassword(ForgotPasswordRequest request) {
+        // TODO: send OTP via WhatsApp gateway
+
         log.info("[START] otpService.verifyForgotPasswordOtp request : {} ", request);
+        memberActivityService.createMemberActivity(request.getEmail(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PASSWORD);
 
-        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PASSWORD);
-
-        Member member = memberRepository.findByPhoneNumber(request.getPhoneNumber())
+        Member member = memberRepository.findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
-        // TODO: send OTP via SMS gateway
         String otp = OtpUtil.generateOtp();
 
         MemberOtp memberOtp = new MemberOtp();
@@ -68,11 +69,14 @@ public class MemberService {
         memberOtp.setOtpType(OtpType.FORGOT_PASSWORD);
         memberOtp.setExpiredAt(OtpUtil.getExpiredTime());
         memberOtp.setCreatedAt(LocalDateTime.now());
-
         memberOtpRepository.save(memberOtp);
-        log.info("FORGOT PASSWORD OTP: {}, phoneNumber: {}", otp, request.getPhoneNumber());
 
-        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PASSWORD);
+        String fullName = member.getFirstName().trim() + member.getLastName().trim();
+        otpService.sendOtp(fullName, request.getEmail(), otp);
+
+        memberActivityService.createMemberActivity(request.getEmail(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PASSWORD);
+
+        log.info("FORGOT PASSWORD OTP: {}, phoneNumber: {}", otp, request.getEmail());
         log.info("[END] otpService.verifyForgotPasswordOtp successfully request : {} ", request);
 
         return new BaseResponse<>(
