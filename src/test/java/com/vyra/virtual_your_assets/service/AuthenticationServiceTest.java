@@ -295,7 +295,7 @@ class AuthenticationServiceTest {
 
         MemberOtp memberOtp = new MemberOtp();
         memberOtp.setOtpCode("hashedOtp");
-        memberOtp.setAttempts(2); // Simulation: wrong 2 times
+        memberOtp.setAttempts(3); // Simulation: wrong 3 times
         memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
 
         when(memberRepository.findByEmailIgnoreCase(request.getEmail())).thenReturn(Optional.of(member));
