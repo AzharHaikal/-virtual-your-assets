@@ -8,7 +8,6 @@ import lombok.Data;
 
 @Data
 public class RegisterRequest {
-
     @NotBlank(message = "First name is required")
     @Size(max = 20, message = "First name must not exceed 20 characters")
     @Pattern(regexp = "^[A-Za-z ]+$", message = "First name may contain letters only")
@@ -32,5 +31,5 @@ public class RegisterRequest {
     @NotBlank(message = "PIN is required")
     @Pattern(regexp = "^\\d{6}$", message = "PIN must consist of exactly 6 digits")
     private String pin;
-}
 
+}

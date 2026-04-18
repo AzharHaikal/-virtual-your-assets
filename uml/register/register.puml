@@ -1,0 +1,41 @@
+@startuml
+title Register Member Flow
+
+' Menghilangkan bagian bawah (footer) agar ikon tidak double
+hide footbox
+
+actor "User" as User
+participant "Mobile App" as App
+participant "Vyra Backend" as BE
+database "Vyra DB" as DB
+
+autonumber
+
+User -> App: Input Register Data
+activate App
+App -> App: Checklist Box Term Conditions/Privacy Policy
+deactivate App
+
+App -> BE: Sent Register Data
+activate BE
+
+BE -> BE: Request Validated
+activate BE
+deactivate BE
+
+BE -> DB: Validate Data Exists
+activate DB
+DB --> BE: Data Not Exist
+deactivate DB
+
+BE -> DB: Save Member (Status: INACTIVE)
+activate DB
+DB --> BE: Member Saved
+deactivate DB
+
+BE -> BE: Generate & Send OTP (Email)
+
+BE --> App: Redirect to OTP Page
+deactivate BE
+
+@enduml

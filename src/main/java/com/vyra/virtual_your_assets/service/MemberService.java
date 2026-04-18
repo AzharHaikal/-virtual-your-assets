@@ -18,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -55,7 +56,7 @@ public class MemberService {
     public BaseResponse<Void> forgotPin(ForgotPasswordRequest request) {
         // TODO: send OTP via WhatsApp gateway
 
-        log.info("[START] otpService.verifyForgotPasswordOtp request : {} ", request);
+        log.info("[START] memberService.forgotPin request : {} ", request);
         memberActivityService.createMemberActivity(request.getEmail(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PASSWORD);
 
         Member member = memberRepository.findByEmailIgnoreCase(request.getEmail())
@@ -77,7 +78,7 @@ public class MemberService {
         memberActivityService.createMemberActivity(request.getEmail(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PASSWORD);
 
         log.info("FORGOT PASSWORD OTP: {}, phoneNumber: {}", otp, request.getEmail());
-        log.info("[END] otpService.verifyForgotPasswordOtp successfully request : {} ", request);
+        log.info("[END] memberService.forgotPin successfully request : {} ", request);
 
         return new BaseResponse<>(
                 ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(),

@@ -23,8 +23,8 @@ public class AuthenticationController {
     private final AuthenticationService authenticationService;
 
     @PostMapping(REGISTER)
-    public ResponseEntity<BaseResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authenticationService.register(request));
+    public BaseResponse<RegisterResponse> registerMember(@Valid @RequestBody RegisterRequest request) {
+        return authenticationService.registerMember(request);
     }
 
     @PostMapping(RESEND_OTP)

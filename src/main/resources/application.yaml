@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: virtual-your-asset
+    name: VIRTUAL_YOUR_ASSET
 
   datasource:
     url: jdbc:postgresql://localhost:5432/vyra
@@ -32,11 +32,18 @@ spring:
           starttls:
             enable: true
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${spring.application.name:},%.-12X{traceId},%.-8X{spanId}] %logger{36} : %msg%n"
   level:
     org:
       hibernate:
         SQL: off
-        type:
-          descriptor:
-            sql:
-              BasicBinder: off
+
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+
+crypto:
+  secret-key: 1234567890123456

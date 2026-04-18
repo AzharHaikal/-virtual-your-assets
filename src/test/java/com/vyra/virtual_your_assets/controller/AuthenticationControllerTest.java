@@ -50,12 +50,10 @@ class AuthenticationControllerTest {
                 regResponse
         );
 
-        when(service.register(any(RegisterRequest.class))).thenReturn(mockResponse);
+        when(service.registerMember(any(RegisterRequest.class))).thenReturn(mockResponse);
 
-        ResponseEntity<BaseResponse<RegisterResponse>> responseEntity = controller.register(request);
-
-        assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
-        assertNotNull(responseEntity.getBody());
+        BaseResponse<RegisterResponse> responseEntity = controller.registerMember(request);
+        assertEquals(ErrorConstant.REGISTER_SUCCESS.getCode(), responseEntity.getResponseStatus());
     }
 
     @Test

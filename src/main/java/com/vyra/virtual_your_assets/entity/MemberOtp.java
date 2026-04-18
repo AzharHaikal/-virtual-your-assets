@@ -31,7 +31,7 @@ public class MemberOtp {
     @Enumerated(EnumType.STRING)
     private OtpType otpType;
 
-    @Column
+    @Column(name = "attempts")
     private Integer attempts;
 
     @Column(name = "created_at")

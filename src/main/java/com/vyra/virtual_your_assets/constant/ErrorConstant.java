@@ -8,6 +8,12 @@ import lombok.Getter;
 public enum ErrorConstant {
 
     REGISTER_SUCCESS("VYRA-REG-000", "Your registration was successful"),
+    REGISTER_FAILED("VYRA-REG-001", "Your registration was failed"),
+
+    CREATE_WALLET_SUCCESS("VYRA-WLT-000", "Create wallet was successful"),
+    CREATE_WALLET_FAILED("VYRA-WLT-001", "Create wallet was failed"),
+
+    EMAIL_SEND_FAILED("VYRA-EML-001", "Failed when sent otp via email"),
 
     LOGIN_SUCCESS("VYRA-LGN-000", "You've successfully logged in"),
 

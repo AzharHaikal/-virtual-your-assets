@@ -37,4 +37,5 @@ public class Member {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
 }

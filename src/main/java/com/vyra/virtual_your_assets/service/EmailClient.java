@@ -28,7 +28,7 @@ public class EmailClient {
             helper.setText(htmlContent, true);
             mailSender.send(message);
         } catch (Exception e) {
-            throw new BusinessException(ErrorConstant.INTERNAL_SERVER_ERROR);
+            throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
         }
     }
 

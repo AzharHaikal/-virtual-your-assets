@@ -5,8 +5,13 @@ public class MemberActivityEvent {
     // REGISTER
     public static final String ATTEMPT_REGISTER = "Member attempted to register an account";
     public static final String SUCCESS_REGISTER = "Member successfully registered an account";
+    public static final String FAILED_REGISTER = "Member failed to register";
     public static final String ATTEMPT_GENERATE_OTP_REGISTER = "Member requested OTP for register";
     public static final String SUCCESS_GENERATE_OTP_REGISTER = "OTP for register was successfully generated";
+
+    // Wallet
+    public static final String ATTEMPT_CREATE_WALLET = "Member attempted to create wallet";
+    public static final String SUCCESS_CREATE_WALLET = "Member successfully create wallet";
 
     // LOGIN
     public static final String ATTEMPT_LOGIN = "Member attempted to log in";
