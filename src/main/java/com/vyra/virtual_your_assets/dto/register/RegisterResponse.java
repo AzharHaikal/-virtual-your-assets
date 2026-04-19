@@ -8,6 +8,7 @@ import java.util.UUID;
 @Data
 public class RegisterResponse {
     private String memberId;
+    private String fullName;
     private String email;
     private String phoneNumber;
 

@@ -31,8 +31,7 @@ public class ValidationService {
 
 
     public Member getEmailIgnoreCase(String email) {
-        return memberRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+        return memberRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
     }
 
     public MemberOtp verifyOtp(Member member, VerifyOtpRequest request) {

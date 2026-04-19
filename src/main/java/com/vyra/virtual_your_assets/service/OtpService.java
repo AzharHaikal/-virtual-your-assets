@@ -3,6 +3,7 @@ package com.vyra.virtual_your_assets.service;
 import com.vyra.virtual_your_assets.constant.ErrorConstant;
 import com.vyra.virtual_your_assets.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,7 @@ public class OtpService {
             );
             whatsAppClient.sendMessage(phoneNumber, message);
             */
-        } catch (Exception ex) {
+        } catch (Exception e) {
             throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
         }
     }

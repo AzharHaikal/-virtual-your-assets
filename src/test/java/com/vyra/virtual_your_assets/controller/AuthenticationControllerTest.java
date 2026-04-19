@@ -42,7 +42,7 @@ class AuthenticationControllerTest {
         request.setPin("123456");
 
         RegisterResponse regResponse = new RegisterResponse();
-        regResponse.setMemberId(UUID.randomUUID());
+        regResponse.setMemberId("memberId");
 
         BaseResponse<RegisterResponse> mockResponse = new BaseResponse<>(
                 ErrorConstant.REGISTER_SUCCESS.getCode(),

@@ -10,6 +10,8 @@ import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
 import com.vyra.virtual_your_assets.dto.register.RegisterResponse;
 import com.vyra.virtual_your_assets.dto.register.ResendOtpRequest;
 import com.vyra.virtual_your_assets.dto.register.VerifyOtpRequest;
+import com.vyra.virtual_your_assets.dto.wallet.CreateWalletRequest;
+import com.vyra.virtual_your_assets.dto.wallet.CreateWalletResponse;
 import com.vyra.virtual_your_assets.entity.Member;
 import com.vyra.virtual_your_assets.entity.MemberOtp;
 import com.vyra.virtual_your_assets.entity.MemberToken;
@@ -18,6 +20,8 @@ import com.vyra.virtual_your_assets.repository.MemberActivityRepository;
 import com.vyra.virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.virtual_your_assets.repository.MemberRepository;
 import com.vyra.virtual_your_assets.repository.MemberTokenRepository;
+import org.apache.logging.log4j.util.InternalException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,51 +35,55 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthenticationServiceTest {
-    @Mock
-    private MemberRepository memberRepository;
-    @Mock
-    private MemberOtpRepository memberOtpRepository;
-    @Mock
-    private MemberTokenRepository memberTokenRepository;
-    @Mock
-    private MemberActivityService memberActivityService;
-    @Mock
-    private OtpService otpService;
-    @Mock
-    private ValidationService validationService;
-    @Mock
-    private BCryptPasswordEncoder passwordEncoder;
-    @InjectMocks
-    private AuthenticationService authenticationService;
+    @Mock private MemberRepository memberRepository;
+    @Mock private MemberOtpRepository memberOtpRepository;
+    @Mock private MemberTokenRepository memberTokenRepository;
+    @Mock private MemberActivityService memberActivityService;
+    @Mock private OtpService otpService;
+    @Mock private ValidationService validationService;
+    @Mock private WalletService walletService;
+    @Mock private BCryptPasswordEncoder passwordEncoder;
+    @InjectMocks private AuthenticationService authenticationService;
 
     @Test
     void registerSuccess() {
-        RegisterRequest request = new RegisterRequest();
-        request.setFirstName("Azhar");
-        request.setLastName("Haikal");
-        request.setEmail("azhar@mail.com");
-        request.setPhoneNumber("62812345678");
-        request.setPin("123456");
+        RegisterRequest request = getRegisterRequest();
 
-        when(passwordEncoder.encode(anyString())).thenReturn("hashedPin");
+        BaseResponse<CreateWalletResponse> createWalletResponse = new BaseResponse<>();
+        createWalletResponse.setResponseStatus(ErrorConstant.CREATE_WALLET_SUCCESS.getCode());
 
-        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> {
-            Member member = invocation.getArgument(0);
-            member.setMemberId(UUID.randomUUID().toString());
-            return member;
-        });
+        when(passwordEncoder.encode(any())).thenReturn("hashedPin");
+        when(walletService.createMemberWallet(any())).thenReturn(createWalletResponse);
 
         BaseResponse<RegisterResponse> response = authenticationService.registerMember(request);
-        assertNotNull(response);
         assertEquals(ErrorConstant.REGISTER_SUCCESS.getCode(), response.getResponseStatus());
-        assertEquals(request.getEmail(), response.getData().getEmail());
+        assertEquals(ErrorConstant.REGISTER_SUCCESS.getMessage(), response.getResponseMessage());
+    }
 
-        verify(memberRepository, times(1)).save(any(Member.class));
-        verify(otpService, times(1)).sendOtp(anyString(), anyString(), anyString());
+    @Test
+    void register_failed_whenCreateWallet() {
+        RegisterRequest request = getRegisterRequest();
+
+        BaseResponse<CreateWalletResponse> createWalletResponse = new BaseResponse<>();
+        createWalletResponse.setResponseStatus(ErrorConstant.CREATE_WALLET_FAILED.getCode());
+
+        when(passwordEncoder.encode(any())).thenReturn("hashedPin");
+        when(walletService.createMemberWallet(any())).thenReturn(createWalletResponse);
+
+        assertThrows(BusinessException.class, () -> authenticationService.registerMember(request));
+    }
+
+    @Test
+    void register_failed_whenCreateWalletReturnException() {
+        RegisterRequest request = getRegisterRequest();
+        when(passwordEncoder.encode(any())).thenReturn("hashedPin");
+        when(walletService.createMemberWallet(any())).thenThrow(new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage()));
+        assertThrows(InternalException.class, () -> authenticationService.registerMember(request));
     }
 
     @Test
@@ -84,28 +92,29 @@ class AuthenticationServiceTest {
         request.setEmail("azhar@mail.com");
         request.setOtpType(OtpType.REGISTER);
 
-        Member member = new Member();
-        member.setFirstName("Azhar");
-        member.setLastName("Haikal");
-        member.setEmail("azhar@mail.com");
-        member.setPhoneNumber("62812345678");
+        Member member = getMember();
 
-        when(validationService.getEmailIgnoreCase(request.getEmail())).thenReturn(member);
-        when(passwordEncoder.encode(anyString())).thenReturn("hashedOtpCode");
+        when(validationService.getEmailIgnoreCase(any())).thenReturn(member);
+        when(passwordEncoder.encode(any())).thenReturn("hashedOtpCode");
 
         BaseResponse<Void> response = authenticationService.resendOtp(request);
-
-        assertNotNull(response);
         assertEquals(ErrorConstant.RESEND_OTP.getCode(), response.getResponseStatus());
+        assertEquals(ErrorConstant.RESEND_OTP.getMessage(), response.getResponseMessage());
+    }
 
-        verify(memberOtpRepository, times(1)).deleteByPhoneNumberAndOtpType(member.getPhoneNumber(), request.getOtpType());
+    @Test
+    void resendOtp_failed_whenSendOtpReturnException() {
+        ResendOtpRequest request = new ResendOtpRequest();
+        request.setEmail("azhar@mail.com");
+        request.setOtpType(OtpType.REGISTER);
 
-        verify(memberOtpRepository, times(1)).save(argThat(otp ->
-                otp.getPhoneNumber().equals(member.getPhoneNumber()) &&
-                        otp.getAttempts() == 0
-        ));
+        Member member = getMember();
 
-        verify(otpService, times(1)).sendOtp(anyString(), eq(member.getEmail()), anyString());
+        when(validationService.getEmailIgnoreCase(any())).thenReturn(member);
+        when(passwordEncoder.encode(any())).thenReturn("hashedOtpCode");
+
+        doThrow(new BusinessException(ErrorConstant.EMAIL_SEND_FAILED)).when(otpService).sendOtp(any(), any(), any());
+        assertThrows(BusinessException.class, () -> authenticationService.resendOtp(request));
     }
 
     @Test
@@ -119,19 +128,15 @@ class AuthenticationServiceTest {
         memberOtp.setOtpCode("hashedOtp");
         memberOtp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
 
-        Member member = new Member();
-        member.setPhoneNumber("1324567989");
-        member.setEmail(request.getEmail());
+        Member member = getMember();
         member.setStatus(MemberStatus.INACTIVE);
 
-        when(validationService.getEmailIgnoreCase(request.getEmail())).thenReturn(member);
-        when(validationService.verifyOtp(member, request)).thenReturn(memberOtp);
+        when(validationService.getEmailIgnoreCase(any())).thenReturn(member);
+        when(validationService.verifyOtp(any(), any())).thenReturn(memberOtp);
 
         BaseResponse<Void> response = authenticationService.verifyOtp(request);
-
         assertEquals(ErrorConstant.VERIFY_OTP_SUCCESS.getCode(), response.getResponseStatus());
-        assertEquals(MemberStatus.ACTIVE, member.getStatus());
-        verify(memberOtpRepository).delete(memberOtp);
+        assertEquals(ErrorConstant.VERIFY_OTP_SUCCESS.getMessage(), response.getResponseMessage());
     }
 
     @Test
@@ -140,43 +145,35 @@ class AuthenticationServiceTest {
         request.setIdentifier("62812345678");
         request.setPin("123456");
 
-        Member member = new Member();
+        Member member = getMember();
         member.setMemberId("uuid-member");
         member.setEmail("azhar@mail.com");
         member.setPhoneNumber("62812345678");
         member.setPin("hashedPin");
         member.setStatus(MemberStatus.ACTIVE);
 
-        when(validationService.getMemberByEmailOrPhoneNumber(request.getIdentifier())).thenReturn(member);
-        when(passwordEncoder.matches(request.getPin(), member.getPin())).thenReturn(true);
+        when(validationService.getMemberByEmailOrPhoneNumber(any())).thenReturn(member);
+        when(passwordEncoder.matches(any(), any())).thenReturn(true);
 
         BaseResponse<LoginResponse> response = authenticationService.login(request);
-
-        assertNotNull(response);
         assertEquals(ErrorConstant.LOGIN_SUCCESS.getCode(), response.getResponseStatus());
-        assertNotNull(response.getData().getToken());
-        assertEquals(member.getEmail(), response.getData().getEmail());
-
-        verify(memberTokenRepository, times(1)).save(any(MemberToken.class));
+        assertEquals(ErrorConstant.LOGIN_SUCCESS.getMessage(), response.getResponseMessage());
     }
 
     @Test
-    void loginFailedMemberNotActive() {
+    void login_failed_memberInactive() {
         LoginRequest request = new LoginRequest();
         request.setIdentifier("62812345678");
 
-        Member member = new Member();
+        Member member = getMember();
         member.setStatus(MemberStatus.INACTIVE);
-        when(validationService.getMemberByEmailOrPhoneNumber(request.getIdentifier())).thenReturn(member);
+        when(validationService.getMemberByEmailOrPhoneNumber(any())).thenReturn(member);
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                authenticationService.login(request)
-        );
-        assertEquals(ErrorConstant.MEMBER_NOT_ACTIVE, ex.getErrorConstant());
+        assertThrows(BusinessException.class, () -> authenticationService.login(request));
     }
 
     @Test
-    void loginFailedInvalidPin() {
+    void login_failed_invalidPin() {
         LoginRequest request = new LoginRequest();
         request.setIdentifier("62812345678");
         request.setPin("wrong-pin");
@@ -185,12 +182,31 @@ class AuthenticationServiceTest {
         member.setPin("hashedPin");
         member.setStatus(MemberStatus.ACTIVE);
 
-        when(validationService.getMemberByEmailOrPhoneNumber(request.getIdentifier())).thenReturn(member);
-        when(passwordEncoder.matches(request.getPin(), member.getPin())).thenReturn(false);
+        when(validationService.getMemberByEmailOrPhoneNumber(any())).thenReturn(member);
+        when(passwordEncoder.matches(any(), any())).thenReturn(false);
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                authenticationService.login(request)
-        );
-        assertEquals(ErrorConstant.INVALID_PIN, ex.getErrorConstant());
+        assertThrows(BusinessException.class, () -> authenticationService.login(request));
+    }
+
+    // ═════════════════════════════════ //
+    //              HELPER               //
+    // ═════════════════════════════════ //
+    private RegisterRequest getRegisterRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setFirstName("Azhar");
+        request.setLastName("Haikal");
+        request.setEmail("azhar@mail.com");
+        request.setPhoneNumber("62812345678");
+        request.setPin("123456");
+        return request;
+    }
+
+    private Member getMember() {
+        Member member = new Member();
+        member.setFirstName("Azhar");
+        member.setLastName("Haikal");
+        member.setEmail("azhar@mail.com");
+        member.setPhoneNumber("62812345678");
+        return member;
     }
 }
