@@ -5,10 +5,7 @@ import com.vyra.virtual_your_assets.constant.OtpType;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.login.LoginRequest;
 import com.vyra.virtual_your_assets.dto.login.LoginResponse;
-import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
-import com.vyra.virtual_your_assets.dto.register.RegisterResponse;
-import com.vyra.virtual_your_assets.dto.register.ResendOtpRequest;
-import com.vyra.virtual_your_assets.dto.register.VerifyOtpRequest;
+import com.vyra.virtual_your_assets.dto.register.*;
 import com.vyra.virtual_your_assets.service.AuthenticationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,8 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,10 +22,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthenticationControllerTest {
-    @Mock
-    private AuthenticationService service;
-    @InjectMocks
-    private AuthenticationController controller;
+    @Mock private AuthenticationService service;
+    @InjectMocks private AuthenticationController controller;
 
     @Test
     void registerSuccess() {
@@ -41,19 +34,20 @@ class AuthenticationControllerTest {
         request.setPhoneNumber("62811111111");
         request.setPin("123456");
 
-        RegisterResponse regResponse = new RegisterResponse();
-        regResponse.setMemberId("memberId");
+        RegisterResponse registerResponse = new RegisterResponse();
+        registerResponse.setMemberId("memberId");
 
         BaseResponse<RegisterResponse> mockResponse = new BaseResponse<>(
                 ErrorConstant.REGISTER_SUCCESS.getCode(),
                 ErrorConstant.REGISTER_SUCCESS.getMessage(),
-                regResponse
+                registerResponse
         );
 
         when(service.registerMember(any(RegisterRequest.class))).thenReturn(mockResponse);
 
-        BaseResponse<RegisterResponse> responseEntity = controller.registerMember(request);
-        assertEquals(ErrorConstant.REGISTER_SUCCESS.getCode(), responseEntity.getResponseStatus());
+        BaseResponse<RegisterResponse> response = controller.registerMember(request);
+        assertEquals(ErrorConstant.REGISTER_SUCCESS.getCode(), response.getResponseStatus());
+        assertEquals(ErrorConstant.REGISTER_SUCCESS.getMessage(), response.getResponseMessage());
     }
 
     @Test
@@ -70,10 +64,8 @@ class AuthenticationControllerTest {
 
         when(service.resendOtp(any(ResendOtpRequest.class))).thenReturn(mockResponse);
 
-        ResponseEntity<BaseResponse<Void>> responseEntity = controller.resendOtp(request);
-
-        assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
-        assertNotNull(responseEntity.getBody());
+        BaseResponse<Void> response = controller.resendOtp(request);
+        assertNotNull(response);
     }
 
     @Test
@@ -90,10 +82,8 @@ class AuthenticationControllerTest {
 
         when(service.verifyOtp(any(VerifyOtpRequest.class))).thenReturn(mockResponse);
 
-        ResponseEntity<BaseResponse<Void>> responseEntity = controller.verifyOtp(request);
-
-        assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
-        assertNotNull(responseEntity.getBody());
+        BaseResponse<Void> response = controller.verifyOtp(request);
+        assertNotNull(response);
     }
 
     @Test
@@ -111,11 +101,45 @@ class AuthenticationControllerTest {
                 loginData
         );
 
-        when(service.login(any(LoginRequest.class))).thenReturn(mockResponse);
+        when(service.loginMember(any(LoginRequest.class))).thenReturn(mockResponse);
 
-        ResponseEntity<BaseResponse<LoginResponse>> responseEntity = controller.login(request);
+        BaseResponse<LoginResponse> response = controller.loginMember(request);
+        assertEquals(ErrorConstant.LOGIN_SUCCESS.getCode(), response.getResponseStatus());
+        assertEquals(ErrorConstant.LOGIN_SUCCESS.getMessage(), response.getResponseMessage());
+    }
 
-        assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
-        assertNotNull(responseEntity.getBody());
+    @Test
+    void forgotPasswordSuccess() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("62811111111");
+
+        BaseResponse<Void> mockResponse = new BaseResponse<>(
+                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(),
+                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getMessage(),
+                null
+        );
+
+        when(service.forgotPin(any(ForgotPasswordRequest.class))).thenReturn(mockResponse);
+
+        BaseResponse<Void> response = controller.forgotPin(request);
+        assertNotNull(response);
+    }
+
+    @Test
+    void resetPasswordSuccess() {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setPhoneNumber("62811111111");
+        request.setNewPin("654321");
+
+        BaseResponse<Void> mockResponse = new BaseResponse<>(
+                ErrorConstant.RESET_PIN_SUCCESS.getCode(),
+                ErrorConstant.RESET_PIN_SUCCESS.getMessage(),
+                null
+        );
+
+        when(service.resetPin(any(ResetPasswordRequest.class))).thenReturn(mockResponse);
+
+        BaseResponse<Void> response = controller.resetPin(request);
+        assertNotNull(response);
     }
 }

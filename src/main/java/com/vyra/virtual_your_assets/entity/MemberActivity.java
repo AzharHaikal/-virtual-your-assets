@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "member_activity")
+@Table(schema = "idp", name = "member_activity")
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,9 +16,10 @@ public class MemberActivity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String memberActivityId;
 
-    @Column(name = "phone_number")
+    @Column(length = 50)
     private String phoneNumber;
 
+    @Column(length = 100)
     private String description;
 
     @Column(name = "created_at")

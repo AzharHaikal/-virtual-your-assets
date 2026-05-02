@@ -66,14 +66,14 @@ class ValidationServiceTest {
     void getEmailIgnoreCase_success() {
         Member member = new Member();
         when(memberRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.of(member));
-        Member result = validationService.getEmailIgnoreCase("test@mail.com");
+        Member result = validationService.getMemberByEmailIgnoreCase("test@mail.com");
         assertNotNull(result);
     }
 
     @Test
     void getEmailIgnoreCase_notFound() {
         when(memberRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
-        BusinessException ex = assertThrows(BusinessException.class, () -> validationService.getEmailIgnoreCase("test@mail.com"));
+        BusinessException ex = assertThrows(BusinessException.class, () -> validationService.getMemberByEmailIgnoreCase("test@mail.com"));
         assertEquals(ErrorConstant.MEMBER_NOT_FOUND, ex.getErrorConstant());
     }
 

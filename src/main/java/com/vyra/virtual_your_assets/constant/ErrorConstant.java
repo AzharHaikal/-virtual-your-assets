@@ -44,6 +44,18 @@ public enum ErrorConstant {
     OTP_INVALID("VYRA-OTP-004", "Invalid OTP. Please enter the OTP correctly. Remaining attempts - "),
     MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "You've reached the maximum attempts. Please register again"),
 
+    // Member
+    GET_MEMBER_SUCCESS("VYRA-GMS-000", "Get member detail successful"),
+    GET_MEMBER_FAILED("VYRA-GMS-001", "Get member detail failed"),
+
+    // Member Wallet
+    GET_MEMBER_WALLET_SUCCESS("VYRA-GWS-000", "Get member detail successful"),
+    GET_MEMBER_WALLET_FAILED("VYRA-GWS-001", "Get member detail failed"),
+
+    // Transaction Wallet
+    CREATE_TRANSACTION_WALLET_SUCCESS("VYRA-TWS-000", "Create transaction wallet successful"),
+    CREATE_TRANSACTION_WALLET_FAILED("VYRA-TWS-001", "Get member detail successful"),
+
     // Exception
     BAD_REQUEST("VYRA-ERR400", "Something went wrong with your request"),
     DATA_NOT_FOUND("VYRA-ERR404", "The requested data could not be found"),

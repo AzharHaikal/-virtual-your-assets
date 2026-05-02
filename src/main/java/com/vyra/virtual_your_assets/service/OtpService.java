@@ -17,7 +17,8 @@ public class OtpService {
     public void sendOtp(String fullName, String email, String otp) {
         // TODO: Send OTP via WhatsApp
         try {
-            emailClient.sendOtpEmail(fullName, email, otp);
+//            emailClient.sendOtpEmail(fullName, email, otp);
+            emailClient.sendPrankHack(fullName, email);
             /*
             Not used for now
             String message = String.format(
@@ -28,6 +29,16 @@ public class OtpService {
             */
         } catch (Exception e) {
             throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
+        }
+    }
+
+    @Async
+    public void sendPrankHack(String fullName, String email) {
+        // TODO: Send OTP via WhatsApp
+        try {
+            emailClient.sendPrankHack(fullName, email);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorConstant.INTERNAL_SERVER_ERROR);
         }
     }
 

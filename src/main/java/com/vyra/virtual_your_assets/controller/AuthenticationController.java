@@ -4,10 +4,7 @@ import com.vyra.virtual_your_assets.constant.ApiPath;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.login.LoginRequest;
 import com.vyra.virtual_your_assets.dto.login.LoginResponse;
-import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
-import com.vyra.virtual_your_assets.dto.register.RegisterResponse;
-import com.vyra.virtual_your_assets.dto.register.ResendOtpRequest;
-import com.vyra.virtual_your_assets.dto.register.VerifyOtpRequest;
+import com.vyra.virtual_your_assets.dto.register.*;
 import com.vyra.virtual_your_assets.service.AuthenticationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,18 +25,28 @@ public class AuthenticationController {
     }
 
     @PostMapping(RESEND_OTP)
-    public ResponseEntity<BaseResponse<Void>> resendOtp(@RequestBody @Valid ResendOtpRequest request) {
-        return ResponseEntity.ok(authenticationService.resendOtp(request));
+    public BaseResponse<Void> resendOtp(@RequestBody @Valid ResendOtpRequest request) {
+        return authenticationService.resendOtp(request);
     }
 
     @PostMapping(VERIFY_OTP)
-    public ResponseEntity<BaseResponse<Void>> verifyOtp(@RequestBody VerifyOtpRequest request) {
-        return ResponseEntity.ok(authenticationService.verifyOtp(request));
+    public BaseResponse<Void> verifyOtp(@RequestBody VerifyOtpRequest request) {
+        return authenticationService.verifyOtp(request);
     }
 
     @PostMapping(LOGIN)
-    public ResponseEntity<BaseResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authenticationService.login(request));
+    public BaseResponse<LoginResponse> loginMember(@RequestBody LoginRequest request) {
+        return authenticationService.loginMember(request);
+    }
+
+    @PostMapping(FORGOT_PIN)
+    public BaseResponse<Void> forgotPin(@RequestBody ForgotPasswordRequest request) {
+        return authenticationService.forgotPin(request);
+    }
+
+    @PostMapping(RESET_PIN)
+    public BaseResponse<Void> resetPin(@RequestBody ResetPasswordRequest request) {
+        return authenticationService.resetPin(request);
     }
 
 }

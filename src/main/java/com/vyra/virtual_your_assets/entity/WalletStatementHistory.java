@@ -6,21 +6,33 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(schema = "wallet", name = "member_wallet")
+@Table(schema = "wallet", name = "wallet_statement_history")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MemberWallet {
+public class WalletStatementHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    private String walletStatementHistoryId;
+
+    @Column(name = "wallet_statement_id")
+    private String walletStatementId;
+
+    @Column(name = "member_wallet_id")
     private String memberWalletId;
 
-    @Column(name = "phone_number", nullable = false)
-    private String phoneNumber;
+    @Column(name = "transaction_id")
+    private String transactionId;
+
+    @Column(name = "previous_balance")
+    private BigDecimal previousBalance;
+    private BigDecimal credit;
+    private BigDecimal debit;
 
     private String createdBy;
     private String modifiedBy;
@@ -28,4 +40,5 @@ public class MemberWallet {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
+
 }

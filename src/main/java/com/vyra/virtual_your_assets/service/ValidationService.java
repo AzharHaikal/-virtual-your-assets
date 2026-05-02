@@ -29,8 +29,11 @@ public class ValidationService {
         if (memberRepository.findByEmailIgnoreCase(email).isPresent()) throw new BusinessException(ErrorConstant.EMAIL_ALREADY_EXIST);
     }
 
+    public Member getMemberByPhoneNumber(String phoneNumber) {
+        return memberRepository.findByPhoneNumber(phoneNumber).orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+    }
 
-    public Member getEmailIgnoreCase(String email) {
+    public Member getMemberByEmailIgnoreCase(String email) {
         return memberRepository.findByEmailIgnoreCase(email).orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
     }
 

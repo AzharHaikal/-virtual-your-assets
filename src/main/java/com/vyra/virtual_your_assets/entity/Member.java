@@ -7,7 +7,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "member")
+@Table(schema = "idp", name = "member")
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,16 +17,16 @@ public class Member {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String memberId;
 
-    @Column(name = "first_name", nullable = false)
+    @Column(nullable = false, length = 50)
     private String firstName;
 
-    @Column(name = "last_name", nullable = false)
+    @Column(nullable = false, length = 50)
     private String lastName;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 50)
     private String email;
 
-    @Column(name = "phone_number", nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 15)
     private String phoneNumber;
 
     @Column(nullable = false)
@@ -34,6 +34,9 @@ public class Member {
 
     @Enumerated(EnumType.STRING)
     private MemberStatus status;
+
+    private String createdBy;
+    private String modifiedBy;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

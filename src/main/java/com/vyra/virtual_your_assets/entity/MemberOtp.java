@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "member_otp")
+@Table(schema = "idp", name = "member_otp")
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,7 +19,7 @@ public class MemberOtp {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String memberOtpId;
 
-    @Column(name = "phone_number", nullable = false)
+    @Column(nullable = false, length = 15)
     private String phoneNumber;
 
     @Column(nullable = false)
@@ -34,6 +34,5 @@ public class MemberOtp {
     @Column(name = "attempts")
     private Integer attempts;
 
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
 }

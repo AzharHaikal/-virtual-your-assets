@@ -33,4 +33,23 @@ public class MemberActivityEvent {
     public static final String ATTEMPT_RESET_PASSWORD = "Member attempted to reset the password";
     public static final String SUCCESS_RESET_PASSWORD = "Member successfully reset the password";
 
+    // GET MEMBER
+    public static final String ATTEMPT_GET_MEMBER_DETAIL = "Attempt get member detail";
+    public static final String SUCCESS_GET_MEMBER_DETAIL = "Successfully get member detail";
+    public static final String FAILED_GET_MEMBER_DETAIL = "Failed get member detail";
+
+    // GET MEMBER WALLET
+    public static final String ATTEMPT_GET_MEMBER_WALLET = "Attempt get member wallet";
+    public static final String SUCCESS_GET_MEMBER_WALLET = "Successfully get member wallet";
+
+    // TRANSACTION
+    public static final String ATTEMPT_CREATE_TRANSACTION = "Attempt create transaction";
+    public static final String SUCCESS_CREATE_TRANSACTION = "Successfully create transaction";
+    public static final String FAILED_CREATE_TRANSACTION = "Failed create transaction";
+
+    // TRANSACTION WALLET
+    public static final String ATTEMPT_INSERT_WALLET_STATEMENT = "Attempt insert transaction wallet statement";
+    public static final String SUCCESS_INSERT_WALLET_STATEMENT = "Attempt insert transaction wallet statement";
+
+
 }

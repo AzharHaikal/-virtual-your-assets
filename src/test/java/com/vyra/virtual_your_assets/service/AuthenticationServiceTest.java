@@ -10,18 +10,14 @@ import com.vyra.virtual_your_assets.dto.register.RegisterRequest;
 import com.vyra.virtual_your_assets.dto.register.RegisterResponse;
 import com.vyra.virtual_your_assets.dto.register.ResendOtpRequest;
 import com.vyra.virtual_your_assets.dto.register.VerifyOtpRequest;
-import com.vyra.virtual_your_assets.dto.wallet.CreateWalletRequest;
 import com.vyra.virtual_your_assets.dto.wallet.CreateWalletResponse;
 import com.vyra.virtual_your_assets.entity.Member;
 import com.vyra.virtual_your_assets.entity.MemberOtp;
-import com.vyra.virtual_your_assets.entity.MemberToken;
 import com.vyra.virtual_your_assets.exception.BusinessException;
-import com.vyra.virtual_your_assets.repository.MemberActivityRepository;
 import com.vyra.virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.virtual_your_assets.repository.MemberRepository;
 import com.vyra.virtual_your_assets.repository.MemberTokenRepository;
 import org.apache.logging.log4j.util.InternalException;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,11 +26,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -51,7 +44,7 @@ class AuthenticationServiceTest {
     @InjectMocks private AuthenticationService authenticationService;
 
     @Test
-    void registerSuccess() {
+    void registerMemberSuccess() {
         RegisterRequest request = getRegisterRequest();
 
         BaseResponse<CreateWalletResponse> createWalletResponse = new BaseResponse<>();
@@ -66,7 +59,7 @@ class AuthenticationServiceTest {
     }
 
     @Test
-    void register_failed_whenCreateWallet() {
+    void registerMember_failed_whenCreateWallet() {
         RegisterRequest request = getRegisterRequest();
 
         BaseResponse<CreateWalletResponse> createWalletResponse = new BaseResponse<>();
@@ -79,7 +72,7 @@ class AuthenticationServiceTest {
     }
 
     @Test
-    void register_failed_whenCreateWalletReturnException() {
+    void registerMember_failed_whenCreateWalletReturnException() {
         RegisterRequest request = getRegisterRequest();
         when(passwordEncoder.encode(any())).thenReturn("hashedPin");
         when(walletService.createMemberWallet(any())).thenThrow(new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage()));
@@ -94,7 +87,7 @@ class AuthenticationServiceTest {
 
         Member member = getMember();
 
-        when(validationService.getEmailIgnoreCase(any())).thenReturn(member);
+        when(validationService.getMemberByEmailIgnoreCase(any())).thenReturn(member);
         when(passwordEncoder.encode(any())).thenReturn("hashedOtpCode");
 
         BaseResponse<Void> response = authenticationService.resendOtp(request);
@@ -110,7 +103,7 @@ class AuthenticationServiceTest {
 
         Member member = getMember();
 
-        when(validationService.getEmailIgnoreCase(any())).thenReturn(member);
+        when(validationService.getMemberByEmailIgnoreCase(any())).thenReturn(member);
         when(passwordEncoder.encode(any())).thenReturn("hashedOtpCode");
 
         doThrow(new BusinessException(ErrorConstant.EMAIL_SEND_FAILED)).when(otpService).sendOtp(any(), any(), any());
@@ -131,7 +124,7 @@ class AuthenticationServiceTest {
         Member member = getMember();
         member.setStatus(MemberStatus.INACTIVE);
 
-        when(validationService.getEmailIgnoreCase(any())).thenReturn(member);
+        when(validationService.getMemberByEmailIgnoreCase(any())).thenReturn(member);
         when(validationService.verifyOtp(any(), any())).thenReturn(memberOtp);
 
         BaseResponse<Void> response = authenticationService.verifyOtp(request);
@@ -155,7 +148,7 @@ class AuthenticationServiceTest {
         when(validationService.getMemberByEmailOrPhoneNumber(any())).thenReturn(member);
         when(passwordEncoder.matches(any(), any())).thenReturn(true);
 
-        BaseResponse<LoginResponse> response = authenticationService.login(request);
+        BaseResponse<LoginResponse> response = authenticationService.loginMember(request);
         assertEquals(ErrorConstant.LOGIN_SUCCESS.getCode(), response.getResponseStatus());
         assertEquals(ErrorConstant.LOGIN_SUCCESS.getMessage(), response.getResponseMessage());
     }
@@ -169,7 +162,7 @@ class AuthenticationServiceTest {
         member.setStatus(MemberStatus.INACTIVE);
         when(validationService.getMemberByEmailOrPhoneNumber(any())).thenReturn(member);
 
-        assertThrows(BusinessException.class, () -> authenticationService.login(request));
+        assertThrows(BusinessException.class, () -> authenticationService.loginMember(request));
     }
 
     @Test
@@ -181,11 +174,12 @@ class AuthenticationServiceTest {
         Member member = new Member();
         member.setPin("hashedPin");
         member.setStatus(MemberStatus.ACTIVE);
+        member.setPhoneNumber("123456789");
 
         when(validationService.getMemberByEmailOrPhoneNumber(any())).thenReturn(member);
         when(passwordEncoder.matches(any(), any())).thenReturn(false);
 
-        assertThrows(BusinessException.class, () -> authenticationService.login(request));
+        assertThrows(BusinessException.class, () -> authenticationService.loginMember(request));
     }
 
     // ═════════════════════════════════ //
