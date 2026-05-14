@@ -8,8 +8,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class BaseResponse<T> {
-
     private String responseStatus;
     private String responseMessage;
     private T data;
+
 }

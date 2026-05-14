@@ -1,29 +1,41 @@
 package com.vyra.virtual_your_assets.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "member_token")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(schema = "idp", name = "member_token")
+@Entity
 public class MemberToken {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String memberTokenId;
 
+    @Column(nullable = false)
     private String memberId;
 
-    @Column(length = 500)
+    @Column(nullable = false, unique = true)
     private String accessToken;
 
-    private LocalDateTime expiredAt;
+    @Column(nullable = false, unique = true)
+    private String refreshToken;
+
+    @Column(nullable = false)
+    private String deviceId;
+
+    @Column(nullable = false)
+    private String deviceName;
+
+    @Column(nullable = false)
+    private String ipAddress;
+
+    private LocalDateTime accessTokenExpiredAt;
+    private LocalDateTime refreshTokenExpiredAt;
     private LocalDateTime createdAt;
 }

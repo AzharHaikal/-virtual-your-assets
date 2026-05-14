@@ -17,7 +17,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<BaseResponse<Void>> handleBusinessException(BusinessException ex) {
         log.warn("BusinessException: {}", ex.getMessage());
-        return ResponseEntity.ok(
+        return ResponseEntity.badRequest().body(
                 new BaseResponse<>(
                         ex.getErrorConstant().getCode(),
                         ex.getMessage(),

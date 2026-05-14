@@ -1,4 +1,4 @@
-package com.vyra.virtual_your_assets.dto;
+package com.vyra.virtual_your_assets.dto.activity;
 
 import lombok.Builder;
 import lombok.Data;

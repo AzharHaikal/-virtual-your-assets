@@ -1,93 +1,150 @@
-# virtual-your-assets
+# 🌀 Virtual Your Asset (VYRA) – Backend API
+
+**VYRA Backend API** adalah layanan backend berbasis **Spring Boot** yang dirancang untuk mengelola aset virtual dengan standar kualitas kode yang tinggi melalui **CI/CD pipeline otomatis**.
+
+---
+
+## 🚀 Fitur Utama
+
+### 🔐 Authentication Module
+- Registrasi pengguna
+- Login
+- Verifikasi OTP
+
+### 🛡 Security
+- Implementasi **JWT (JSON Web Token)** untuk otorisasi API
+
+### 🗄 Database
+- **PostgreSQL** untuk manajemen data persisten
+
+### 🌍 Internationalization
+- Mendukung pesan error multibahasa (i18n)
+
+---
+
+## 🛠 Tech Stack
+
+| Komponen        | Teknologi                     |
+|-----------------|-------------------------------|
+| Framework       | Spring Boot 3.4.x             |
+| Language        | Java 17                       |
+| Database        | PostgreSQL                    |
+| Testing         | JUnit 5, Mockito              |
+| Build Tool      | Maven                         |
+| CI/CD           | GitLab CI                     |
+
+---
+
+## 🏗 CI/CD Pipeline & Quality Gate
+
+Proyek ini mengimplementasikan **Continuous Integration (CI)** untuk memastikan kualitas dan stabilitas kode.
+
+### 1️⃣ Testing – JUnit & Mockito
+- Menggunakan **JUnit 5** dan **Mockito** untuk unit testing
+- **Mockito Extension**:
+    - Mocking layer Service & Repository
+    - Tidak bergantung pada database fisik saat CI
+- **Surefire Reports**:
+    - Laporan testing otomatis
+    - Disimpan sebagai artifact pipeline untuk audit kualitas
+
+### 2️⃣ Static Code Analysis – SonarQube
+Kode dipindai secara berkala untuk mendeteksi:
+- 🐞 Bugs & Vulnerabilities
+- 🧹 Code Smells
+- ✅ Validasi test case
+  > *Add at least one assertion*
+
+### 3️⃣ GitLab CI Configuration
+Pipeline terdiri dari **3 tahap utama**:
+
+1. **Preparation**
+    - Menyiapkan environment Maven
+    - Cache dependency untuk mempercepat build
+
+2. **Check-Branch**
+    - Validasi workflow Git
+    - Hanya mengizinkan `main` & Merge Request
+
+3. **Code-Build**
+    - Menjalankan unit test
+    - Build aplikasi menjadi file executable `.jar`
+
+---
+
+## 📦 Containerization & Deployment (Future Roadmap)
+
+### 🐳 Docker
+Fondasi containerization telah disiapkan.
+
+- **Base Image**:
+  ```dockerfile 
+  eclipse-temurin:17-jdk-alpine
+  
+- **Image ringan, aman, dan siap production**
+
+## 🚧 TODO – Continuous Deployment (CD)
+
+### Rencana pengembangan selanjutnya:
+- **Automated Docker Image Push**
+  Push image ke Docker Hub / GitLab Container Registry
+
+- **Kubernetes Deployment**
+   - Deploy otomatis ke cluster K8s menggunakan:
+
+app-deployment.yaml
 
 
+Environment Secret Management
+Integrasi GitLab CI Variables untuk:
 
-## Getting started
+Database credentials
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Mail server credentials
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+🛠 Cara Menjalankan Secara Lokal
+1️⃣ Clone Repository
+git clone https://gitlab.com/username/virtual-your-assets.git
 
-## Add your files
+2️⃣ Konfigurasi Database
 
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+Sesuaikan application.yml dengan PostgreSQL lokal Anda:
 
-```
-cd existing_repo
-git remote add origin https://gitlab.com/azharlolypop/virtual-your-assets.git
-git branch -M main
-git push -uf origin main
-```
+spring:
+datasource:
+url: jdbc:postgresql://localhost:5432/vyra
+username: your_user
+password: your_password
 
-## Integrate with your tools
+3️⃣ Build & Run Test
+mvn clean package
 
-* [Set up project integrations](https://gitlab.com/azharlolypop/virtual-your-assets/-/settings/integrations)
+4️⃣ Jalankan Aplikasi
+mvn spring-boot:run
 
-## Collaborate with your team
+📂 Struktur Folder
+├── .gitlab-ci.yml          # Konfigurasi CI/CD Pipeline
+├── src
+│   ├── main/java           # Source code utama
+│   └── test/java           # Unit & Integration Tests
+├── target/                 # Output build (.jar)
+└── pom.xml                 # Maven dependencies
 
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+🤝 Kontribusi
 
-## Test and Deploy
+Kontribusi sangat terbuka 🚀
+Silakan:
 
-Use the built-in continuous integration in GitLab.
+Buat Issue untuk bug atau enhancement
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+Ajukan Merge Request untuk fitur baru
 
-***
+⚠️ Pastikan pipeline tetap hijau (✅) sebelum merge
 
-# Editing this README
+📄 License
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Project ini menggunakan lisensi internal / proprietary
+(Sesuaikan jika ingin menggunakan MIT / Apache 2.0)
 
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+✨ VYRA – Virtual Your Assets
+Backend API dengan fokus pada kualitas, keamanan, dan scalability

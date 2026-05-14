@@ -1,26 +1,30 @@
 package com.vyra.virtual_your_assets.entity;
 
+import com.vyra.virtual_your_assets.constant.MemberActivityEvent;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "member_activity")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MemberActivity {
+@Table(schema = "idp", name = "member_activity")
+@Entity
+public class MemberActivity extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String memberActivityId;
+    private String id;
 
-    @Column(name = "phone_number")
+    @Column(nullable = false, length = 15)
     private String phoneNumber;
+
+    @Enumerated(EnumType.STRING)
+    private MemberActivityEvent event;
 
     private String description;
 
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
 }

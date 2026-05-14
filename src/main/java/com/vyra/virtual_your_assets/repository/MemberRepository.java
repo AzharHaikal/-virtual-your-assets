@@ -13,11 +13,10 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     Optional<Member> findByEmailIgnoreCase(String email);
 
-    @Query("""
-        SELECT m FROM Member m
-        WHERE m.email = :identifier OR m.phoneNumber = :identifier
-    """)
-    Optional<Member> findByIdentifier(@Param("identifier") String identifier);
+    @Query(value = "SELECT m FROM Member m WHERE m.email = :identifier OR m.phoneNumber = :identifier")
+    Optional<Member> getMemberByEmailOrPhoneNumber(@Param("identifier") String identifier);
 
     void deleteByPhoneNumber(String phoneNumber);
+
+    Optional<Member> findById(String memberId);
 }
