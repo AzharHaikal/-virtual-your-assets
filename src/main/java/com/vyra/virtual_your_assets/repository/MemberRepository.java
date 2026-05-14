@@ -17,4 +17,6 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     Optional<Member> getMemberByEmailOrPhoneNumber(@Param("identifier") String identifier);
 
     void deleteByPhoneNumber(String phoneNumber);
+
+    Optional<Member> findById(String memberId);
 }

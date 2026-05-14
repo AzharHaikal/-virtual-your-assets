@@ -2,13 +2,12 @@ package com.vyra.virtual_your_assets.controller;
 
 import com.vyra.virtual_your_assets.constant.ApiPath;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
-import com.vyra.virtual_your_assets.dto.login.LoginRequest;
-import com.vyra.virtual_your_assets.dto.login.LoginResponse;
-import com.vyra.virtual_your_assets.dto.register.*;
+import com.vyra.virtual_your_assets.dto.auth.*;
+import com.vyra.virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.virtual_your_assets.service.AuthenticationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import static com.vyra.virtual_your_assets.constant.ApiPath.*;
@@ -25,28 +24,39 @@ public class AuthenticationController {
     }
 
     @PostMapping(RESEND_OTP)
-    public BaseResponse<Void> resendOtp(@RequestBody @Valid ResendOtpRequest request) {
+    public BaseResponse<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
         return authenticationService.resendOtp(request);
     }
 
     @PostMapping(VERIFY_OTP)
-    public BaseResponse<Void> verifyOtp(@RequestBody VerifyOtpRequest request) {
+    public BaseResponse<Void> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
         return authenticationService.verifyOtp(request);
     }
 
     @PostMapping(LOGIN)
-    public BaseResponse<LoginResponse> loginMember(@RequestBody LoginRequest request) {
+    public BaseResponse<LoginResponse> loginMember(@Valid @RequestBody LoginRequest request) {
         return authenticationService.loginMember(request);
     }
 
+    @PostMapping(REFRESH_TOKEN)
+    public BaseResponse<RefreshTokenResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        return authenticationService.refreshToken(request);
+    }
+
     @PostMapping(FORGOT_PIN)
-    public BaseResponse<Void> forgotPin(@RequestBody ForgotPasswordRequest request) {
+    public BaseResponse<Void> forgotPin(@Valid @RequestBody ForgotPasswordRequest request) {
         return authenticationService.forgotPin(request);
     }
 
     @PostMapping(RESET_PIN)
     public BaseResponse<Void> resetPin(@RequestBody ResetPasswordRequest request) {
         return authenticationService.resetPin(request);
+    }
+
+    @PostMapping(LOGOUT)
+    public BaseResponse<Void> logoutMember(Authentication authentication) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return authenticationService.logoutMember(user.getMemberId(), user.getAccessToken());
     }
 
 }

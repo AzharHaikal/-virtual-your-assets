@@ -6,15 +6,26 @@ spring:
     name: VIRTUAL_YOUR_ASSET
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/vyra
-    username: postgres
-    password: qwerty
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
+    hikari:
+      maximum-pool-size: 5
+      data-source-properties:
+        sslmode: require
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    default-schema: flyway
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: false
+    show-sql: true
     open-in-view: false
     properties:
       hibernate:

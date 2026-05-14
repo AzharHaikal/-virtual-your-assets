@@ -7,12 +7,14 @@ import com.vyra.virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.transaction.CreateTransactionRequest;
 import com.vyra.virtual_your_assets.dto.transaction.CreateTransactionResponse;
+import com.vyra.virtual_your_assets.dto.transaction.TransactionHistoryResponse;
 import com.vyra.virtual_your_assets.dto.wallet.TransactionWalletRequest;
 import com.vyra.virtual_your_assets.dto.wallet.TransactionWalletResponse;
 import com.vyra.virtual_your_assets.entity.Member;
 import com.vyra.virtual_your_assets.entity.Transaction;
 import com.vyra.virtual_your_assets.exception.BusinessException;
 import com.vyra.virtual_your_assets.repository.TransactionRepository;
+import com.vyra.virtual_your_assets.util.TransactionUtil;
 import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -35,27 +38,25 @@ public class TransactionService {
 
     @Transactional(rollbackFor = Exception.class)
     @NewSpan
-    public BaseResponse<CreateTransactionResponse> createTransaction(CreateTransactionRequest request) {
-        log.info("[START] transactionService.createTransaction phoneNumber: {} ", request.getPhoneNumber());
-        createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CREATE_TRANSACTION);
+    public BaseResponse<CreateTransactionResponse> createTransaction(String memberId, CreateTransactionRequest request) {
+        Member member = validationService.getMemberById(memberId);
+        log.info("[START] transactionService.createTransaction phoneNumber: {} ", member.getPhoneNumber());
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CREATE_TRANSACTION);
 
-        Member member = validationService.getMemberByPhoneNumber(request.getPhoneNumber());
-
-        String referenceNumber = generateReferenceNumber();
+        String referenceNumber = TransactionUtil.generateReferenceNumber();
 
         Transaction transaction = buildTransaction(request, member, referenceNumber);
         transactionRepository.save(transaction);
 
         // Wallet process
-        TransactionWalletResponse walletData = processWallet(transaction, request);
-
+        TransactionWalletResponse walletData = processWallet(transaction, request, member.getPhoneNumber());
         transaction.setStatus(TransactionStatus.SUCCESS);
         transactionRepository.save(transaction);
 
         CreateTransactionResponse response = buildResponse(transaction, walletData);
 
-        createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_GET_MEMBER_DETAIL);
-        log.info("[END] transactionService.createTransaction successfully phoneNumber: {} ", request.getPhoneNumber());
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_GET_MEMBER_DETAIL);
+        log.info("[END] transactionService.createTransaction successfully phoneNumber: {} ", member.getPhoneNumber());
 
         return new BaseResponse<>(
                 ErrorConstant.GET_MEMBER_SUCCESS.getCode(),
@@ -64,8 +65,15 @@ public class TransactionService {
         );
     }
 
-    private String generateReferenceNumber() {
-        return "VYRA" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")) + ThreadLocalRandom.current().nextInt(100, 999);
+    @Transactional(readOnly = true)
+    public BaseResponse<List<TransactionHistoryResponse>> getHistory(String memberId) {
+        List<Transaction> transactions = transactionRepository.findAllByMemberIdAndDeletedAtIsNullOrderByTransactionDateDesc(memberId);
+        List<TransactionHistoryResponse> responses = transactions.stream().map(this::mapToHistoryResponse).toList();
+        return new BaseResponse<>(
+                ErrorConstant.GET_TRANSACTION_HISTORY_SUCCESS.getCode(),
+                ErrorConstant.GET_TRANSACTION_HISTORY_SUCCESS.getMessage(),
+                responses
+        );
     }
 
     private Transaction buildTransaction(CreateTransactionRequest request, Member member, String ref) {
@@ -78,36 +86,36 @@ public class TransactionService {
                 .transactionDesc(request.getTransactionDesc())
                 .referenceNumber(ref)
                 .transactionDate(LocalDateTime.now())
-                .createdBy(request.getPhoneNumber())
+                .createdBy(member.getPhoneNumber())
                 .createdAt(LocalDateTime.now())
                 .status(TransactionStatus.INQUIRY)
                 .build();
     }
 
-    private TransactionWalletResponse processWallet(Transaction transaction, CreateTransactionRequest request) {
+    private TransactionWalletResponse processWallet(Transaction transaction, CreateTransactionRequest request, String phoneNumber) {
         BaseResponse<TransactionWalletResponse> response;
         try {
-            log.info("Insert transaction into wallet. phoneNumber: {} ", request.getPhoneNumber());
+            log.info("Insert transaction into wallet. phoneNumber: {} ", phoneNumber);
             TransactionWalletRequest walletRequest = new TransactionWalletRequest();
-            walletRequest.setTransactionId(transaction.getTransactionId());
-            walletRequest.setPhoneNumber(request.getPhoneNumber());
+            walletRequest.setTransactionId(transaction.getId());
+            walletRequest.setPhoneNumber(phoneNumber);
             walletRequest.setAmount(request.getAmount());
             walletRequest.setCategory(request.getCategory());
 
             response = walletService.createTransactionWallet(walletRequest);
             if (!ErrorConstant.CREATE_TRANSACTION_WALLET_SUCCESS.getCode().equals(response.getResponseStatus())) {
-                log.info("Failed when insert transaction in wallet service. phoneNumber: {}", request.getPhoneNumber());
+                log.info("Failed when insert transaction in wallet service. phoneNumber: {}", phoneNumber);
                 throw new BusinessException(ErrorConstant.CREATE_TRANSACTION_WALLET_FAILED);
             }
 
         } catch (BusinessException e) {
-            log.error("[ERROR] create transaction {} encountered an exception: {}", request.getPhoneNumber(), e.getMessage(), e);
-            createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.FAILED_CREATE_TRANSACTION);
+            log.error("[ERROR] create transaction {} encountered an exception: {}", phoneNumber, e.getMessage(), e);
+            createMemberActivity(phoneNumber, MemberActivityEvent.FAILED_CREATE_TRANSACTION);
             throw new BusinessException(ErrorConstant.BAD_REQUEST);
 
         } catch (Exception e) {
-            log.error("[ERROR] Unexpected error during create transaction {}, message: {}", request.getPhoneNumber(), e.getMessage(), e);
-            createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.FAILED_CREATE_TRANSACTION);
+            log.error("[ERROR] Unexpected error during create transaction {}, message: {}", phoneNumber, e.getMessage(), e);
+            createMemberActivity(phoneNumber, MemberActivityEvent.FAILED_CREATE_TRANSACTION);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }
 
@@ -127,8 +135,22 @@ public class TransactionService {
         return response;
     }
 
-    private void createMemberActivity(Object object, String activityEvent) {
-        memberActivityService.createMemberActivity(object.toString(), activityEvent);
+    private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
+        memberActivityService.createMemberActivity(phoneNumber, activityEvent);
+    }
+
+    private TransactionHistoryResponse mapToHistoryResponse(Transaction transaction) {
+        TransactionHistoryResponse response = new TransactionHistoryResponse();
+        response.setTransactionId(transaction.getId());
+        response.setReferenceNumber(transaction.getReferenceNumber());
+        response.setType(transaction.getType());
+        response.setCategory(transaction.getCategory());
+        response.setStatus(transaction.getStatus());
+        response.setAmount(transaction.getAmount());
+        response.setTransactionDesc(transaction.getTransactionDesc());
+        response.setTransactionDate(transaction.getTransactionDate());
+
+        return response;
     }
 
 }

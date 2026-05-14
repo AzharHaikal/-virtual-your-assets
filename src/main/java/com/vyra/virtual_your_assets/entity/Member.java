@@ -6,16 +6,17 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(schema = "idp", name = "member")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Member {
+@Table(schema = "idp", name = "member")
+@Entity
+public class Member extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String memberId;
+    private String id;
 
     @Column(nullable = false, length = 50)
     private String firstName;
@@ -34,11 +35,4 @@ public class Member {
 
     @Enumerated(EnumType.STRING)
     private MemberStatus status;
-
-    private String createdBy;
-    private String modifiedBy;
-
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
 }

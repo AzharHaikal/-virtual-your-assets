@@ -8,16 +8,17 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Entity
-@Table(schema = "idp", name = "member_otp")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(schema = "idp", name = "member_otp")
+@Entity
 public class MemberOtp {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String memberOtpId;
+    private String id;
 
     @Column(nullable = false, length = 15)
     private String phoneNumber;
@@ -25,14 +26,14 @@ public class MemberOtp {
     @Column(nullable = false)
     private String otpCode;
 
-    @Column(name = "expired_at", nullable = false)
-    private LocalDateTime expiredAt;
-
     @Enumerated(EnumType.STRING)
     private OtpType otpType;
 
-    @Column(name = "attempts")
-    private Integer attempts;
+    @Column(nullable = false)
+    private Integer attempts = 0;
+
+    @Column(nullable = false)
+    private LocalDateTime expiredAt;
 
     private LocalDateTime createdAt;
 }

@@ -2,8 +2,8 @@
 //
 //import com.vyra.virtual_your_assets.constant.ErrorConstant;
 //import com.vyra.virtual_your_assets.dto.BaseResponse;
-//import com.vyra.virtual_your_assets.dto.register.ForgotPasswordRequest;
-//import com.vyra.virtual_your_assets.dto.register.ResetPasswordRequest;
+//import com.vyra.virtual_your_assets.dto.auth.ForgotPasswordRequest;
+//import com.vyra.virtual_your_assets.dto.auth.ResetPasswordRequest;
 //import com.vyra.virtual_your_assets.entity.Member;
 //import com.vyra.virtual_your_assets.entity.MemberOtp;
 //import com.vyra.virtual_your_assets.exception.BusinessException;

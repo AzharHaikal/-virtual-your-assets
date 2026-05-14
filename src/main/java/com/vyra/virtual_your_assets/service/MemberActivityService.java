@@ -1,5 +1,6 @@
 package com.vyra.virtual_your_assets.service;
 
+import com.vyra.virtual_your_assets.constant.MemberActivityEvent;
 import com.vyra.virtual_your_assets.entity.MemberActivity;
 import com.vyra.virtual_your_assets.repository.MemberActivityRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,10 +16,11 @@ public class MemberActivityService {
     private final MemberActivityRepository memberActivityRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void createMemberActivity(String phoneNumber, String description) {
+    public void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
         MemberActivity request = MemberActivity.builder()
                 .phoneNumber(phoneNumber)
-                .description(description)
+                .event(activityEvent)
+                .description(activityEvent.getDescription())
                 .createdAt(LocalDateTime.now())
                 .build();
         memberActivityRepository.save(request);

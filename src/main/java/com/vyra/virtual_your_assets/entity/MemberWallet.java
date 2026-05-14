@@ -1,31 +1,32 @@
 package com.vyra.virtual_your_assets.entity;
 
+import com.vyra.virtual_your_assets.constant.MemberStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(schema = "wallet", name = "member_wallet")
-@Data
+import com.vyra.virtual_your_assets.constant.MemberActivityEvent;
+
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MemberWallet {
+@Table(schema = "wallet", name = "member_wallet")
+@Entity
+public class MemberWallet extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String memberWalletId;
+    private String id;
 
-    @Column(name = "phone_number", nullable = false)
+    @Column(nullable = false)
+    private String memberId;
+
+    @Column(nullable = false, length = 15)
     private String phoneNumber;
 
-    private String createdBy;
-    private String modifiedBy;
+    @Enumerated(EnumType.STRING)
+    private MemberStatus status;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
 }

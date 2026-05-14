@@ -41,21 +41,26 @@ public class WalletService {
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CREATE_WALLET);
 
         MemberWallet memberWallet = new MemberWallet();
-        BeanUtils.copyProperties(request, memberWallet);
+        memberWallet.setMemberId(request.getMemberId());
+        memberWallet.setPhoneNumber(request.getPhoneNumber());
         memberWallet.setCreatedBy(request.getPhoneNumber());
         memberWallet.setCreatedAt(LocalDateTime.now());
         memberWalletRepository.save(memberWallet);
 
         WalletStatement walletStatement = new WalletStatement();
-        BeanUtils.copyProperties(request, walletStatement);
-        walletStatement.setCreatedAt(LocalDateTime.now());
+        walletStatement.setMemberWalletId(memberWallet.getId());
+        walletStatement.setPhoneNumber(request.getPhoneNumber());
         walletStatement.setTotalCredit(BigDecimal.ZERO);
         walletStatement.setTotalDebit(BigDecimal.ZERO);
         walletStatement.setBalance(BigDecimal.ZERO);
+        walletStatement.setCreatedBy(request.getPhoneNumber());
+        walletStatement.setCreatedAt(LocalDateTime.now());
         walletStatementRepository.save(walletStatement);
 
         CreateWalletResponse response = new CreateWalletResponse();
+        response.setMemberId(request.getMemberId());
         response.setPhoneNumber(request.getPhoneNumber());
+        response.setBalance(walletStatement.getBalance());
 
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_CREATE_WALLET);
         log.info("[END] walletService.createMemberWallet successfully. phoneNumber: {} ", request.getPhoneNumber());
@@ -103,7 +108,7 @@ public class WalletService {
         BigDecimal amount = request.getAmount();
 
         WalletStatementHistory history = new WalletStatementHistory();
-        history.setWalletStatementId(wallet.getWalletStatementId());
+        history.setWalletStatementId(wallet.getId());
         history.setMemberWalletId(wallet.getMemberWalletId());
         history.setTransactionId(request.getTransactionId());
         history.setPreviousBalance(wallet.getBalance());

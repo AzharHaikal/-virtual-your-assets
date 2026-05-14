@@ -4,29 +4,31 @@ import com.vyra.virtual_your_assets.constant.transaction.TransactionCategory;
 import com.vyra.virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.virtual_your_assets.constant.transaction.TransactionType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(schema = "transaction_finance", name = "transaction")
-@Data
-@Builder
+@Getter
+@Setter
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Transaction {
+@Table(schema = "transaction_finance", name = "transaction")
+@Entity
+public class Transaction extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String transactionId;
+    private String id;
 
-    @Column(name = "user_phone_number", nullable = false)
+    @Column(nullable = false)
+    private String memberId;
+
+    @Column(nullable = false, length = 15)
     private String userPhoneNumber;
 
-    @Column(name = "user_email", nullable = false)
+    @Column(nullable = false, length = 50)
     private String userEmail;
 
     @Enumerated(EnumType.STRING)
@@ -38,22 +40,14 @@ public class Transaction {
     @Enumerated(EnumType.STRING)
     private TransactionStatus status;
 
-    @Column(name = "amount", nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "transaction_desc")
+    @Column(nullable = false)
     private String transactionDesc;
 
-    @Column(name = "reference_number")
+    @Column(nullable = false, unique = true, length = 50)
     private String referenceNumber;
 
-    @Column(name = "transaction_date")
     private LocalDateTime transactionDate;
-
-    private String createdBy;
-    private String modifiedBy;
-
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
 }

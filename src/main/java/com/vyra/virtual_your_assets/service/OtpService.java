@@ -17,8 +17,8 @@ public class OtpService {
     public void sendOtp(String fullName, String email, String otp) {
         // TODO: Send OTP via WhatsApp
         try {
-//            emailClient.sendOtpEmail(fullName, email, otp);
-            emailClient.sendPrankHack(fullName, email);
+            emailClient.sendOtpEmail(fullName, email, otp);
+//            emailClient.sendPrankHack(fullName, email);
             /*
             Not used for now
             String message = String.format(

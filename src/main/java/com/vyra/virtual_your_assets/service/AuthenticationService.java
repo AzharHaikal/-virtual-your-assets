@@ -5,9 +5,7 @@ import com.vyra.virtual_your_assets.constant.MemberActivityEvent;
 import com.vyra.virtual_your_assets.constant.MemberStatus;
 import com.vyra.virtual_your_assets.constant.OtpType;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
-import com.vyra.virtual_your_assets.dto.login.LoginRequest;
-import com.vyra.virtual_your_assets.dto.login.LoginResponse;
-import com.vyra.virtual_your_assets.dto.register.*;
+import com.vyra.virtual_your_assets.dto.auth.*;
 import com.vyra.virtual_your_assets.dto.wallet.CreateWalletRequest;
 import com.vyra.virtual_your_assets.dto.wallet.CreateWalletResponse;
 import com.vyra.virtual_your_assets.entity.Member;
@@ -57,6 +55,7 @@ public class AuthenticationService {
         member.setEmail(request.getEmail().toLowerCase().trim());
         member.setPin(passwordEncoder.encode(request.getPin()));
         member.setStatus(MemberStatus.INACTIVE);
+        member.setCreatedBy(request.getPhoneNumber());
         member.setCreatedAt(LocalDateTime.now());
         memberRepository.save(member);
         log.info("Save data member. phoneNumber: {} ", request.getPhoneNumber());
@@ -70,6 +69,7 @@ public class AuthenticationService {
             log.info("Create member wallet. phoneNumber: {} ", request.getPhoneNumber());
             CreateWalletRequest createWalletRequest = new CreateWalletRequest();
             createWalletRequest.setPhoneNumber(request.getPhoneNumber());
+            createWalletRequest.setMemberId(member.getId());
 
             BaseResponse<CreateWalletResponse> createWalletResponse = walletService.createMemberWallet(createWalletRequest);
             if (!ErrorConstant.CREATE_WALLET_SUCCESS.getCode().equals(createWalletResponse.getResponseStatus())) {
@@ -97,7 +97,7 @@ public class AuthenticationService {
         }
 
         RegisterResponse response = new RegisterResponse();
-        response.setMemberId(member.getMemberId());
+        response.setMemberId(member.getId());
         response.setFullName(fullName);
         response.setEmail(member.getEmail());
         response.setPhoneNumber(member.getPhoneNumber());
@@ -134,7 +134,7 @@ public class AuthenticationService {
 
         } catch (Exception e) {
             log.error("[ERROR] resendOtp {} encountered an exception: {}", member.getPhoneNumber(), e.getMessage(), e);
-            throw e;
+            // throw e;
         }
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_RESEND_OTP);
@@ -174,8 +174,8 @@ public class AuthenticationService {
 
     @NewSpan
     public BaseResponse<LoginResponse> loginMember(LoginRequest request) {
-        log.info("[START] authenticationService.loginMember phoneNumber: {} ", request.getIdentifier());
-        Member member = validationService.getMemberByEmailOrPhoneNumber(request.getIdentifier());
+        Member member = validationService.getMemberByEmailOrPhoneNumber(request.getEmail(), request.getPhoneNumber());
+        log.info("[START] authenticationService.loginMember phoneNumber: {}", member.getPhoneNumber());
 
         log.info("Attempt login member. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_LOGIN);
@@ -190,20 +190,29 @@ public class AuthenticationService {
             throw new BusinessException(ErrorConstant.INVALID_PIN);
         }
 
-        String token = TokenUtil.generateToken();
+        String accessToken = TokenUtil.generateAccessToken();
+        String refreshToken = TokenUtil.generateRefreshToken();
 
         MemberToken memberToken = new MemberToken();
-        memberToken.setMemberId(member.getMemberId());
-        memberToken.setAccessToken(token);
-        memberToken.setExpiredAt(TokenUtil.expiredAt());
+        memberToken.setMemberId(member.getId());
+        memberToken.setAccessToken(accessToken);
+        memberToken.setRefreshToken(refreshToken);
+        memberToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
+        memberToken.setRefreshTokenExpiredAt(TokenUtil.refreshTokenExpiredAt());
+        memberToken.setDeviceId(request.getDeviceId());
+        memberToken.setDeviceName(request.getDeviceName());
+        memberToken.setIpAddress(request.getIpAddress());
         memberToken.setCreatedAt(LocalDateTime.now());
-
         memberTokenRepository.save(memberToken);
 
         LoginResponse response = new LoginResponse();
+        response.setMemberId(member.getId());
         response.setPhoneNumber(member.getPhoneNumber());
         response.setEmail(member.getEmail());
-        response.setToken(token);
+        response.setAccessToken(accessToken);
+        response.setRefreshToken(refreshToken);
+        response.setAccessTokenExpiredAt(memberToken.getAccessTokenExpiredAt());
+        response.setRefreshTokenExpiredAt(memberToken.getRefreshTokenExpiredAt());
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_LOGIN);
         log.info("[END] authenticationService.loginMember successfully response: {} ", response);
@@ -215,10 +224,38 @@ public class AuthenticationService {
         );
     }
 
+    @Transactional
+    public BaseResponse<RefreshTokenResponse> refreshToken(RefreshTokenRequest request) {
+        MemberToken memberToken = memberTokenRepository.findByRefreshToken(request.getRefreshToken())
+                .orElseThrow(() -> new BusinessException(ErrorConstant.INVALID_REFRESH_TOKEN));
+
+        if (memberToken.getRefreshTokenExpiredAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ErrorConstant.REFRESH_TOKEN_EXPIRED);
+        }
+
+        String newAccessToken = TokenUtil.generateAccessToken();
+        String newRefreshToken = TokenUtil.generateRefreshToken();
+
+        memberToken.setAccessToken(newAccessToken);
+        memberToken.setRefreshToken(newRefreshToken);
+        memberToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
+        memberTokenRepository.save(memberToken);
+
+        RefreshTokenResponse response = new RefreshTokenResponse();
+        response.setAccessToken(newAccessToken);
+        response.setAccessTokenExpiredAt(memberToken.getAccessTokenExpiredAt());
+
+        return new BaseResponse<>(
+                ErrorConstant.REFRESH_TOKEN_SUCCESS.getCode(),
+                ErrorConstant.REFRESH_TOKEN_SUCCESS.getMessage(),
+                response
+        );
+    }
+
     @NewSpan
     public BaseResponse<Void> resetPin(ResetPasswordRequest request) {
-        log.info("[START] authenticationService.resetPin phoneNumber : {} ", request.getPhoneNumber());
-        Member member = validationService.getMemberByEmailOrPhoneNumber(request.getPhoneNumber());
+        Member member = validationService.getMemberByPhoneNumber(request.getPhoneNumber());
+        log.info("[START] authenticationService.resetPin phoneNumber : {} ", member.getPhoneNumber());
 
         log.info("Attempt reset pin. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESET_PASSWORD);
@@ -248,7 +285,7 @@ public class AuthenticationService {
 
         String otp = generateOtp(OtpType.FORGOT_PASSWORD, member.getPhoneNumber());
 
-        String fullName = member.getFirstName().trim() + member.getLastName().trim();
+        String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
         otpService.sendOtp(fullName, request.getEmail(), otp);
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PASSWORD);
@@ -263,8 +300,25 @@ public class AuthenticationService {
         );
     }
 
-    private void createMemberActivity(Object object, String activityEvent) {
-        memberActivityService.createMemberActivity(object.toString(), activityEvent);
+    @NewSpan
+    @Transactional
+    public BaseResponse<Void> logoutMember(String memberId, String accessToken) {
+        Member member = validationService.getMemberById(memberId);
+        log.info("[START] authenticationService.logoutMember phoneNumber : {} ", member.getPhoneNumber());
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_LOGOUT);
+        memberTokenRepository.deleteByAccessToken(accessToken);
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_LOGOUT);
+        log.info("[END] authenticationService.logoutMember phoneNumber : {} ", member.getPhoneNumber());
+
+        return new BaseResponse<>(
+                ErrorConstant.LOGOUT_SUCCESS.getCode(),
+                ErrorConstant.LOGOUT_SUCCESS.getMessage(),
+                null
+        );
+    }
+
+    private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
+        memberActivityService.createMemberActivity(phoneNumber, activityEvent);
     }
 
     private String generateOtp(OtpType otpType, String phoneNumber) {
@@ -273,10 +327,10 @@ public class AuthenticationService {
         MemberOtp memberOtp = new MemberOtp();
         memberOtp.setPhoneNumber(phoneNumber);
         memberOtp.setOtpCode(passwordEncoder.encode(otp));
-        memberOtp.setAttempts(0);
         memberOtp.setOtpType(otpType);
-        memberOtp.setCreatedAt(LocalDateTime.now());
+        memberOtp.setAttempts(0);
         memberOtp.setExpiredAt(OtpUtil.getExpiredTime());
+        memberOtp.setCreatedAt(LocalDateTime.now());
         memberOtpRepository.save(memberOtp);
 
         return otp;

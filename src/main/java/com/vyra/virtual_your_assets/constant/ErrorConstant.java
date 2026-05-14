@@ -7,6 +7,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ErrorConstant {
 
+    // Register
     REGISTER_SUCCESS("VYRA-REG-000", "Your registration was successful"),
     REGISTER_FAILED("VYRA-REG-001", "Your registration was failed"),
 
@@ -16,12 +17,17 @@ public enum ErrorConstant {
     EMAIL_SEND_FAILED("VYRA-EML-001", "Failed when sent otp via email"),
 
     LOGIN_SUCCESS("VYRA-LGN-000", "You've successfully logged in"),
+    LOGOUT_SUCCESS("VYRA-LGT-000", "You've successfully logged out"),
 
     FORGOT_PASSWORD_OTP_SENT("VYRA-FP-001", "An OTP has been sent"),
     RESET_PIN_SUCCESS("VYRA-FP-002", "Your PIN has been successfully updated"),
 
+    // Token
     TOKEN_CREATED("VYRA-TKN-001", "Your session has been created"),
     TOKEN_EXPIRED("VYRA-TKN-002", "Your session has expired. Please log in again"),
+    INVALID_REFRESH_TOKEN("VYRA-TKN-003", "Invalid refresh token"),
+    REFRESH_TOKEN_EXPIRED("VYRA-TKN-004", "Your refresh session has expired. Please log in again"),
+    REFRESH_TOKEN_SUCCESS("VYRA-TKN-005", "Access token refreshed successfully"),
 
     // Invalid
     INVALID_PIN("VYRA-INV-001", "Invalid PIN. Please try again"),
@@ -36,6 +42,9 @@ public enum ErrorConstant {
     PHONE_NUMBER_ALREADY_EXIST("VYRA-EXS-001", "Your account already exists. Please use a different account"),
     EMAIL_ALREADY_EXIST("VYRA-EXS-002", "Your account already exists. Please use a different account"),
 
+    PHONE_NUMBER_ALREADY_EXIST_V2("VYRA-EXS-003", "Email already exists, please use different email"),
+    EMAIL_ALREADY_EXIST_V2("VYRA-EXS-004", "Phone number already exists, please use different phone number"),
+
     // OTP
     VERIFY_OTP_SUCCESS("VYRA-OTP-000", "OTP verification successful"),
     RESEND_OTP("VYRA-OTP-001", "If the account exists, a new OTP has been sent"),
@@ -48,6 +57,9 @@ public enum ErrorConstant {
     GET_MEMBER_SUCCESS("VYRA-GMS-000", "Get member detail successful"),
     GET_MEMBER_FAILED("VYRA-GMS-001", "Get member detail failed"),
 
+    // Update member profile
+    UPDATE_PROFILE_SUCCESS("VYRA-UPS-000", "Update member profile successful"),
+
     // Member Wallet
     GET_MEMBER_WALLET_SUCCESS("VYRA-GWS-000", "Get member detail successful"),
     GET_MEMBER_WALLET_FAILED("VYRA-GWS-001", "Get member detail failed"),
@@ -55,6 +67,9 @@ public enum ErrorConstant {
     // Transaction Wallet
     CREATE_TRANSACTION_WALLET_SUCCESS("VYRA-TWS-000", "Create transaction wallet successful"),
     CREATE_TRANSACTION_WALLET_FAILED("VYRA-TWS-001", "Get member detail successful"),
+
+    // Transaction History
+    GET_TRANSACTION_HISTORY_SUCCESS("VYRA-GTH-000","Transaction history retrieved successfully"),
 
     // Exception
     BAD_REQUEST("VYRA-ERR400", "Something went wrong with your request"),

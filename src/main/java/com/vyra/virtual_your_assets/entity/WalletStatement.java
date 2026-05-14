@@ -2,45 +2,36 @@ package com.vyra.virtual_your_assets.entity;
 
 import com.vyra.virtual_your_assets.crypto.BalanceEncryptConverter;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(schema = "wallet", name = "wallet_statement")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class WalletStatement {
+@Table(schema = "wallet", name = "wallet_statement")
+@Entity
+public class WalletStatement extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String walletStatementId;
+    private String id;
 
-    @Column(name = "member_wallet_id", nullable = false)
+    @Column(nullable = false, unique = true)
     private String memberWalletId;
 
-    @Column(name = "phone_number", nullable = false)
+    @Column(nullable = false)
     private String phoneNumber;
 
-    @Column(name = "total_credit")
+    @Column(precision = 19, scale = 2)
     private BigDecimal totalCredit;
 
-    @Column(name = "total_debit")
+    @Column(precision = 19, scale = 2)
     private BigDecimal totalDebit;
 
-    @Column(name = "balance")
     @Convert(converter = BalanceEncryptConverter.class)
     private BigDecimal balance;
 
-    private String createdBy;
-    private String modifiedBy;
-
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
 }

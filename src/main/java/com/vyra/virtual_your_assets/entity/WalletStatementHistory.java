@@ -1,44 +1,42 @@
 package com.vyra.virtual_your_assets.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(schema = "wallet", name = "wallet_statement_history")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(schema = "wallet", name = "wallet_statement_history")
+@Entity
 public class WalletStatementHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String walletStatementHistoryId;
+    private String id;
 
-    @Column(name = "wallet_statement_id")
+    @Column(nullable = false)
     private String walletStatementId;
 
-    @Column(name = "member_wallet_id")
+    @Column(nullable = false)
     private String memberWalletId;
 
-    @Column(name = "transaction_id")
+    @Column(nullable = false)
     private String transactionId;
 
-    @Column(name = "previous_balance")
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal previousBalance;
+
+    @Column(precision = 19, scale = 2)
     private BigDecimal credit;
+
+    @Column(precision = 19, scale = 2)
     private BigDecimal debit;
 
-    private String createdBy;
-    private String modifiedBy;
-
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal currentBalance;
 
 }
