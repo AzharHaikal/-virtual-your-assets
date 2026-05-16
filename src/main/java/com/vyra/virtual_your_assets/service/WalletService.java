@@ -13,12 +13,8 @@ import com.vyra.virtual_your_assets.repository.MemberWalletRepository;
 import com.vyra.virtual_your_assets.repository.WalletStatementHistoryRepository;
 import com.vyra.virtual_your_assets.repository.WalletStatementRepository;
 import io.micrometer.tracing.annotation.NewSpan;
-import jakarta.persistence.Column;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +32,7 @@ public class WalletService {
 
     @Transactional
     @NewSpan
-    public BaseResponse<CreateWalletResponse> createMemberWallet(CreateWalletRequest request) {
+    public BaseResponse<CreateWalletResponse> createWallet(CreateWalletRequest request) {
         log.info("[START] walletService.createMemberWallet. phoneNumber: {} ", request.getPhoneNumber());
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CREATE_WALLET);
 
@@ -75,7 +71,7 @@ public class WalletService {
     @NewSpan
     public BaseResponse<GetMemberWalletResponse> getMemberWallet(String phoneNumber) {
         log.info("[START] walletService.getMemberWallet. phoneNumber: {} ", phoneNumber);
-        memberActivityService.createMemberActivity(phoneNumber, MemberActivityEvent.ATTEMPT_GET_MEMBER_WALLET);
+        createMemberActivity(phoneNumber, MemberActivityEvent.ATTEMPT_GET_MEMBER_WALLET);
 
         WalletStatement getWallet = walletStatementRepository.findByPhoneNumber(phoneNumber)
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
@@ -86,7 +82,7 @@ public class WalletService {
         response.setTotalDebit(getWallet.getTotalDebit());
         response.setBalance(getWallet.getBalance());
 
-        memberActivityService.createMemberActivity(phoneNumber, MemberActivityEvent.SUCCESS_GET_MEMBER_WALLET);
+        createMemberActivity(phoneNumber, MemberActivityEvent.SUCCESS_GET_MEMBER_WALLET);
         log.info("[END] walletService.getMemberWallet successfully. phoneNumber: {} ", phoneNumber);
 
         return new BaseResponse<>(
@@ -100,7 +96,7 @@ public class WalletService {
     @NewSpan
     public BaseResponse<TransactionWalletResponse> createTransactionWallet(TransactionWalletRequest request) {
         log.info("[START] walletService.createTransactionWallet. phoneNumber: {} ", request.getPhoneNumber());
-        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_INSERT_WALLET_STATEMENT);
+        createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_INSERT_WALLET_STATEMENT);
 
         WalletStatement wallet = walletStatementRepository.findByPhoneNumber(request.getPhoneNumber())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
@@ -132,7 +128,7 @@ public class WalletService {
         response.setTotalDebit(wallet.getTotalDebit());
         response.setBalance(wallet.getBalance());
 
-        memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_INSERT_WALLET_STATEMENT);
+        createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_INSERT_WALLET_STATEMENT);
         log.info("[END] walletService.createTransactionWallet successfully. phoneNumber: {} ", request.getPhoneNumber());
 
         return new BaseResponse<>(
@@ -140,5 +136,9 @@ public class WalletService {
                 ErrorConstant.CREATE_TRANSACTION_WALLET_SUCCESS.getMessage(),
                 response
         );
+    }
+
+    private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
+        memberActivityService.createMemberActivity(phoneNumber, activityEvent);
     }
 }

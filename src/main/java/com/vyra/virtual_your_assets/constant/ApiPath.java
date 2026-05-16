@@ -26,7 +26,7 @@ public class ApiPath {
     // Wallet Controller
     public static final String V1_WALLET = "/api/v1/wallet";
     public static final String CREATE_WALLET = "/create";
-    public static final String GET_WALLET = "/get-wallet-balance";
+    public static final String GET_WALLET = "/get-wallet/{phoneNumber}";
 
     // Transaction Controller
     public static final String V1_TRANSACTION = "/api/v1/transaction";

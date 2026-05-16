@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.vyra</groupId>
-	<artifactId>virtual-your-assets</artifactId>
+	<artifactId>be-virtual-your-assets</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Virtual Your Asset</name>
 	<description>Project Virtual Your Asset</description>
