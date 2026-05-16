@@ -59,6 +59,9 @@ public enum MemberActivityEvent {
     SUCCESS_CREATE_TRANSACTION("Successfully create transaction"),
     FAILED_CREATE_TRANSACTION("Failed create transaction"),
 
+    ATTEMPT_GET_TRANSACTION_HISTORY("Attempt get transaction history"),
+    SUCCESS_GET_TRANSACTION_HISTORY("Successfully get transaction history"),
+
     // TRANSACTION WALLET
     ATTEMPT_INSERT_WALLET_STATEMENT("Attempt insert transaction wallet statement"),
     SUCCESS_INSERT_WALLET_STATEMENT("Attempt insert transaction wallet statement");

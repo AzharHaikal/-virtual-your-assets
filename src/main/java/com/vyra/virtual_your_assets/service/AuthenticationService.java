@@ -71,7 +71,7 @@ public class AuthenticationService {
             createWalletRequest.setPhoneNumber(request.getPhoneNumber());
             createWalletRequest.setMemberId(member.getId());
 
-            BaseResponse<CreateWalletResponse> createWalletResponse = walletService.createMemberWallet(createWalletRequest);
+            BaseResponse<CreateWalletResponse> createWalletResponse = walletService.createWallet(createWalletRequest);
             if (!ErrorConstant.CREATE_WALLET_SUCCESS.getCode().equals(createWalletResponse.getResponseStatus())) {
                 log.info("Failed when creating member wallet. phoneNumber: {} ", request.getPhoneNumber());
                 throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);

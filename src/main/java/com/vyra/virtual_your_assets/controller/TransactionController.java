@@ -9,10 +9,9 @@ import com.vyra.virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.virtual_your_assets.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 import static com.vyra.virtual_your_assets.constant.ApiPath.CREATE_TRANSACTION;
 import static com.vyra.virtual_your_assets.constant.ApiPath.GET_HISTORY_TRANSACTION;
@@ -33,8 +32,16 @@ public class TransactionController {
     }
 
     @GetMapping(GET_HISTORY_TRANSACTION)
-    public BaseResponse<List<TransactionHistoryResponse>> getHistory(Authentication authentication) {
+    public BaseResponse<Page<TransactionHistoryResponse>> getTransactionHistory(
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            Authentication authentication
+    ) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
-        return transactionService.getHistory(user.getMemberId());
+        return transactionService.getTransactionHistory(startDate, endDate, type, page, size, user.getMemberId()
+        );
     }
 }

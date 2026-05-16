@@ -19,13 +19,17 @@ import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalTime;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -66,9 +70,24 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
-    public BaseResponse<List<TransactionHistoryResponse>> getHistory(String memberId) {
-        List<Transaction> transactions = transactionRepository.findAllByMemberIdAndDeletedAtIsNullOrderByTransactionDateDesc(memberId);
-        List<TransactionHistoryResponse> responses = transactions.stream().map(this::mapToHistoryResponse).toList();
+    public BaseResponse<Page<TransactionHistoryResponse>> getTransactionHistory(
+            String startDate, String endDate, String type, int page, int size, String memberId
+    ) {
+        Member member = validationService.getMemberById(memberId);
+        log.info("[START] transactionService.getTransactionHistory phoneNumber: {} ", member.getPhoneNumber());
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GET_TRANSACTION_HISTORY);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
+
+        LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
+        LocalDateTime end = LocalDate.parse(endDate).atTime(LocalTime.MAX);
+
+        Page<Transaction> transactions = transactionRepository.findTransactionHistory(memberId, start, end, type, pageable);
+        Page<TransactionHistoryResponse> responses = transactions.map(this::mapToHistoryResponse);
+
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_GET_TRANSACTION_HISTORY);
+        log.info("[END] transactionService.getTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
+
         return new BaseResponse<>(
                 ErrorConstant.GET_TRANSACTION_HISTORY_SUCCESS.getCode(),
                 ErrorConstant.GET_TRANSACTION_HISTORY_SUCCESS.getMessage(),
@@ -148,7 +167,6 @@ public class TransactionService {
         response.setStatus(transaction.getStatus());
         response.setAmount(transaction.getAmount());
         response.setTransactionDesc(transaction.getTransactionDesc());
-        response.setTransactionDate(transaction.getTransactionDate());
 
         return response;
     }
