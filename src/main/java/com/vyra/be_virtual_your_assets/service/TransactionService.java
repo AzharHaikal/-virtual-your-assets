@@ -47,14 +47,14 @@ public class TransactionService {
 
     @NewSpan
     public BaseResponse<GetChartResponse> getChart(String memberId, String period) {
-        String normalizedPeriod = period == null ? "ALL" : period.toUpperCase();
+        String normalizedPeriod = period == null ? "1W" : period.toUpperCase();
 
         List<Object[]> results = switch (normalizedPeriod) {
-            case "1W" -> transactionRepository.getChartDaily(memberId, LocalDateTime.now().minusWeeks(1));
             case "1M" -> transactionRepository.getChartDaily(memberId, LocalDateTime.now().minusMonths(1));
             case "3M" -> transactionRepository.getChartWeekly(memberId, LocalDateTime.now().minusMonths(3));
             case "1Y" -> transactionRepository.getChartMonthly(memberId, LocalDateTime.now().minusYears(1));
-            default -> transactionRepository.getChartMonthlyAll(memberId);
+            case "ALL" -> transactionRepository.getChartMonthlyAll(memberId);
+            default   -> transactionRepository.getChartDaily(memberId, LocalDateTime.now().minusWeeks(1));
         };
 
         List<ChartItemResponse> chart = buildChartWithEmptyBucket(normalizedPeriod, results);
@@ -257,17 +257,25 @@ public class TransactionService {
                                 (BigDecimal) row[2]
                         )
                 ));
+
         List<ChartItemResponse> chart = new ArrayList<>();
 
-        for (LocalDate date = start;
-             !date.isAfter(end);
-             date = date.plusDays(1)) {
-
+        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
             String label = date.toString();
             chart.add(data.getOrDefault(label, new ChartItemResponse(label, BigDecimal.ZERO, BigDecimal.ZERO)));
         }
 
-        return chart;
+        int lastNonEmpty = -1;
+        for (int i = chart.size() - 1; i >= 0; i--) {
+            ChartItemResponse item = chart.get(i);
+            if (item.getIncome().compareTo(BigDecimal.ZERO) != 0 ||
+                    item.getExpense().compareTo(BigDecimal.ZERO) != 0) {
+                lastNonEmpty = i;
+                break;
+            }
+        }
+
+        return lastNonEmpty >= 0 ? chart.subList(0, lastNonEmpty + 1) : chart;
     }
 
     private List<ChartItemResponse> buildWeeklyChart(List<Object[]> results) {
