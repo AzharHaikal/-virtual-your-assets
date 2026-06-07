@@ -1,0 +1,22 @@
+package com.vyra.be_virtual_your_assets.repository;
+
+import com.vyra.be_virtual_your_assets.entity.Member;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface MemberRepository extends JpaRepository<Member, UUID> {
+    Optional<Member> findByPhoneNumber(String phoneNumber);
+
+    Optional<Member> findByEmailIgnoreCase(String email);
+
+    @Query(value = "SELECT m FROM Member m WHERE m.email = :identifier OR m.phoneNumber = :identifier")
+    Optional<Member> getMemberByEmailOrPhoneNumber(@Param("identifier") String identifier);
+
+    void deleteByPhoneNumber(String phoneNumber);
+
+    Optional<Member> findById(String memberId);
+}
