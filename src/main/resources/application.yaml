@@ -1,20 +1,20 @@
 server:
-  port: ${PORT:8080}
+  port: ${PORT:8000}
 
 spring:
   application:
     name: VIRTUAL_YOUR_ASSET
 
   datasource:
-    url: ${DATABASE_URL}
-    username: ${DATABASE_USERNAME}
-    password: ${DATABASE_PASSWORD}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/vyra}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:qwerty}
     driver-class-name: org.postgresql.Driver
 
     hikari:
       maximum-pool-size: 5
-      data-source-properties:
-        sslmode: require
+#      data-source-properties:
+#        sslmode: require
 
   flyway:
     enabled: true

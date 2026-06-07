@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 public class TransactionWalletResponse {
     private String phoneNumber;
     private BigDecimal previousBalance;
-    private BigDecimal totalCredit;
-    private BigDecimal totalDebit;
+    private BigDecimal totalIncome;
+    private BigDecimal totalExpense;
     private BigDecimal balance;
 }

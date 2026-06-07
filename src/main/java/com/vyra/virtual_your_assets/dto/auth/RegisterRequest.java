@@ -24,7 +24,7 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^62\\d+$", message = "Phone number must start with 62")
+    @Pattern(regexp = "^628\\d+$", message = "Phone number must start with 628")
     @Size(min = 10, max = 15, message = "Phone number must contain 10 to 15 digits")
     private String phoneNumber;
 

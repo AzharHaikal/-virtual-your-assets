@@ -2,6 +2,7 @@ package com.vyra.virtual_your_assets.config;
 
 import com.vyra.virtual_your_assets.constant.SecurityConstant;
 import com.vyra.virtual_your_assets.security.filter.AuthTokenFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,9 +29,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> {})
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(
+                                (request, response, authException) -> {
+                                    response.sendError(
+                                            HttpServletResponse.SC_UNAUTHORIZED,
+                                            "Unauthorized"
+                                    );
+                                }
+                        )
                 )
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers(SecurityConstant.WHITE_LIST_URL)
@@ -38,7 +50,11 @@ public class SecurityConfig {
                                 .anyRequest()
                                 .authenticated()
                 )
-                .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        authTokenFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
+
         return http.build();
     }
 }

@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -13,7 +12,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Table(schema = "wallet", name = "wallet_statement_history")
 @Entity
-public class WalletStatementHistory {
+public class WalletStatementHistory extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -30,11 +29,13 @@ public class WalletStatementHistory {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal previousBalance;
 
+    @Builder.Default
     @Column(precision = 19, scale = 2)
-    private BigDecimal credit;
+    private BigDecimal income = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(precision = 19, scale = 2)
-    private BigDecimal debit;
+    private BigDecimal expense = BigDecimal.ZERO;;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal currentBalance;

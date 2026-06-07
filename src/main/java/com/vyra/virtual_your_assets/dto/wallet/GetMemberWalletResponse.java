@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 @Data
 public class GetMemberWalletResponse {
     private String phoneNumber;
-    private BigDecimal totalCredit;
-    private BigDecimal totalDebit;
+    private BigDecimal totalIncome;
+    private BigDecimal totalExpense;
     private BigDecimal balance;
 }

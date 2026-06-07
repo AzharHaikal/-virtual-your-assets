@@ -17,12 +17,12 @@ public class MemberActivityService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
-        MemberActivity request = MemberActivity.builder()
-                .phoneNumber(phoneNumber)
-                .event(activityEvent)
-                .description(activityEvent.getDescription())
-                .createdAt(LocalDateTime.now())
-                .build();
-        memberActivityRepository.save(request);
+        MemberActivity memberActivity = new MemberActivity();
+        memberActivity.setPhoneNumber(phoneNumber);
+        memberActivity.setEvent(activityEvent.name());
+        memberActivity.setDescription(activityEvent.getDescription());
+        memberActivity.setCreatedBy(phoneNumber);
+        memberActivity.setCreatedAt(LocalDateTime.now());
+        memberActivityRepository.save(memberActivity);
     }
 }

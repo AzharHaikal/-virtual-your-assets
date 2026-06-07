@@ -11,7 +11,7 @@ public class CreateTransactionResponse {
     private String transactionId;
     private String phoneNumber;
     private String email;
-    private TransactionCategory category;
+    private String category;
     private TransactionType transactionType;
     private BigDecimal amount;
     private String referenceNumber;

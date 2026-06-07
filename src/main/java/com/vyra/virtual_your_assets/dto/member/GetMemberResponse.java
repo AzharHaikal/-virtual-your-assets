@@ -11,8 +11,8 @@ public class GetMemberResponse {
     private String fullName;
     private String email;
     private String phoneNumber;
-    private BigDecimal totalCredit;
-    private BigDecimal totalDebit;
+    private BigDecimal totalIncome;
+    private BigDecimal totalExpense;
     private BigDecimal balance;
-
+    private BigDecimal growthPercentage;
 }

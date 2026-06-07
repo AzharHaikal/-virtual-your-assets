@@ -7,6 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface WalletStatementRepository extends JpaRepository<WalletStatement, UUID> {
-
     Optional<WalletStatement> findByPhoneNumber(String phoneNumber);
+
 }

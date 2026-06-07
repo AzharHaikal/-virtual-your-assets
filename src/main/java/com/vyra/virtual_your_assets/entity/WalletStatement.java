@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -26,10 +25,10 @@ public class WalletStatement extends BaseEntity {
     private String phoneNumber;
 
     @Column(precision = 19, scale = 2)
-    private BigDecimal totalCredit;
+    private BigDecimal totalIncome;
 
     @Column(precision = 19, scale = 2)
-    private BigDecimal totalDebit;
+    private BigDecimal totalExpense;
 
     @Convert(converter = BalanceEncryptConverter.class)
     private BigDecimal balance;
