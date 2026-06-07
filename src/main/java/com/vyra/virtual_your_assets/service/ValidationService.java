@@ -1,12 +1,13 @@
 package com.vyra.virtual_your_assets.service;
 
 import com.vyra.virtual_your_assets.constant.ErrorConstant;
+import com.vyra.virtual_your_assets.constant.MemberStatus;
 import com.vyra.virtual_your_assets.dto.auth.VerifyOtpRequest;
 import com.vyra.virtual_your_assets.dto.member.UpdateProfileRequest;
+import com.vyra.virtual_your_assets.dto.member.ValidateIsUpdateProfile;
 import com.vyra.virtual_your_assets.entity.Member;
 import com.vyra.virtual_your_assets.entity.MemberOtp;
 import com.vyra.virtual_your_assets.exception.BusinessException;
-import com.vyra.virtual_your_assets.repository.MemberActivityRepository;
 import com.vyra.virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.virtual_your_assets.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,6 @@ import java.time.LocalDateTime;
 public class ValidationService {
     private final MemberRepository memberRepository;
     private final MemberOtpRepository memberOtpRepository;
-    private final MemberActivityRepository memberActivityRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     public void validateDataExistRegister(String phoneNumber, String email) {
@@ -33,6 +33,11 @@ public class ValidationService {
 
     public Member getMemberById(String memberId) {
         return memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+    }
+
+    public Member getMemberByEmailOrPhoneNumber(String email, String phoneNumber) {
+        if (StringUtils.isNotBlank(email)) return getMemberByEmailIgnoreCase(email);
+        return getMemberByPhoneNumber(phoneNumber);
     }
 
     public Member getMemberByPhoneNumber(String phoneNumber) {
@@ -59,12 +64,11 @@ public class ValidationService {
             int remainingAttempts = maxAttempts - currentAttempts;
 
             if (currentAttempts >= maxAttempts) {
+                log.info("Executing account to suspend member: {}", member.getPhoneNumber());
+                member.setStatus(MemberStatus.SUSPENDED);
+                memberRepository.save(member);
                 memberOtpRepository.deleteByPhoneNumber(member.getPhoneNumber());
-                memberRepository.deleteByPhoneNumber(member.getPhoneNumber());
-                // Delete member wallet, wallet statement
-                memberActivityRepository.deleteByPhoneNumber(member.getPhoneNumber());
-
-                log.warn("Max attempts {} reached for {}. Data deleted.", currentAttempts, request.getEmail());
+                log.warn("Max attempts {} reached for {}. account has been suspended.", currentAttempts, member.getPhoneNumber());
                 throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED);
             } else {
                 memberOtpRepository.save(memberOtp);
@@ -74,41 +78,38 @@ public class ValidationService {
         return memberOtp;
     }
 
-    public Member getMemberByEmailOrPhoneNumber(String email, String phoneNumber) {
-        if (StringUtils.isNotBlank(email)) return getMemberByEmailIgnoreCase(email);
-        return getMemberByPhoneNumber(phoneNumber);
-    }
-
-    public void validateUpdateProfile(Member member, UpdateProfileRequest request) {
+    public ValidateIsUpdateProfile validateIsUpdateProfile(Member member, UpdateProfileRequest request) {
         log.info("Validate request update profile. phoneNumber: {}", member.getPhoneNumber());
+        ValidateIsUpdateProfile isUpdateProfile = new ValidateIsUpdateProfile();
+
         if (StringUtils.isNotBlank(request.getFirstName())) member.setFirstName(request.getFirstName().trim());
         if (StringUtils.isNotBlank(request.getLastName())) member.setLastName(request.getLastName().trim());
 
         if (StringUtils.isNotBlank(request.getEmail())) {
-            String email = request.getEmail().trim().toLowerCase();
             log.info("Check email already exist. phoneNumber: {}", member.getPhoneNumber());
-            memberRepository.findByEmailIgnoreCase(email)
+            memberRepository.findByEmailIgnoreCase(request.getEmail())
                     .ifPresent(existingMember -> {
                         if (!existingMember.getId().equals(member.getId())) {
                             log.error("Email already exist for another account. phoneNumber: {}", member.getPhoneNumber());
                             throw new BusinessException(ErrorConstant.EMAIL_ALREADY_EXIST_V2);
                         }
                     });
-
-            member.setEmail(email);
+            member.setEmail(request.getEmail());
+            isUpdateProfile.setEmailChanged(true);
         }
 
         if (StringUtils.isNotBlank(request.getPhoneNumber())) {
-            String phoneNumber = request.getPhoneNumber().trim();
             log.info("Check phone number already exist. phoneNumber: {}", member.getPhoneNumber());
-            memberRepository.findByPhoneNumber(phoneNumber)
+            memberRepository.findByPhoneNumber(request.getPhoneNumber())
                     .ifPresent(existingMember -> {
                         if (!existingMember.getId().equals(member.getId())) {
                             log.error("Phone number already exist for another account. phoneNumber: {}", member.getPhoneNumber());
-                            throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST);
+                            throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST_V2);
                         }
                     });
-            member.setPhoneNumber(phoneNumber);
+            member.setPhoneNumber(request.getPhoneNumber());
+            isUpdateProfile.setPhoneChanged(true);
         }
+        return isUpdateProfile;
     }
 }

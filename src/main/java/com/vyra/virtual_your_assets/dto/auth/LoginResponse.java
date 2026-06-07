@@ -13,5 +13,4 @@ public class LoginResponse {
     private String refreshToken;
     private LocalDateTime accessTokenExpiredAt;
     private LocalDateTime refreshTokenExpiredAt;
-
 }

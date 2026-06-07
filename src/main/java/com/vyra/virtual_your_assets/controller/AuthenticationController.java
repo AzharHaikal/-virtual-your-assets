@@ -3,6 +3,8 @@ package com.vyra.virtual_your_assets.controller;
 import com.vyra.virtual_your_assets.constant.ApiPath;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.auth.*;
+import com.vyra.virtual_your_assets.dto.member.UpdateProfileRequest;
+import com.vyra.virtual_your_assets.dto.member.UpdateProfileResponse;
 import com.vyra.virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.virtual_your_assets.service.AuthenticationService;
 import jakarta.validation.Valid;
@@ -44,12 +46,12 @@ public class AuthenticationController {
     }
 
     @PostMapping(FORGOT_PIN)
-    public BaseResponse<Void> forgotPin(@Valid @RequestBody ForgotPasswordRequest request) {
+    public BaseResponse<Void> forgotPin(@Valid @RequestBody ForgotPinRequest request) {
         return authenticationService.forgotPin(request);
     }
 
     @PostMapping(RESET_PIN)
-    public BaseResponse<Void> resetPin(@RequestBody ResetPasswordRequest request) {
+    public BaseResponse<Void> resetPin(@RequestBody ResetPinRequest request) {
         return authenticationService.resetPin(request);
     }
 

@@ -6,6 +6,7 @@ import com.vyra.virtual_your_assets.constant.MemberStatus;
 import com.vyra.virtual_your_assets.constant.OtpType;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
 import com.vyra.virtual_your_assets.dto.auth.*;
+import com.vyra.virtual_your_assets.dto.member.UpdateProfileResponse;
 import com.vyra.virtual_your_assets.dto.wallet.CreateWalletRequest;
 import com.vyra.virtual_your_assets.dto.wallet.CreateWalletResponse;
 import com.vyra.virtual_your_assets.entity.Member;
@@ -41,8 +42,8 @@ public class AuthenticationService {
     private final WalletService walletService;
     private final BCryptPasswordEncoder passwordEncoder;
 
-    @Transactional
     @NewSpan
+    @Transactional
     public BaseResponse<RegisterResponse> registerMember(RegisterRequest request) {
         log.info("[START] authenticationService.registerMember phoneNumber: {} ", request.getPhoneNumber());
         createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_REGISTER);
@@ -61,10 +62,9 @@ public class AuthenticationService {
         log.info("Save data member. phoneNumber: {} ", request.getPhoneNumber());
 
         String otp = generateOtp(OtpType.REGISTER, request.getPhoneNumber());
-
         String fullName = request.getFirstName().trim() + " " + request.getLastName().trim();
 
-        // Create wallet and send OTP
+        // Create wallet
         try {
             log.info("Create member wallet. phoneNumber: {} ", request.getPhoneNumber());
             CreateWalletRequest createWalletRequest = new CreateWalletRequest();
@@ -76,16 +76,6 @@ public class AuthenticationService {
                 log.info("Failed when creating member wallet. phoneNumber: {} ", request.getPhoneNumber());
                 throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);
             }
-
-            log.info("Attempt send otp to email. phoneNumber: {}, otp: {} ", request.getPhoneNumber(), otp);
-            createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_OTP_REGISTER);
-
-            // Send OTP async
-            otpService.sendOtp(fullName, request.getEmail(), otp);
-
-            createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_OTP_REGISTER);
-            log.info("Success send otp to email. phoneNumber: {}, otp: {} ", request.getPhoneNumber(), otp);
-
         } catch (BusinessException e) {
             log.error("[ERROR] register {} encountered an exception: {}", request.getPhoneNumber(), e.getMessage(), e);
             createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.FAILED_REGISTER);
@@ -95,6 +85,13 @@ public class AuthenticationService {
             createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.FAILED_REGISTER);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }
+
+        log.info("Send async OTP to email. phoneNumber: {}, otp: {} ", request.getPhoneNumber(), otp);
+        createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_OTP_REGISTER);
+
+        // Send OTP async
+        otpService.sendOtp(fullName, request.getEmail(), request.getPhoneNumber(), otp);
+        log.info("Successfully send OTP for phoneNumber: {} ", request.getPhoneNumber());
 
         RegisterResponse response = new RegisterResponse();
         response.setMemberId(member.getId());
@@ -112,30 +109,23 @@ public class AuthenticationService {
         );
     }
 
-    @Transactional
     @NewSpan
+    @Transactional
     public BaseResponse<Void> resendOtp(ResendOtpRequest request) {
-        // TODO : Try testing delete
         log.info("[START] authenticationService.resendOtp email: {} ", request.getEmail());
         Member member = validationService.getMemberByEmailIgnoreCase(request.getEmail());
-
-        log.info("Attempt resend otp to email. phoneNumber: {}", member.getPhoneNumber());
-        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESEND_OTP);
 
         memberOtpRepository.deleteByPhoneNumberAndOtpType(member.getPhoneNumber(), request.getOtpType());
 
         String otp = generateOtp(request.getOtpType(), member.getPhoneNumber());
+        String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
+
+        log.info("Resend async otp to email. phoneNumber: {}, otp: {} ", member.getPhoneNumber(), otp);
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESEND_OTP);
 
         // Send OTP async
-        try {
-            log.info("Attempt resend otp to email. phoneNumber: {}, otp: {} ", member.getPhoneNumber(), otp);
-            otpService.sendOtp(member.getFirstName().trim() + " " + member.getLastName().trim(), request.getEmail(), otp);
-            log.info("Success resend otp to email. phoneNumber: {}", member.getPhoneNumber());
-
-        } catch (Exception e) {
-            log.error("[ERROR] resendOtp {} encountered an exception: {}", member.getPhoneNumber(), e.getMessage(), e);
-            // throw e;
-        }
+        otpService.sendOtp(fullName, request.getEmail(), member.getPhoneNumber(), otp);
+        log.info("Successfully resend OTP to email for phoneNumber: {} ", member.getPhoneNumber());
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_RESEND_OTP);
         log.info("[END] authenticationService.resendOtp successfully phoneNumber: {}", member.getPhoneNumber());
@@ -147,18 +137,17 @@ public class AuthenticationService {
         );
     }
 
-    @Transactional(noRollbackFor = BusinessException.class)
     @NewSpan
+    @Transactional(noRollbackFor = BusinessException.class)
     public BaseResponse<Void> verifyOtp(VerifyOtpRequest request) {
-        log.info("[START] authenticationService.verifyOtp email: {} ", request.getEmail());
         Member member = validationService.getMemberByEmailIgnoreCase(request.getEmail());
+        log.info("[START] authenticationService.verifyOtp phoneNumber: {} ", member.getPhoneNumber());
 
         log.info("Attempt verify otp. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_VERIFY_OTP);
 
         MemberOtp memberOtp = validationService.verifyOtp(member, request);
         member.setStatus(MemberStatus.ACTIVE);
-        member.setUpdatedAt(LocalDateTime.now());
         memberRepository.save(member);
         memberOtpRepository.delete(memberOtp);
 
@@ -173,6 +162,7 @@ public class AuthenticationService {
     }
 
     @NewSpan
+    @Transactional
     public BaseResponse<LoginResponse> loginMember(LoginRequest request) {
         Member member = validationService.getMemberByEmailOrPhoneNumber(request.getEmail(), request.getPhoneNumber());
         log.info("[START] authenticationService.loginMember phoneNumber: {}", member.getPhoneNumber());
@@ -182,11 +172,13 @@ public class AuthenticationService {
 
         if (MemberStatus.ACTIVE != member.getStatus()) {
             log.info("Login failed member not active. phoneNumber: {} ", member.getPhoneNumber());
+            createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_LOGIN);
             throw new BusinessException(ErrorConstant.MEMBER_NOT_ACTIVE);
         }
 
         if (!passwordEncoder.matches(request.getPin(), member.getPin())) {
             log.info("Login failed invalid pin. phoneNumber: {} ", member.getPhoneNumber());
+            createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_LOGIN);
             throw new BusinessException(ErrorConstant.INVALID_PIN);
         }
 
@@ -215,7 +207,7 @@ public class AuthenticationService {
         response.setRefreshTokenExpiredAt(memberToken.getRefreshTokenExpiredAt());
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_LOGIN);
-        log.info("[END] authenticationService.loginMember successfully response: {} ", response);
+        log.info("[END] authenticationService.loginMember successfully phoneNumber: {}", member.getPhoneNumber());
 
         return new BaseResponse<>(
                 ErrorConstant.LOGIN_SUCCESS.getCode(),
@@ -224,6 +216,7 @@ public class AuthenticationService {
         );
     }
 
+    @NewSpan
     @Transactional
     public BaseResponse<RefreshTokenResponse> refreshToken(RefreshTokenRequest request) {
         MemberToken memberToken = memberTokenRepository.findByRefreshToken(request.getRefreshToken())
@@ -239,11 +232,13 @@ public class AuthenticationService {
         memberToken.setAccessToken(newAccessToken);
         memberToken.setRefreshToken(newRefreshToken);
         memberToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
-        memberTokenRepository.save(memberToken);
+        memberToken.setRefreshTokenExpiredAt(TokenUtil.refreshTokenExpiredAt());
 
         RefreshTokenResponse response = new RefreshTokenResponse();
         response.setAccessToken(newAccessToken);
+        response.setRefreshToken(newRefreshToken);
         response.setAccessTokenExpiredAt(memberToken.getAccessTokenExpiredAt());
+        response.setRefreshTokenExpiredAt(memberToken.getRefreshTokenExpiredAt());
 
         return new BaseResponse<>(
                 ErrorConstant.REFRESH_TOKEN_SUCCESS.getCode(),
@@ -253,19 +248,44 @@ public class AuthenticationService {
     }
 
     @NewSpan
-    public BaseResponse<Void> resetPin(ResetPasswordRequest request) {
-        Member member = validationService.getMemberByPhoneNumber(request.getPhoneNumber());
-        log.info("[START] authenticationService.resetPin phoneNumber : {} ", member.getPhoneNumber());
+    public BaseResponse<Void> forgotPin(ForgotPinRequest request) {
+        Member member = validationService.getMemberByEmailIgnoreCase(request.getEmail());
+        log.info("[START] authenticationService.forgotPin phoneNumber: {} ", member.getPhoneNumber());
+
+        String otp = generateOtp(OtpType.FORGOT_PIN, member.getPhoneNumber());
+        String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
+
+        log.info("Send async otp to email. phoneNumber: {}, otp: {} ", member.getPhoneNumber(), otp);
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PIN);
+
+        // Send OTP async
+        otpService.sendOtp(fullName, request.getEmail(), member.getPhoneNumber(), otp);
+        log.info("Successfully send OTP to email for phoneNumber: {} ", member.getPhoneNumber());
+
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PIN);
+        log.info("[END] authenticationService.forgotPin successfully phoneNumber: {}", member.getPhoneNumber());
+
+        return new BaseResponse<>(
+                ErrorConstant.FORGOT_PIN_OTP_SENT.getCode(),
+                ErrorConstant.FORGOT_PIN_OTP_SENT.getMessage(),
+                null
+        );
+    }
+
+    @NewSpan
+    public BaseResponse<Void> resetPin(ResetPinRequest request) {
+        Member member = validationService.getMemberByEmailOrPhoneNumber(request.getEmail(), request.getPhoneNumber());
+        log.info("[START] authenticationService.resetPin phoneNumber: {}", member.getPhoneNumber());
 
         log.info("Attempt reset pin. phoneNumber: {}", member.getPhoneNumber());
-        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESET_PASSWORD);
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESET_PIN);
 
         member.setPin(passwordEncoder.encode(request.getNewPin()));
         member.setUpdatedAt(LocalDateTime.now());
         memberRepository.save(member);
 
-        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_RESET_PASSWORD);
-        log.info("[END] authenticationService.resetPin successfully request : {} ", request);
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_RESET_PIN);
+        log.info("[END] authenticationService.resetPin successfully phoneNumber: {}", member.getPhoneNumber());
 
         return new BaseResponse<>(
                 ErrorConstant.RESET_PIN_SUCCESS.getCode(),
@@ -275,50 +295,20 @@ public class AuthenticationService {
     }
 
     @NewSpan
-    public BaseResponse<Void> forgotPin(ForgotPasswordRequest request) {
-        // TODO: send OTP via WhatsApp gateway
-        log.info("[START] authenticationService.forgotPin email : {} ", request.getEmail());
-        Member member = memberRepository.findByEmailIgnoreCase(request.getEmail())
-                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
-
-        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PASSWORD);
-
-        String otp = generateOtp(OtpType.FORGOT_PASSWORD, member.getPhoneNumber());
-
-        String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
-        otpService.sendOtp(fullName, request.getEmail(), otp);
-
-        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PASSWORD);
-
-        log.info("FORGOT PASSWORD OTP: {}, phoneNumber: {}", otp, request.getEmail());
-        log.info("[END] authenticationService.forgotPin successfully request : {} ", request);
-
-        return new BaseResponse<>(
-                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(),
-                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getMessage(),
-                null
-        );
-    }
-
-    @NewSpan
     @Transactional
     public BaseResponse<Void> logoutMember(String memberId, String accessToken) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] authenticationService.logoutMember phoneNumber : {} ", member.getPhoneNumber());
+        log.info("[START] authenticationService.logoutMember phoneNumber: {} ", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_LOGOUT);
         memberTokenRepository.deleteByAccessToken(accessToken);
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_LOGOUT);
-        log.info("[END] authenticationService.logoutMember phoneNumber : {} ", member.getPhoneNumber());
+        log.info("[END] authenticationService.logoutMember successfully phoneNumber: {} ", member.getPhoneNumber());
 
         return new BaseResponse<>(
                 ErrorConstant.LOGOUT_SUCCESS.getCode(),
                 ErrorConstant.LOGOUT_SUCCESS.getMessage(),
                 null
         );
-    }
-
-    private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
-        memberActivityService.createMemberActivity(phoneNumber, activityEvent);
     }
 
     private String generateOtp(OtpType otpType, String phoneNumber) {
@@ -334,5 +324,9 @@ public class AuthenticationService {
         memberOtpRepository.save(memberOtp);
 
         return otp;
+    }
+
+    private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
+        memberActivityService.createMemberActivity(phoneNumber, activityEvent);
     }
 }

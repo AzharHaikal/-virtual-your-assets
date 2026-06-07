@@ -13,7 +13,7 @@ public class TransactionHistoryResponse {
     private String transactionId;
     private String referenceNumber;
     private TransactionType type;
-    private TransactionCategory category;
+    private String category;
     private TransactionStatus status;
     private BigDecimal amount;
     private String transactionDesc;

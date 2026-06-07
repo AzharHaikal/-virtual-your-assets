@@ -2,6 +2,8 @@ package com.vyra.virtual_your_assets.controller;
 
 import com.vyra.virtual_your_assets.constant.ApiPath;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
+import com.vyra.virtual_your_assets.dto.auth.ChangePinRequest;
+import com.vyra.virtual_your_assets.dto.chart.GetChartResponse;
 import com.vyra.virtual_your_assets.dto.member.GetMemberResponse;
 import com.vyra.virtual_your_assets.dto.member.UpdateProfileRequest;
 import com.vyra.virtual_your_assets.dto.member.UpdateProfileResponse;
@@ -19,23 +21,27 @@ import static com.vyra.virtual_your_assets.constant.ApiPath.*;
 public class MemberController {
     private final MemberService memberService;
 
-//    @GetMapping(GET_MEMBER)
-//    public BaseResponse<GetMemberResponse> getMember(@PathVariable("phoneNumber") String phoneNumber) {
-//        return memberService.getMember(phoneNumber);
-//    }
-
     @GetMapping(GET_MEMBER)
     public BaseResponse<GetMemberResponse> getMember(Authentication authentication) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
         return memberService.getMember(user.getMemberId());
     }
 
-    @PatchMapping(EDIT_PROFILE)
+    @PatchMapping(UPDATE_PROFILE)
     public BaseResponse<UpdateProfileResponse> updateProfile(
             Authentication authentication,
             @Valid @RequestBody UpdateProfileRequest request
     ) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
         return memberService.updateProfile(user.getMemberId(), request);
+    }
+
+    @PatchMapping(CHANGE_PIN)
+    public BaseResponse<Void> updateProfile(
+            Authentication authentication,
+            @Valid @RequestBody ChangePinRequest request
+    ) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return memberService.changePin(user.getMemberId(), request);
     }
 }

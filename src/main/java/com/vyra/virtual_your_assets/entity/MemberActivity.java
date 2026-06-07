@@ -21,10 +21,7 @@ public class MemberActivity extends BaseEntity {
     @Column(nullable = false, length = 15)
     private String phoneNumber;
 
-    @Enumerated(EnumType.STRING)
-    private MemberActivityEvent event;
-
+    private String event;
     private String description;
-
     private LocalDateTime createdAt;
 }

@@ -1,7 +1,9 @@
 package com.vyra.virtual_your_assets.controller;
 
 import com.vyra.virtual_your_assets.constant.ApiPath;
+import com.vyra.virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.virtual_your_assets.dto.BaseResponse;
+import com.vyra.virtual_your_assets.dto.chart.GetChartResponse;
 import com.vyra.virtual_your_assets.dto.transaction.CreateTransactionRequest;
 import com.vyra.virtual_your_assets.dto.transaction.CreateTransactionResponse;
 import com.vyra.virtual_your_assets.dto.transaction.TransactionHistoryResponse;
@@ -13,8 +15,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import static com.vyra.virtual_your_assets.constant.ApiPath.CREATE_TRANSACTION;
-import static com.vyra.virtual_your_assets.constant.ApiPath.GET_HISTORY_TRANSACTION;
+import java.util.List;
+
+import static com.vyra.virtual_your_assets.constant.ApiPath.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,20 +25,32 @@ import static com.vyra.virtual_your_assets.constant.ApiPath.GET_HISTORY_TRANSACT
 public class TransactionController {
     private final TransactionService transactionService;
 
+    @GetMapping(GET_CHART)
+    public BaseResponse<GetChartResponse> getChart(@RequestParam String period, Authentication authentication) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return transactionService.getChart(user.getMemberId(), period);
+    }
+
     @PostMapping(CREATE_TRANSACTION)
-    public BaseResponse<CreateTransactionResponse> createWallet(
-            Authentication authentication,
-            @RequestBody @Valid CreateTransactionRequest request
+    public BaseResponse<CreateTransactionResponse> createTransaction(
+            @RequestBody @Valid CreateTransactionRequest request,
+            Authentication authentication
     ) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
         return transactionService.createTransaction(user.getMemberId(), request);
     }
 
-    @GetMapping(GET_HISTORY_TRANSACTION)
+    @GetMapping(GET_TOP_TRANSACTION_HISTORY)
+    public BaseResponse<List<TransactionHistoryResponse>> getTopTransactionHistory(Authentication authentication) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return transactionService.getTopTransactionHistory(user.getMemberId());
+    }
+
+    @GetMapping(GET_TRANSACTION_HISTORY)
     public BaseResponse<Page<TransactionHistoryResponse>> getTransactionHistory(
             @RequestParam String startDate,
             @RequestParam String endDate,
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) TransactionType type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication

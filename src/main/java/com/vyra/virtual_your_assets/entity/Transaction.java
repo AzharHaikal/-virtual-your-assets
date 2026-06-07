@@ -31,13 +31,14 @@ public class Transaction extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String userEmail;
 
-    @Enumerated(EnumType.STRING)
-    private TransactionCategory category;
+    private String transactionCategory;
 
     @Enumerated(EnumType.STRING)
-    private TransactionType type;
+    @Column(columnDefinition = "varchar(20)")
+    private TransactionType transactionType;
 
     @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(50)")
     private TransactionStatus status;
 
     @Column(nullable = false, precision = 19, scale = 2)

@@ -19,7 +19,7 @@ public enum ErrorConstant {
     LOGIN_SUCCESS("VYRA-LGN-000", "You've successfully logged in"),
     LOGOUT_SUCCESS("VYRA-LGT-000", "You've successfully logged out"),
 
-    FORGOT_PASSWORD_OTP_SENT("VYRA-FP-001", "An OTP has been sent"),
+    FORGOT_PIN_OTP_SENT("VYRA-FP-001", "An OTP has been sent"),
     RESET_PIN_SUCCESS("VYRA-FP-002", "Your PIN has been successfully updated"),
 
     // Token
@@ -31,12 +31,14 @@ public enum ErrorConstant {
 
     // Invalid
     INVALID_PIN("VYRA-INV-001", "Invalid PIN. Please try again"),
+    INVALID_PIN_MISS_MATCH("VYRA-INV-002", "Wrong PIN. Please input with correct PIN"),
 
     // Not Found (generic to prevent enumeration)
     PHONE_NUMBER_NOT_FOUND("VYRA-DNF-001", "Invalid account. Please check your account details"),
     EMAIL_NOT_FOUND("VYRA-DNF-002", "Invalid account. Please check your account details"),
     MEMBER_NOT_FOUND("VYRA-DNF-003", "Invalid account. Please check your account details"),
     MEMBER_NOT_ACTIVE("VYRA-DNF-004", "Invalid account. Please check your account status"),
+    MEMBER_SUSPENDED("VYRA-DNF-005", "Invalid account. Please check your account status"),
 
     // Exists (generic)
     PHONE_NUMBER_ALREADY_EXIST("VYRA-EXS-001", "Your account already exists. Please use a different account"),
@@ -51,7 +53,7 @@ public enum ErrorConstant {
     OTP_NOT_FOUND("VYRA-OTP-002", "Invalid or expired OTP"),
     OTP_EXPIRED("VYRA-OTP-003", "The OTP has expired. Please request a new one"),
     OTP_INVALID("VYRA-OTP-004", "Invalid OTP. Please enter the OTP correctly. Remaining attempts - "),
-    MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "You've reached the maximum attempts. Please register again"),
+    MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "You've reached the maximum attempts. Your account has been suspended"),
 
     // Member
     GET_MEMBER_SUCCESS("VYRA-GMS-000", "Get member detail successful"),
@@ -59,17 +61,28 @@ public enum ErrorConstant {
 
     // Update member profile
     UPDATE_PROFILE_SUCCESS("VYRA-UPS-000", "Update member profile successful"),
+    UPDATE_WALLET_SUCCESS("VYRA-UWS-000", "Update member wallet successful"),
+    UPDATE_WALLET_FAILED("VYRA-UWS-000", "Update member wallet failed"),
 
     // Member Wallet
     GET_MEMBER_WALLET_SUCCESS("VYRA-GWS-000", "Get member detail successful"),
     GET_MEMBER_WALLET_FAILED("VYRA-GWS-001", "Get member detail failed"),
 
+    // Chart
+    GET_CHART_SUCCESS("VYRA-GCS-000", "Get chart successful"),
+
     // Transaction Wallet
     CREATE_TRANSACTION_WALLET_SUCCESS("VYRA-TWS-000", "Create transaction wallet successful"),
     CREATE_TRANSACTION_WALLET_FAILED("VYRA-TWS-001", "Get member detail successful"),
 
+    CREATE_TRANSACTION_SUCCESS("VYRA-CTS-000", "Create transaction successful"),
+
     // Transaction History
+    GET_TOP_TRANSACTION_HISTORY_SUCCESS("VYRA-GTT-000","Top transaction history retrieved successfully"),
     GET_TRANSACTION_HISTORY_SUCCESS("VYRA-GTH-000","Transaction history retrieved successfully"),
+
+    // Member Change Pin
+    CHANGE_PIN_SUCCESS("VYRA-CPS-000", "Change pin successful"),
 
     // Exception
     BAD_REQUEST("VYRA-ERR400", "Something went wrong with your request"),
