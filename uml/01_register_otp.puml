@@ -1,0 +1,123 @@
+@startuml 01_register_otp
+title Register + OTP Verification Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "AuthenticationController" as Controller
+participant "AuthenticationService" as AuthService
+participant "ValidationService" as Validation
+participant "WalletService" as Wallet
+participant "OtpService" as OtpSvc
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+database "MemberOtpRepository" as OtpRepo
+database "MemberWalletRepository" as WalletRepo
+participant "EmailClient" as Email
+
+== Register ==
+
+Client -> Controller : POST /api/v1/auth/register\n{firstName, lastName, email, phoneNumber, pin}
+Controller -> AuthService : registerMember(request)
+
+AuthService -> Activity : createMemberActivity(ATTEMPT_REGISTER)
+
+AuthService -> Validation : validateDataExistRegister(phoneNumber, email)
+Validation -> MemberRepo : findByPhoneNumber(phoneNumber)
+MemberRepo --> Validation : empty
+Validation -> MemberRepo : findByEmailIgnoreCase(email)
+MemberRepo --> Validation : empty
+Validation --> AuthService : OK
+
+AuthService -> MemberRepo : save(member) [status=INACTIVE, pin=bcrypt(pin)]
+MemberRepo --> AuthService : member saved
+
+AuthService -> Wallet : createWallet({phoneNumber, memberId})
+Wallet -> WalletRepo : save(MemberWallet)
+Wallet -> WalletRepo : save(WalletStatement, balance=0)
+Wallet --> AuthService : CreateWalletResponse
+
+AuthService -> OtpSvc : generateOtp(REGISTER, phoneNumber)
+OtpSvc -> OtpRepo : save(MemberOtp [hashed, expiredAt])
+OtpRepo --> OtpSvc : saved
+OtpSvc --> AuthService : otp (plain)
+
+AuthService -> OtpSvc : sendOtp(fullName, email, phoneNumber, otp) [async]
+OtpSvc -> Email : sendEmail(otp)
+Email --> OtpSvc : sent
+
+AuthService -> Activity : createMemberActivity(SUCCESS_REGISTER)
+AuthService --> Controller : BaseResponse<RegisterResponse>
+Controller --> Client : 200 OK\n{memberId, fullName, email, phoneNumber}
+
+== Resend OTP ==
+
+Client -> Controller : POST /api/v1/auth/resend-otp\n{email, otpType}
+Controller -> AuthService : resendOtp(request)
+
+AuthService -> Validation : getMemberByEmailIgnoreCase(email)
+Validation -> MemberRepo : findByEmailIgnoreCase(email)
+MemberRepo --> Validation : member
+Validation --> AuthService : member
+
+AuthService -> OtpRepo : deleteByPhoneNumberAndOtpType(phoneNumber, otpType)
+AuthService -> OtpSvc : generateOtp(otpType, phoneNumber)
+OtpSvc -> OtpRepo : save(new MemberOtp)
+OtpSvc --> AuthService : otp (plain)
+
+AuthService -> Activity : createMemberActivity(ATTEMPT_RESEND_OTP)
+AuthService -> OtpSvc : sendOtp(fullName, email, phoneNumber, otp) [async]
+OtpSvc -> Email : sendEmail(otp)
+
+AuthService -> Activity : createMemberActivity(SUCCESS_RESEND_OTP)
+AuthService --> Controller : BaseResponse<Void>
+Controller --> Client : 200 OK\n"If the account exists, a new OTP has been sent"
+
+== Verify OTP ==
+
+Client -> Controller : POST /api/v1/auth/verify-otp\n{email, otpCode, otpType}
+Controller -> AuthService : verifyOtp(request)
+
+AuthService -> Validation : getMemberByEmailIgnoreCase(email)
+Validation -> MemberRepo : findByEmailIgnoreCase(email)
+MemberRepo --> Validation : member
+Validation --> AuthService : member
+
+AuthService -> Activity : createMemberActivity(ATTEMPT_VERIFY_OTP)
+
+AuthService -> Validation : verifyOtp(member, request)
+Validation -> OtpRepo : findTopByPhoneNumberAndOtpType(...)
+OtpRepo --> Validation : MemberOtp
+
+alt OTP expired
+    Validation --> AuthService : throw BusinessException(OTP_EXPIRED)
+    AuthService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else OTP code mismatch
+    Validation -> OtpRepo : save(memberOtp [attempts+1])
+    alt attempts >= 4
+        Validation -> MemberRepo : save(member [status=SUSPENDED])
+        Validation -> OtpRepo : deleteByPhoneNumber(phoneNumber)
+        Validation --> AuthService : throw BusinessException(MAX_ATTEMPTS_REACHED)
+    else attempts < 4
+        Validation --> AuthService : throw BusinessException(OTP_INVALID, remainingAttempts)
+    end
+    AuthService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else OTP valid
+    Validation --> AuthService : MemberOtp
+    AuthService -> MemberRepo : save(member [status=ACTIVE])
+    AuthService -> OtpRepo : delete(memberOtp)
+    AuthService -> Activity : createMemberActivity(SUCCESS_VERIFY_OTP)
+    AuthService --> Controller : BaseResponse<Void>
+    Controller --> Client : 200 OK\n"OTP verification successful"
+end
+
+@enduml

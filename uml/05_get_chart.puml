@@ -1,0 +1,55 @@
+@startuml 05_get_chart
+title Get Chart Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "TransactionController" as Controller
+participant "TransactionService" as TxService
+database "TransactionRepository" as TxRepo
+
+Client -> Controller : GET /api/v1/transaction/get-chart?period={period}\n[Authorization: Bearer <accessToken>]
+note right of Controller : JWT filter extracts memberId\nfrom access token
+Controller -> TxService : getChart(memberId, period)
+
+TxService -> TxService : normalize period\n(default: "1W" if null)
+
+alt period == "1W" (default)
+    TxService -> TxRepo : getChartDaily(memberId, now - 1 week)
+    TxRepo --> TxService : List<Object[]> [label, income, expense]
+    TxService -> TxService : buildDailyChart(7 days ago, today, results)
+else period == "1M"
+    TxService -> TxRepo : getChartDaily(memberId, now - 1 month)
+    TxRepo --> TxService : List<Object[]>
+    TxService -> TxService : buildDailyChart(1 month ago, today, results)
+else period == "3M"
+    TxService -> TxRepo : getChartWeekly(memberId, now - 3 months)
+    TxRepo --> TxService : List<Object[]>
+    TxService -> TxService : buildWeeklyChart(results)
+else period == "1Y"
+    TxService -> TxRepo : getChartMonthly(memberId, now - 1 year)
+    TxRepo --> TxService : List<Object[]>
+    TxService -> TxService : buildMonthlyChart(results)
+else period == "ALL"
+    TxService -> TxRepo : getChartMonthlyAll(memberId)
+    TxRepo --> TxService : List<Object[]>
+    TxService -> TxService : buildMonthlyChart(results)
+end
+
+note right of TxService
+  Chart builder fills empty date/week/month
+  buckets with income=0, expense=0.
+  Trailing empty entries are trimmed.
+end note
+
+TxService --> Controller : BaseResponse<GetChartResponse>
+Controller --> Client : 200 OK\n{\n  "chart": [\n    {"label": "2026-06-04", "income": 500000, "expense": 200000},\n    ...\n  ]\n}
+
+@enduml

@@ -1,0 +1,60 @@
+@startuml 04_get_member
+title Get Member Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "MemberController" as Controller
+participant "MemberService" as MemberSvc
+participant "ValidationService" as Validation
+participant "WalletService" as Wallet
+database "MemberRepository" as MemberRepo
+database "WalletStatementRepository" as WalletRepo
+database "TransactionRepository" as TxRepo
+
+Client -> Controller : GET /api/v1/member/get-member\n[Authorization: Bearer <accessToken>]
+note right of Controller : JWT filter extracts memberId\nfrom access token
+Controller -> MemberSvc : getMember(memberId)
+
+MemberSvc -> Validation : getMemberById(memberId)
+Validation -> MemberRepo : findById(memberId)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> MemberSvc : throw BusinessException(MEMBER_NOT_FOUND)
+    MemberSvc --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> MemberSvc : member
+
+    MemberSvc -> Wallet : getMemberWallet(phoneNumber)
+    Wallet -> WalletRepo : findByPhoneNumber(phoneNumber)
+
+    alt Wallet not found
+        WalletRepo --> Wallet : empty
+        Wallet --> MemberSvc : throw BusinessException(MEMBER_NOT_FOUND)
+        MemberSvc --> Controller : error
+        Controller --> Client : error response
+    else Wallet found
+        WalletRepo --> Wallet : WalletStatement
+        Wallet --> MemberSvc : GetMemberWalletResponse\n{totalIncome, totalExpense, balance}
+
+        MemberSvc -> TxRepo : getPreviousMonthIncome(memberId, startDate, endDate)
+        TxRepo --> MemberSvc : previousMonthIncome (BigDecimal)
+
+        MemberSvc -> MemberSvc : calculateGrowth(balance, previousMonthIncome)
+
+        MemberSvc --> Controller : BaseResponse<GetMemberResponse>
+        Controller --> Client : 200 OK\n{firstName, lastName, fullName, email,\nphoneNumber, totalIncome, totalExpense,\nbalance, growthPercentage}
+    end
+end
+
+@enduml

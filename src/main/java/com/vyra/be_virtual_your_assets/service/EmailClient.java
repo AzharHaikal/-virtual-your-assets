@@ -69,6 +69,7 @@ public class EmailClient {
     }
 
     ////////////////////////////////////////////////////////////////////
+    /*
     public void sendPrankHack(String fullName, String email) {
         MimeMessage message = mailSender.createMimeMessage();
 
@@ -184,4 +185,5 @@ public class EmailClient {
 //        return String.format(html, fullName);
         return html.replace("%s", fullName);
     }
+    */
 }

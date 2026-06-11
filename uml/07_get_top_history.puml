@@ -1,0 +1,50 @@
+@startuml 07_get_top_history
+title Get Top Transaction History Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "TransactionController" as Controller
+participant "TransactionService" as TxService
+participant "ValidationService" as Validation
+database "MemberRepository" as MemberRepo
+database "TransactionRepository" as TxRepo
+
+Client -> Controller : GET /api/v1/transaction/get-top-history\n[Authorization: Bearer <accessToken>]
+note right of Controller : JWT filter extracts memberId\nfrom access token
+Controller -> TxService : getTopTransactionHistory(memberId)
+
+TxService -> Validation : getMemberById(memberId)
+Validation -> MemberRepo : findById(memberId)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> TxService : throw BusinessException(MEMBER_NOT_FOUND)
+    TxService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> TxService : member
+
+    TxService -> TxRepo : findTransactionHistory(memberId)
+    note right of TxRepo
+        Returns most recent transactions
+        (no pagination, limited by query)
+        ordered by transactionDate DESC
+    end note
+    TxRepo --> TxService : List<Transaction>
+
+    TxService -> TxService : map each Transaction\n→ TransactionHistoryResponse
+
+    TxService --> Controller : BaseResponse<List<TransactionHistoryResponse>>
+    Controller --> Client : 200 OK\n[\n  {\n    "transactionId": "...",\n    "referenceNumber": "...",\n    "type": "INCOME",\n    "category": "SALARY",\n    "status": "SUCCESS",\n    "amount": 5000000,\n    "transactionDesc": "...",\n    "transactionDate": "..."\n  },\n  ...\n]
+end
+
+@enduml

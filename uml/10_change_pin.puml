@@ -1,0 +1,54 @@
+@startuml 10_change_pin
+title Change PIN Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "MemberController" as Controller
+participant "MemberService" as MemberSvc
+participant "ValidationService" as Validation
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+
+Client -> Controller : PATCH /api/v1/member/change-pin\n{oldPin, newPin}\n[Authorization: Bearer <accessToken>]
+note right of Controller : JWT filter extracts memberId\nfrom access token
+Controller -> MemberSvc : changePin(memberId, request)
+
+MemberSvc -> Validation : getMemberById(memberId)
+Validation -> MemberRepo : findById(memberId)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> MemberSvc : throw BusinessException(MEMBER_NOT_FOUND)
+    MemberSvc --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> MemberSvc : member
+
+    MemberSvc -> Activity : createMemberActivity(ATTEMPT_CHANGE_PIN)
+
+    MemberSvc -> MemberSvc : BCrypt.matches(oldPin, member.pin)
+
+    alt Old PIN does not match
+        MemberSvc -> Activity : createMemberActivity(FAILED_CHANGE_PIN)
+        MemberSvc --> Controller : throw BusinessException(INVALID_PIN_MISS_MATCH)
+        Controller --> Client : 400 Bad Request\n"Wrong PIN. Please input with correct PIN"
+    else Old PIN matches
+        MemberSvc -> MemberRepo : save(member\n[pin=bcrypt(newPin), updatedAt=now])
+        MemberRepo --> MemberSvc : saved
+
+        MemberSvc -> Activity : createMemberActivity(SUCCESS_CHANGE_PIN)
+        MemberSvc --> Controller : BaseResponse<Void>
+        Controller --> Client : 200 OK\n"Change pin successful"
+    end
+end
+
+@enduml
