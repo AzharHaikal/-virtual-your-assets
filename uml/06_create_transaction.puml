@@ -1,0 +1,81 @@
+@startuml 06_create_transaction
+title Create Transaction Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "TransactionController" as Controller
+participant "TransactionService" as TxService
+participant "ValidationService" as Validation
+participant "WalletService" as Wallet
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+database "TransactionRepository" as TxRepo
+database "WalletStatementRepository" as WalletRepo
+database "WalletStatementHistoryRepository" as HistoryRepo
+
+Client -> Controller : POST /api/v1/transaction/create\n{category, type, amount, transactionDate, transactionDesc}\n[Authorization: Bearer <accessToken>]
+Controller -> TxService : createTransaction(memberId, request)
+
+TxService -> Validation : getMemberById(memberId)
+Validation -> MemberRepo : findById(memberId)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> TxService : throw BusinessException(MEMBER_NOT_FOUND)
+    TxService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> TxService : member
+
+    note over TxService
+      Generate referenceNumber = "VYRA-{timestamp}-{random}"
+      If type=EXPENSE → negate amount
+    end note
+
+    TxService -> Activity : createMemberActivity(ATTEMPT_CREATE_TRANSACTION)
+
+    TxService -> TxRepo : save(Transaction [status=INQUIRY,\nmemberId, phoneNumber, email,\ncategory, type, amount, desc, ref])
+    TxRepo --> TxService : transaction saved (with id)
+
+    TxService -> Wallet : createTransactionWallet({transactionId, phoneNumber, amount, type})
+
+    Wallet -> WalletRepo : findByPhoneNumber(phoneNumber)
+
+    alt Wallet not found
+        WalletRepo --> Wallet : empty
+        Wallet --> TxService : throw BusinessException(MEMBER_NOT_FOUND)
+        TxService -> Activity : createMemberActivity(FAILED_CREATE_TRANSACTION)
+        TxService --> Controller : 400 Bad Request
+        Controller --> Client : error response
+    else Wallet found
+        WalletRepo --> Wallet : WalletStatement
+
+        alt type == INCOME
+            Wallet -> Wallet : balance += amount\ntotalIncome += amount
+        else type == EXPENSE
+            Wallet -> Wallet : balance += amount (negative)\ntotalExpense += amount
+        end
+
+        Wallet -> HistoryRepo : save(WalletStatementHistory\n[previousBalance, currentBalance, income/expense])
+        Wallet -> WalletRepo : save(WalletStatement [updated balance])
+
+        Wallet --> TxService : TransactionWalletResponse\n{phoneNumber, totalIncome, totalExpense, balance}
+
+        TxService -> TxRepo : save(Transaction [status=SUCCESS])
+
+        TxService -> Activity : createMemberActivity(SUCCESS_CREATE_TRANSACTION)
+        TxService --> Controller : BaseResponse<CreateTransactionResponse>
+        Controller --> Client : 200 OK\n{transactionId, phoneNumber, email,\ncategory, transactionType, amount,\nreferenceNumber, transactionDesc, balance}
+    end
+end
+
+@enduml

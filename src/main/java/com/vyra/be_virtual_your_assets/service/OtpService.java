@@ -26,6 +26,7 @@ public class OtpService {
         }
     }
 
+    /*
     @Async
     public void sendPrankHack(String fullName, String email) {
         try {
@@ -34,5 +35,6 @@ public class OtpService {
             throw new BusinessException(ErrorConstant.INTERNAL_SERVER_ERROR);
         }
     }
+    */
 
 }

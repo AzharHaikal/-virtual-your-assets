@@ -1,0 +1,91 @@
+@startuml 03_forgot_reset_pin
+title Forgot PIN + Reset PIN Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "AuthenticationController" as Controller
+participant "AuthenticationService" as AuthService
+participant "ValidationService" as Validation
+participant "OtpService" as OtpSvc
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+database "MemberOtpRepository" as OtpRepo
+participant "EmailClient" as Email
+
+== Step 1: Forgot PIN — Request OTP ==
+
+Client -> Controller : POST /api/v1/auth/forgot-pin\n{email}
+Controller -> AuthService : forgotPin(request)
+
+AuthService -> Validation : getMemberByEmailIgnoreCase(email)
+Validation -> MemberRepo : findByEmailIgnoreCase(email)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> AuthService : throw BusinessException(MEMBER_NOT_FOUND)
+    AuthService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> AuthService : member
+
+    AuthService -> OtpSvc : generateOtp(FORGOT_PIN, phoneNumber)
+    OtpSvc -> OtpRepo : save(MemberOtp [hashed, expiredAt])
+    OtpRepo --> OtpSvc : saved
+    OtpSvc --> AuthService : otp (plain)
+
+    AuthService -> Activity : createMemberActivity(ATTEMPT_GENERATE_FORGOT_PIN)
+    AuthService -> OtpSvc : sendOtp(fullName, email, phoneNumber, otp) [async]
+    OtpSvc -> Email : sendEmail(otp)
+    Email --> OtpSvc : sent
+
+    AuthService -> Activity : createMemberActivity(SUCCESS_GENERATE_FORGOT_PIN)
+    AuthService --> Controller : BaseResponse<Void>
+    Controller --> Client : 200 OK\n"An OTP has been sent"
+end
+
+== Step 2: Verify OTP (reuse verify-otp endpoint) ==
+
+note over Client, Email
+    Client calls POST /api/v1/auth/verify-otp with otpType=FORGOT_PIN
+    (see 01_register_otp.puml for detailed verify-otp flow)
+end note
+
+Client -> Controller : POST /api/v1/auth/verify-otp\n{email, otpCode, otpType: FORGOT_PIN}
+Controller --> Client : 200 OK on success
+
+== Step 3: Reset PIN ==
+
+Client -> Controller : POST /api/v1/auth/reset-pin\n{email OR phoneNumber, newPin}
+Controller -> AuthService : resetPin(request)
+
+AuthService -> Validation : getMemberByEmailOrPhoneNumber(email, phoneNumber)
+Validation -> MemberRepo : findByEmailIgnoreCase(email)\nor findByPhoneNumber(phoneNumber)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> AuthService : throw BusinessException(MEMBER_NOT_FOUND)
+    AuthService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> AuthService : member
+
+    AuthService -> Activity : createMemberActivity(ATTEMPT_RESET_PIN)
+    AuthService -> MemberRepo : save(member [pin=bcrypt(newPin), updatedAt=now])
+    MemberRepo --> AuthService : saved
+
+    AuthService -> Activity : createMemberActivity(SUCCESS_RESET_PIN)
+    AuthService --> Controller : BaseResponse<Void>
+    Controller --> Client : 200 OK\n"Your PIN has been successfully updated"
+end
+
+@enduml

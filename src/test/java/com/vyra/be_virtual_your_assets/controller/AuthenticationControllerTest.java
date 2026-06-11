@@ -1,141 +1,160 @@
-//package com.vyra.virtual_your_assets.controller;
-//
-//import com.vyra.virtual_your_assets.constant.ErrorConstant;
-//import com.vyra.virtual_your_assets.constant.OtpType;
-//import com.vyra.virtual_your_assets.dto.BaseResponse;
-//import com.vyra.virtual_your_assets.dto.auth.*;
-//import com.vyra.virtual_your_assets.service.AuthenticationService;
-//import org.junit.jupiter.api.Test;
-//import org.junit.jupiter.api.extension.ExtendWith;
-//import org.mockito.InjectMocks;
-//import org.mockito.Mock;
-//import org.mockito.junit.jupiter.MockitoExtension;
-//
-//import static org.junit.jupiter.api.Assertions.assertEquals;
-//import static org.junit.jupiter.api.Assertions.assertNotNull;
-//import static org.mockito.ArgumentMatchers.any;
-//import static org.mockito.Mockito.when;
-//
-//@ExtendWith(MockitoExtension.class)
-//class AuthenticationControllerTest {
-//    @Mock private AuthenticationService service;
-//    @InjectMocks private AuthenticationController controller;
-//
-//    @Test
-//    void registerSuccess() {
-//        RegisterRequest request = new RegisterRequest();
-//        request.setFirstName("Azhar");
-//        request.setLastName("Haikal");
-//        request.setEmail("test@mail.com");
-//        request.setPhoneNumber("62811111111");
-//        request.setPin("123456");
-//
-//        RegisterResponse registerResponse = new RegisterResponse();
-//        registerResponse.setMemberId("memberId");
-//
-//        BaseResponse<RegisterResponse> mockResponse = new BaseResponse<>(
-//                ErrorConstant.REGISTER_SUCCESS.getCode(),
-//                ErrorConstant.REGISTER_SUCCESS.getMessage(),
-//                registerResponse
-//        );
-//
-//        when(service.registerMember(any(RegisterRequest.class))).thenReturn(mockResponse);
-//
-//        BaseResponse<RegisterResponse> response = controller.registerMember(request);
-//        assertEquals(ErrorConstant.REGISTER_SUCCESS.getCode(), response.getResponseStatus());
-//        assertEquals(ErrorConstant.REGISTER_SUCCESS.getMessage(), response.getResponseMessage());
-//    }
-//
-//    @Test
-//    void resendOtpSuccess() {
-//        ResendOtpRequest request = new ResendOtpRequest();
-//        request.setEmail("azhar@mail.com");
-//        request.setOtpType(OtpType.REGISTER);
-//
-//        BaseResponse<Void> mockResponse = new BaseResponse<>(
-//                ErrorConstant.RESEND_OTP.getCode(),
-//                ErrorConstant.RESEND_OTP.getMessage(),
-//                null
-//        );
-//
-//        when(service.resendOtp(any(ResendOtpRequest.class))).thenReturn(mockResponse);
-//
-//        BaseResponse<Void> response = controller.resendOtp(request);
-//        assertNotNull(response);
-//    }
-//
-//    @Test
-//    void verifyOtpSuccess() {
-//        VerifyOtpRequest request = new VerifyOtpRequest();
-//        request.setEmail("62811111111");
-//        request.setOtpCode("123456");
-//
-//        BaseResponse<Void> mockResponse = new BaseResponse<>(
-//                ErrorConstant.VERIFY_OTP_SUCCESS.getCode(),
-//                ErrorConstant.VERIFY_OTP_SUCCESS.getMessage(),
-//                null
-//        );
-//
-//        when(service.verifyOtp(any(VerifyOtpRequest.class))).thenReturn(mockResponse);
-//
-//        BaseResponse<Void> response = controller.verifyOtp(request);
-//        assertNotNull(response);
-//    }
-//
-//    @Test
-//    void loginSuccess() {
-//        LoginRequest request = new LoginRequest();
-//        request.setIdentifier("628123456789");
-//        request.setPin("123456");
-//
-//        LoginResponse loginData = new LoginResponse();
-//        loginData.setToken("mock-jwt-token");
-//
-//        BaseResponse<LoginResponse> mockResponse = new BaseResponse<>(
-//                ErrorConstant.LOGIN_SUCCESS.getCode(),
-//                ErrorConstant.LOGIN_SUCCESS.getMessage(),
-//                loginData
-//        );
-//
-//        when(service.loginMember(any(LoginRequest.class))).thenReturn(mockResponse);
-//
-//        BaseResponse<LoginResponse> response = controller.loginMember(request);
-//        assertEquals(ErrorConstant.LOGIN_SUCCESS.getCode(), response.getResponseStatus());
-//        assertEquals(ErrorConstant.LOGIN_SUCCESS.getMessage(), response.getResponseMessage());
-//    }
-//
-//    @Test
-//    void forgotPasswordSuccess() {
-//        ForgotPasswordRequest request = new ForgotPasswordRequest();
-//        request.setEmail("62811111111");
-//
-//        BaseResponse<Void> mockResponse = new BaseResponse<>(
-//                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getCode(),
-//                ErrorConstant.FORGOT_PASSWORD_OTP_SENT.getMessage(),
-//                null
-//        );
-//
-//        when(service.forgotPin(any(ForgotPasswordRequest.class))).thenReturn(mockResponse);
-//
-//        BaseResponse<Void> response = controller.forgotPin(request);
-//        assertNotNull(response);
-//    }
-//
-//    @Test
-//    void resetPasswordSuccess() {
-//        ResetPasswordRequest request = new ResetPasswordRequest();
-//        request.setPhoneNumber("62811111111");
-//        request.setNewPin("654321");
-//
-//        BaseResponse<Void> mockResponse = new BaseResponse<>(
-//                ErrorConstant.RESET_PIN_SUCCESS.getCode(),
-//                ErrorConstant.RESET_PIN_SUCCESS.getMessage(),
-//                null
-//        );
-//
-//        when(service.resetPin(any(ResetPasswordRequest.class))).thenReturn(mockResponse);
-//
-//        BaseResponse<Void> response = controller.resetPin(request);
-//        assertNotNull(response);
-//    }
-//}
+package com.vyra.be_virtual_your_assets.controller;
+
+import com.vyra.be_virtual_your_assets.dto.BaseResponse;
+import com.vyra.be_virtual_your_assets.dto.auth.*;
+import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import com.vyra.be_virtual_your_assets.service.AuthenticationService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AuthenticationControllerTest {
+
+    @Mock
+    private AuthenticationService authenticationService;
+
+    @Mock
+    private Authentication authentication;
+
+    @InjectMocks
+    private AuthenticationController authenticationController;
+
+    private final String MEMBER_ID = "member-uuid-001";
+    private final String ACCESS_TOKEN = "access-token-abc";
+
+    private CustomUserDetails userDetails;
+
+    @BeforeEach
+    void setUp() {
+        userDetails = new CustomUserDetails(MEMBER_ID, ACCESS_TOKEN);
+    }
+
+    // =========================================================================
+    // registerMember
+    // =========================================================================
+    @Test
+    void registerMember_shouldDelegateToServiceAndReturnResponse() {
+        RegisterRequest request = new RegisterRequest();
+        BaseResponse<RegisterResponse> expected = new BaseResponse<>("VYRA-REG-000", "Success", new RegisterResponse());
+        when(authenticationService.registerMember(request)).thenReturn(expected);
+
+        BaseResponse<RegisterResponse> result = authenticationController.registerMember(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).registerMember(request);
+    }
+
+    // =========================================================================
+    // resendOtp
+    // =========================================================================
+    @Test
+    void resendOtp_shouldDelegateToServiceAndReturnResponse() {
+        ResendOtpRequest request = new ResendOtpRequest();
+        BaseResponse<Void> expected = new BaseResponse<>("VYRA-OTP-001", "Resent", null);
+        when(authenticationService.resendOtp(request)).thenReturn(expected);
+
+        BaseResponse<Void> result = authenticationController.resendOtp(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).resendOtp(request);
+    }
+
+    // =========================================================================
+    // verifyOtp
+    // =========================================================================
+    @Test
+    void verifyOtp_shouldDelegateToServiceAndReturnResponse() {
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        BaseResponse<Void> expected = new BaseResponse<>("VYRA-OTP-000", "Verified", null);
+        when(authenticationService.verifyOtp(request)).thenReturn(expected);
+
+        BaseResponse<Void> result = authenticationController.verifyOtp(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).verifyOtp(request);
+    }
+
+    // =========================================================================
+    // loginMember
+    // =========================================================================
+    @Test
+    void loginMember_shouldDelegateToServiceAndReturnResponse() {
+        LoginRequest request = new LoginRequest();
+        BaseResponse<LoginResponse> expected = new BaseResponse<>("VYRA-LGN-000", "Logged in", new LoginResponse());
+        when(authenticationService.loginMember(request)).thenReturn(expected);
+
+        BaseResponse<LoginResponse> result = authenticationController.loginMember(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).loginMember(request);
+    }
+
+    // =========================================================================
+    // refreshToken
+    // =========================================================================
+    @Test
+    void refreshToken_shouldDelegateToServiceAndReturnResponse() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        BaseResponse<RefreshTokenResponse> expected = new BaseResponse<>("VYRA-TKN-005", "Refreshed", new RefreshTokenResponse());
+        when(authenticationService.refreshToken(request)).thenReturn(expected);
+
+        BaseResponse<RefreshTokenResponse> result = authenticationController.refreshToken(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).refreshToken(request);
+    }
+
+    // =========================================================================
+    // forgotPin
+    // =========================================================================
+    @Test
+    void forgotPin_shouldDelegateToServiceAndReturnResponse() {
+        ForgotPinRequest request = new ForgotPinRequest();
+        BaseResponse<Void> expected = new BaseResponse<>("VYRA-FP-001", "OTP sent", null);
+        when(authenticationService.forgotPin(request)).thenReturn(expected);
+
+        BaseResponse<Void> result = authenticationController.forgotPin(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).forgotPin(request);
+    }
+
+    // =========================================================================
+    // resetPin
+    // =========================================================================
+    @Test
+    void resetPin_shouldDelegateToServiceAndReturnResponse() {
+        ResetPinRequest request = new ResetPinRequest();
+        BaseResponse<Void> expected = new BaseResponse<>("VYRA-FP-002", "PIN reset", null);
+        when(authenticationService.resetPin(request)).thenReturn(expected);
+
+        BaseResponse<Void> result = authenticationController.resetPin(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(authenticationService).resetPin(request);
+    }
+
+    // =========================================================================
+    // logoutMember
+    // =========================================================================
+    @Test
+    void logoutMember_shouldExtractPrincipalAndDelegateToService() {
+        BaseResponse<Void> expected = new BaseResponse<>("VYRA-LGT-000", "Logged out", null);
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+        when(authenticationService.logoutMember(MEMBER_ID, ACCESS_TOKEN)).thenReturn(expected);
+
+        BaseResponse<Void> result = authenticationController.logoutMember(authentication);
+
+        assertThat(result).isSameAs(expected);
+        verify(authentication).getPrincipal();
+        verify(authenticationService).logoutMember(MEMBER_ID, ACCESS_TOKEN);
+    }
+}
