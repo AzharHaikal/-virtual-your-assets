@@ -1,0 +1,52 @@
+@startuml 08_get_history_transaction
+title Get Transaction History (Paginated) Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "TransactionController" as Controller
+participant "TransactionService" as TxService
+participant "ValidationService" as Validation
+database "MemberRepository" as MemberRepo
+database "TransactionRepository" as TxRepo
+
+Client -> Controller : GET /api/v1/transaction/get-history\n?startDate={date}&endDate={date}\n[&type=INCOME|EXPENSE]\n[&page=0&size=10]\n[Authorization: Bearer <accessToken>]
+note right of Controller : JWT filter extracts memberId\nfrom access token
+Controller -> TxService : getTransactionHistory(startDate, endDate, type, page, size, memberId)
+
+TxService -> Validation : getMemberById(memberId)
+Validation -> MemberRepo : findById(memberId)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> TxService : throw BusinessException(MEMBER_NOT_FOUND)
+    TxService --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> TxService : member
+
+    TxService -> TxService : parse startDate → LocalDateTime (start of day)\nparse endDate   → LocalDateTime (end of day)\nbuild Pageable (page, size, sort: transactionDate DESC)
+
+    TxService -> TxRepo : findTransactionHistory(\n  memberId, start, end, type, pageable)
+    note right of TxRepo
+        Filters by memberId, date range,
+        and optionally by TransactionType.
+        Returns a Spring Data Page<Transaction>.
+    end note
+    TxRepo --> TxService : Page<Transaction>
+
+    TxService -> TxService : map each Transaction\n→ TransactionHistoryResponse
+
+    TxService --> Controller : BaseResponse<Page<TransactionHistoryResponse>>
+    Controller --> Client : 200 OK\n{\n  "content": [ { transactionId, referenceNumber,\n    type, category, status, amount,\n    transactionDesc, transactionDate }, ... ],\n  "totalElements": 25,\n  "totalPages": 3,\n  "size": 10,\n  "number": 0\n}
+end
+
+@enduml

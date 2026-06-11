@@ -1,0 +1,70 @@
+@startuml 02_login
+title Login Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "AuthenticationController" as Controller
+participant "AuthenticationService" as AuthService
+participant "ValidationService" as Validation
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+database "MemberTokenRepository" as TokenRepo
+
+Client -> Controller : POST /api/v1/auth/login\n{email OR phoneNumber, pin, deviceId, deviceName, ipAddress}
+Controller -> AuthService : loginMember(request)
+
+AuthService -> Validation : getMemberByEmailOrPhoneNumber(email, phoneNumber)
+Validation -> MemberRepo : findByEmailIgnoreCase(email)\nor findByPhoneNumber(phoneNumber)
+MemberRepo --> Validation : member
+Validation --> AuthService : member
+
+AuthService -> Activity : createMemberActivity(ATTEMPT_LOGIN)
+
+alt Member not ACTIVE
+    AuthService -> Activity : createMemberActivity(FAILED_LOGIN)
+    AuthService --> Controller : throw BusinessException(MEMBER_NOT_ACTIVE)
+    Controller --> Client : 400 Bad Request
+else PIN mismatch
+    AuthService -> Activity : createMemberActivity(FAILED_LOGIN)
+    AuthService --> Controller : throw BusinessException(INVALID_PIN)
+    Controller --> Client : 400 Bad Request
+else Credentials valid
+    AuthService -> AuthService : generateAccessToken() + generateRefreshToken()
+    AuthService -> TokenRepo : save(MemberToken\n[accessToken, refreshToken, expiry, device info])
+    TokenRepo --> AuthService : saved
+
+    AuthService -> Activity : createMemberActivity(SUCCESS_LOGIN)
+    AuthService --> Controller : BaseResponse<LoginResponse>
+    Controller --> Client : 200 OK\n{memberId, phoneNumber, email,\naccessToken, refreshToken,\naccessTokenExpiredAt, refreshTokenExpiredAt}
+end
+
+== Refresh Token ==
+
+Client -> Controller : POST /api/v1/auth/refresh-token\n{refreshToken}
+Controller -> AuthService : refreshToken(request)
+
+AuthService -> TokenRepo : findByRefreshToken(refreshToken)
+TokenRepo --> AuthService : MemberToken
+
+alt Token not found
+    AuthService --> Controller : throw BusinessException(INVALID_REFRESH_TOKEN)
+    Controller --> Client : 400 Bad Request
+else Refresh token expired
+    AuthService --> Controller : throw BusinessException(REFRESH_TOKEN_EXPIRED)
+    Controller --> Client : 400 Bad Request
+else Token valid
+    AuthService -> AuthService : generateNewAccessToken() + generateNewRefreshToken()
+    AuthService -> TokenRepo : save(MemberToken [updated tokens & expiry])
+    AuthService --> Controller : BaseResponse<RefreshTokenResponse>
+    Controller --> Client : 200 OK\n{accessToken, refreshToken,\naccessTokenExpiredAt, refreshTokenExpiredAt}
+end
+
+@enduml

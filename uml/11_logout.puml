@@ -1,0 +1,60 @@
+@startuml 11_logout
+title Logout Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "AuthenticationController" as Controller
+participant "AuthTokenFilter" as JwtFilter
+participant "AuthenticationService" as AuthService
+participant "ValidationService" as Validation
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+database "MemberTokenRepository" as TokenRepo
+
+Client -> Controller : POST /api/v1/auth/logout\n[Authorization: Bearer <accessToken>]
+
+Controller -> JwtFilter : validate Bearer token
+JwtFilter -> TokenRepo : findByAccessToken(accessToken)
+
+alt Token not found or expired
+    TokenRepo --> JwtFilter : empty
+    JwtFilter --> Controller : 401 Unauthorized
+    Controller --> Client : 401 Unauthorized
+else Token valid
+    TokenRepo --> JwtFilter : MemberToken
+    JwtFilter -> JwtFilter : build CustomUserDetails\n(memberId, accessToken)
+    JwtFilter --> Controller : Authentication principal set
+
+    Controller -> AuthService : logoutMember(memberId, accessToken)
+
+    AuthService -> Validation : getMemberById(memberId)
+    Validation -> MemberRepo : findById(memberId)
+
+    alt Member not found
+        MemberRepo --> Validation : empty
+        Validation --> AuthService : throw BusinessException(MEMBER_NOT_FOUND)
+        AuthService --> Controller : 400 Bad Request
+        Controller --> Client : error response
+    else Member found
+        MemberRepo --> Validation : member
+        Validation --> AuthService : member
+
+        AuthService -> Activity : createMemberActivity(ATTEMPT_LOGOUT)
+        AuthService -> TokenRepo : deleteByAccessToken(accessToken)
+        TokenRepo --> AuthService : deleted
+        AuthService -> Activity : createMemberActivity(SUCCESS_LOGOUT)
+
+        AuthService --> Controller : BaseResponse<Void>
+        Controller --> Client : 200 OK\n"You've successfully logged out"
+    end
+end
+
+@enduml

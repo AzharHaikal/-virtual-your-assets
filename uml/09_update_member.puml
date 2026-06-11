@@ -1,0 +1,98 @@
+@startuml 09_update_member
+title Update Member Profile Flow
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 8
+skinparam sequence {
+    ParticipantBorderColor #4A90D9
+    ParticipantBackgroundColor #EAF4FF
+    ActorBorderColor #2C6E9E
+    LifeLineBorderColor #AAAAAA
+}
+
+actor Client
+participant "MemberController" as Controller
+participant "MemberService" as MemberSvc
+participant "ValidationService" as Validation
+participant "WalletService" as Wallet
+participant "TransactionService" as TxService
+participant "MemberActivityService" as Activity
+database "MemberRepository" as MemberRepo
+database "WalletStatementRepository" as WalletRepo
+database "MemberWalletRepository" as MemberWalletRepo
+database "TransactionRepository" as TxRepo
+
+Client -> Controller : PATCH /api/v1/member/update-profile\n{firstName?, lastName?, email?, phoneNumber?}\n[Authorization: Bearer <accessToken>]
+Controller -> MemberSvc : updateProfile(memberId, request)
+
+MemberSvc -> Validation : getMemberById(memberId)
+Validation -> MemberRepo : findById(memberId)
+
+alt Member not found
+    MemberRepo --> Validation : empty
+    Validation --> MemberSvc : throw BusinessException(MEMBER_NOT_FOUND)
+    MemberSvc --> Controller : 400 Bad Request
+    Controller --> Client : error response
+else Member found
+    MemberRepo --> Validation : member
+    Validation --> MemberSvc : member
+
+    MemberSvc -> Activity : createMemberActivity(ATTEMPT_UPDATE_PROFILE)
+
+    MemberSvc -> Validation : validateIsUpdateProfile(member, request)
+
+    opt firstName changed
+        Validation -> Validation : member.firstName = request.firstName
+    end
+    opt lastName changed
+        Validation -> Validation : member.lastName = request.lastName
+    end
+    opt email changed
+        Validation -> MemberRepo : findByEmailIgnoreCase(newEmail)
+        alt Email already used by another account
+            MemberRepo --> Validation : other member
+            Validation --> MemberSvc : throw BusinessException(EMAIL_ALREADY_EXIST_V2)
+            MemberSvc --> Controller : 400 Bad Request
+            Controller --> Client : error response
+        else Email available
+            MemberRepo --> Validation : empty or same member
+            Validation -> Validation : member.email = newEmail\nisEmailChanged = true
+        end
+    end
+    opt phoneNumber changed
+        Validation -> MemberRepo : findByPhoneNumber(newPhone)
+        alt Phone already used by another account
+            MemberRepo --> Validation : other member
+            Validation --> MemberSvc : throw BusinessException(PHONE_NUMBER_ALREADY_EXIST_V2)
+            MemberSvc --> Controller : 400 Bad Request
+            Controller --> Client : error response
+        else Phone available
+            MemberRepo --> Validation : empty or same member
+            Validation -> Validation : member.phoneNumber = newPhone\nisPhoneChanged = true
+        end
+    end
+
+    Validation --> MemberSvc : ValidateIsUpdateProfile\n{isEmailChanged, isPhoneChanged}
+
+    opt isPhoneChanged == true
+        MemberSvc -> Wallet : updateMemberWallet({oldPhone, newPhone})
+        Wallet -> WalletRepo : findByPhoneNumber(oldPhone) → update to newPhone
+        Wallet -> MemberWalletRepo : findByPhoneNumber(oldPhone) → update to newPhone
+        Wallet --> MemberSvc : done
+    end
+
+    opt isEmailChanged OR isPhoneChanged
+        MemberSvc -> TxService : updateTransaction({oldPhone, newPhone, newEmail})
+        TxService -> TxRepo : findAllByUserPhoneNumber(oldPhone)
+        TxRepo --> TxService : List<Transaction>
+        TxService -> TxService : update each: phoneNumber=newPhone, email=newEmail
+        TxService --> MemberSvc : done
+    end
+
+    MemberSvc -> MemberRepo : save(member [updatedAt=now])
+    MemberSvc -> Activity : createMemberActivity(SUCCESS_UPDATE_PROFILE)
+    MemberSvc --> Controller : BaseResponse<UpdateProfileResponse>
+    Controller --> Client : 200 OK\n{firstName, lastName, email, phoneNumber}
+end
+
+@enduml
