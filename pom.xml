@@ -37,12 +37,10 @@
 		<sonar.exclusions>
 			**/config/**,
 			**/constant/**,
-			**/crypto/**,
 			**/dto/**,
 			**/entity/**,
 			**/exception/**,
-			**/handler/**,
-			**/security/**,
+			**/inject/**,
 			**/VirtualYourAssetApplication.java
 		</sonar.exclusions>
 	</properties>
@@ -119,6 +117,19 @@
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
+
+		<!-- Only for injection data-->
+		<dependency>
+			<groupId>com.github.javafaker</groupId>
+			<artifactId>javafaker</artifactId>
+			<version>1.0.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.opencsv</groupId>
+			<artifactId>opencsv</artifactId>
+			<version>5.7.1</version>
+		</dependency>
     </dependencies>
 
 	<build>
@@ -150,12 +161,10 @@
 					<excludes>
 						<exclude>**/config/**/*</exclude>
 						<exclude>**/constant/**/*</exclude>
-						<exclude>**/crypto/**/*</exclude>
 						<exclude>**/dto/**/*</exclude>
 						<exclude>**/entity/**/*</exclude>
 						<exclude>**/exception/**/*</exclude>
-						<exclude>**/handler/**/*</exclude>
-						<exclude>**/security/**/*</exclude>
+						<exclude>**/inject/**/*</exclude>
 						<exclude>**/VirtualYourAssetApplication.class</exclude>
 					</excludes>
 				</configuration>

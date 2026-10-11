@@ -1,8 +1,8 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
 import com.vyra.be_virtual_your_assets.constant.OtpType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.auth.*;
@@ -18,7 +18,6 @@ import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,7 +58,7 @@ class AuthenticationServiceTest {
         member.setEmail("budi@example.com");
         member.setPhoneNumber("628123456789");
         member.setPin("hashed-pin");
-        member.setStatus(MemberStatus.INACTIVE);
+        member.setStatus(ActiveStatus.INACTIVE);
     }
 
     // =========================================================================
@@ -153,7 +152,7 @@ class AuthenticationServiceTest {
         ResendOtpRequest request = new ResendOtpRequest();
         request.setEmail("budi@example.com");
         request.setOtpType(OtpType.REGISTER);
-        member.setStatus(MemberStatus.INACTIVE);
+        member.setStatus(ActiveStatus.INACTIVE);
         when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
         doNothing().when(memberOtpRepository).deleteByPhoneNumberAndOtpType(anyString(), any());
         when(memberOtpRepository.save(any())).thenReturn(new MemberOtp());
@@ -187,7 +186,7 @@ class AuthenticationServiceTest {
         BaseResponse<Void> result = authenticationService.verifyOtp(request);
 
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.VERIFY_OTP_SUCCESS.getCode());
-        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(member.getStatus()).isEqualTo(ActiveStatus.ACTIVE);
         verify(memberRepository).save(member);
         verify(memberOtpRepository).delete(otp);
     }
@@ -197,7 +196,7 @@ class AuthenticationServiceTest {
     // =========================================================================
     @Test
     void loginMember_success_shouldSaveTokenAndReturnLoginResponse() {
-        member.setStatus(MemberStatus.ACTIVE);
+        member.setStatus(ActiveStatus.ACTIVE);
         LoginRequest request = buildLoginRequest();
         when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
         when(passwordEncoder.matches("123456", "hashed-pin")).thenReturn(true);
@@ -218,7 +217,7 @@ class AuthenticationServiceTest {
     // =========================================================================
     @Test
     void loginMember_memberNotActive_shouldThrowMemberNotActive() {
-        member.setStatus(MemberStatus.INACTIVE);
+        member.setStatus(ActiveStatus.INACTIVE);
         LoginRequest request = buildLoginRequest();
         when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
         doNothing().when(memberActivityService).createMemberActivity(anyString(), any());
@@ -232,7 +231,7 @@ class AuthenticationServiceTest {
 
     @Test
     void loginMember_memberSuspended_shouldThrowMemberNotActive() {
-        member.setStatus(MemberStatus.SUSPENDED);
+        member.setStatus(ActiveStatus.SUSPENDED);
         LoginRequest request = buildLoginRequest();
         when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
         doNothing().when(memberActivityService).createMemberActivity(anyString(), any());
@@ -248,7 +247,7 @@ class AuthenticationServiceTest {
     // =========================================================================
     @Test
     void loginMember_wrongPin_shouldThrowInvalidPin() {
-        member.setStatus(MemberStatus.ACTIVE);
+        member.setStatus(ActiveStatus.ACTIVE);
         LoginRequest request = buildLoginRequest();
         when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
         when(passwordEncoder.matches("123456", "hashed-pin")).thenReturn(false);

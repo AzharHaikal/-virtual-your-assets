@@ -21,7 +21,7 @@ public class OtpService {
             emailClient.sendOtpEmail(fullName, email, otp);
             /* whatsAppClient.sendMessage(phoneNumber, message); */
         } catch (Exception e) {
-            log.error("[ERROR] resendOtp {} encountered an exception: {}", phoneNumber, e.getMessage(), e);
+            log.warn("resendOtp {} encountered an exception: {}", phoneNumber, e.getMessage());
             throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
         }
     }

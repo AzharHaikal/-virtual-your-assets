@@ -11,7 +11,10 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(schema = "idp", name = "member_otp")
+@Table(schema = "idp", name = "member_otp",
+        indexes = {
+                @Index(name = "idx_member_otp_phone_type_created_at", columnList = "phone_number, otp_type, created_at")
+        })
 @Entity
 public class MemberOtp {
     @Id

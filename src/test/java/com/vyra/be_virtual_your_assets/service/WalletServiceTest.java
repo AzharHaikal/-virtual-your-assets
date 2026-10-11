@@ -1,8 +1,8 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.*;
@@ -57,7 +57,7 @@ class WalletServiceTest {
         memberWallet.setId("mw-id-001");
         memberWallet.setMemberId("member-uuid-001");
         memberWallet.setPhoneNumber("628123456789");
-        memberWallet.setStatus(MemberStatus.ACTIVE);
+        memberWallet.setStatus(ActiveStatus.ACTIVE);
     }
 
     // =========================================================================

@@ -10,7 +10,11 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(schema = "idp", name = "member_activity")
+@Table(schema = "idp", name = "member_activity",
+        indexes = {
+                @Index(name = "idx_member_activity_phone_created_at", columnList = "phone_number, created_at"),
+                @Index(name = "idx_member_activity_created_at", columnList = "created_at")
+        })
 @Entity
 public class MemberActivity extends BaseEntity {
     @Id

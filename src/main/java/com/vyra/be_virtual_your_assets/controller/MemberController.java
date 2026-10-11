@@ -2,7 +2,9 @@ package com.vyra.be_virtual_your_assets.controller;
 
 import com.vyra.be_virtual_your_assets.constant.ApiPath;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
+import com.vyra.be_virtual_your_assets.dto.activity.MemberActivityResponse;
 import com.vyra.be_virtual_your_assets.dto.auth.ChangePinRequest;
+import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
 import com.vyra.be_virtual_your_assets.dto.member.GetMemberResponse;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileRequest;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileResponse;
@@ -12,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import static com.vyra.be_virtual_your_assets.constant.ApiPath.*;
 
 @RestController
@@ -24,6 +27,16 @@ public class MemberController {
     public BaseResponse<GetMemberResponse> getMember(Authentication authentication) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
         return memberService.getMember(user.getMemberId());
+    }
+
+    @GetMapping(GET_MEMBER_ACTIVITY)
+    public BaseResponse<PageResponse<MemberActivityResponse>> getMemberActivity(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size
+    ) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return memberService.getMemberActivity(user.getMemberId(), page, size);
     }
 
     @PatchMapping(UPDATE_PROFILE)

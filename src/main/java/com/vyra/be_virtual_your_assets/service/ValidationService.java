@@ -1,7 +1,7 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
 import com.vyra.be_virtual_your_assets.dto.auth.VerifyOtpRequest;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileRequest;
 import com.vyra.be_virtual_your_assets.dto.member.ValidateIsUpdateProfile;
@@ -65,7 +65,7 @@ public class ValidationService {
 
             if (currentAttempts >= maxAttempts) {
                 log.info("Executing account to suspend member: {}", member.getPhoneNumber());
-                member.setStatus(MemberStatus.SUSPENDED);
+                member.setStatus(ActiveStatus.SUSPENDED);
                 memberRepository.save(member);
                 memberOtpRepository.deleteByPhoneNumber(member.getPhoneNumber());
                 log.warn("Max attempts {} reached for {}. account has been suspended.", currentAttempts, member.getPhoneNumber());
@@ -90,7 +90,7 @@ public class ValidationService {
             memberRepository.findByEmailIgnoreCase(request.getEmail())
                     .ifPresent(existingMember -> {
                         if (!existingMember.getId().equals(member.getId())) {
-                            log.error("Email already exist for another account. phoneNumber: {}", member.getPhoneNumber());
+                            log.warn("Email already exist for another account. phoneNumber: {}", member.getPhoneNumber());
                             throw new BusinessException(ErrorConstant.EMAIL_ALREADY_EXIST_V2);
                         }
                     });
@@ -103,7 +103,7 @@ public class ValidationService {
             memberRepository.findByPhoneNumber(request.getPhoneNumber())
                     .ifPresent(existingMember -> {
                         if (!existingMember.getId().equals(member.getId())) {
-                            log.error("Phone number already exist for another account. phoneNumber: {}", member.getPhoneNumber());
+                            log.warn("Phone number already exist for another account. phoneNumber: {}", member.getPhoneNumber());
                             throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST_V2);
                         }
                     });

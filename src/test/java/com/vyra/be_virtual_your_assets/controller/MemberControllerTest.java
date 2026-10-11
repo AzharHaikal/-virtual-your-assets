@@ -15,8 +15,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
+import com.vyra.be_virtual_your_assets.dto.activity.MemberActivityResponse;
+import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MemberControllerTest {
@@ -90,5 +94,23 @@ class MemberControllerTest {
         assertThat(result).isSameAs(expected);
         verify(authentication).getPrincipal();
         verify(memberService).changePin(MEMBER_ID, request);
+    }
+
+
+    // =========================================================================
+    // getMemberActivity
+    // =========================================================================
+    @Test
+    void getMemberActivity_shouldDelegateWithPrincipalIdAndPaging() {
+        BaseResponse<PageResponse<MemberActivityResponse>> expected =
+                new BaseResponse<>("VYRA-GMA-000", "Success", new PageResponse<>());
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+        when(memberService.getMemberActivity(MEMBER_ID, 2, 15)).thenReturn(expected);
+
+        BaseResponse<PageResponse<MemberActivityResponse>> result =
+                memberController.getMemberActivity(authentication, 2, 15);
+
+        assertThat(result).isSameAs(expected);
+        verify(memberService).getMemberActivity(MEMBER_ID, 2, 15);
     }
 }
