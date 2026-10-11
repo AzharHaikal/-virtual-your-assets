@@ -11,7 +11,10 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(schema = "wallet", name = "wallet_statement")
+@Table(schema = "wallet", name = "wallet_statement",
+        indexes = {
+                @Index(name = "idx_wallet_statement_phone", columnList = "phone_number")
+        })
 @Entity
 public class WalletStatement extends BaseEntity {
     @Id

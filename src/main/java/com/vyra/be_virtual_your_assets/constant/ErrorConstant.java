@@ -57,6 +57,7 @@ public enum ErrorConstant {
 
     // Member
     GET_MEMBER_SUCCESS("VYRA-GMS-000", "Get member detail successful"),
+    GET_MEMBER_ACTIVITY_SUCCESS("VYRA-GMA-000", "Get member activity successful"),
     GET_MEMBER_FAILED("VYRA-GMS-001", "Get member detail failed"),
 
     // Update member profile
@@ -87,7 +88,68 @@ public enum ErrorConstant {
     // Exception
     BAD_REQUEST("VYRA-ERR400", "Something went wrong with your request"),
     DATA_NOT_FOUND("VYRA-ERR404", "The requested data could not be found"),
-    INTERNAL_SERVER_ERROR("VYRA-ERR500", "We are experiencing a system issue. Please try again later");
+    INTERNAL_SERVER_ERROR("VYRA-ERR500", "We are experiencing a system issue. Please try again later"),
+
+    // =========================================================================
+    // ADMIN AUTH
+    // =========================================================================
+    ADMIN_LOGIN_SUCCESS("VYRA-ADM-LGN-000", "You've successfully logged in"),
+    ADMIN_LOGOUT_SUCCESS("VYRA-ADM-LGT-000", "You've successfully logged out"),
+    ADMIN_REFRESH_TOKEN_SUCCESS("VYRA-ADM-TKN-000", "Access token refreshed successfully"),
+    ADMIN_INVALID_CREDENTIALS("VYRA-ADM-LGN-001", "Invalid email or password"),
+    ADMIN_NOT_FOUND("VYRA-ADM-DNF-001", "Admin account could not be found"),
+    ADMIN_NOT_ACTIVE("VYRA-ADM-LGN-002", "Your account is not active. Please contact a super administrator"),
+    ADMIN_INVALID_REFRESH_TOKEN("VYRA-ADM-TKN-001", "Invalid refresh token"),
+    ADMIN_REFRESH_TOKEN_EXPIRED("VYRA-ADM-TKN-002", "Your session has expired. Please log in again"),
+    ADMIN_UNAUTHORIZED("VYRA-ADM-AUT-001", "You don't have permission to perform this action"),
+
+    // =========================================================================
+    // ADMIN MANAGEMENT (CRUD admin users / RBAC)
+    // =========================================================================
+    ADMIN_REGISTER_SUCCESS("VYRA-ADM-REG-000", "Admin account has been successfully created"),
+    ADMIN_EMAIL_ALREADY_EXIST("VYRA-ADM-EXS-001", "An admin account with this email already exists"),
+    ADMIN_PHONE_ALREADY_EXIST("VYRA-ADM-EXS-002", "An admin account with this phone number already exists"),
+    ADMIN_GET_LIST_SUCCESS("VYRA-ADM-LST-000", "Admin list retrieved successfully"),
+    ADMIN_GET_DETAIL_SUCCESS("VYRA-ADM-DTL-000", "Admin detail retrieved successfully"),
+    ADMIN_UPDATE_SUCCESS("VYRA-ADM-UPD-000", "Admin account updated successfully"),
+    ADMIN_DELETE_SUCCESS("VYRA-ADM-DEL-000", "Admin account deleted successfully"),
+    ADMIN_UPDATE_STATUS_SUCCESS("VYRA-ADM-STS-000", "Admin status updated successfully"),
+    ADMIN_RESET_PASSWORD_SUCCESS("VYRA-ADM-RPW-000", "Admin password has been reset successfully"),
+    ADMIN_CANNOT_MODIFY_SELF_STATUS("VYRA-ADM-STS-001", "You cannot change the status of your own account"),
+    ADMIN_CANNOT_DELETE_SELF("VYRA-ADM-DEL-001", "You cannot delete your own account"),
+    ADMIN_GET_PROFILE_SUCCESS("VYRA-ADM-PRF-000", "Admin profile retrieved successfully"),
+
+    // =========================================================================
+    // ADMIN DASHBOARD
+    // =========================================================================
+    DASHBOARD_SUMMARY_SUCCESS("VYRA-DSH-SUM-000", "Dashboard summary retrieved successfully"),
+    DASHBOARD_CHART_SUCCESS("VYRA-DSH-CHT-000", "Dashboard chart data retrieved successfully"),
+    DASHBOARD_DISTRIBUTION_SUCCESS("VYRA-DSH-DST-000", "Category distribution retrieved successfully"),
+    DASHBOARD_RECENT_TRANSACTIONS_SUCCESS("VYRA-DSH-TRX-000", "Recent transactions retrieved successfully"),
+    DASHBOARD_LATEST_MEMBERS_SUCCESS("VYRA-DSH-MBR-000", "Latest members retrieved successfully"),
+
+    // =========================================================================
+    // ADMIN MEMBER MANAGEMENT
+    // =========================================================================
+    ADMIN_MEMBER_LIST_SUCCESS("VYRA-AMM-LST-000", "Member list retrieved successfully"),
+    ADMIN_MEMBER_DETAIL_SUCCESS("VYRA-AMM-DTL-000", "Member detail retrieved successfully"),
+    ADMIN_MEMBER_TRANSACTIONS_SUCCESS("VYRA-AMM-TRX-000", "Member transaction history retrieved successfully"),
+    ADMIN_MEMBER_STATUS_UPDATE_SUCCESS("VYRA-AMM-STS-000", "Member status updated successfully"),
+    ADMIN_MEMBER_DELETE_SUCCESS("VYRA-AMM-DEL-000", "Member deleted successfully"),
+
+    // =========================================================================
+    // ADMIN REPORTS
+    // =========================================================================
+    REPORT_INCOME_SUCCESS("VYRA-RPT-INC-000", "Income report retrieved successfully"),
+    REPORT_EXPENSE_SUCCESS("VYRA-RPT-EXP-000", "Expense report retrieved successfully"),
+    REPORT_TRANSACTION_SUCCESS("VYRA-RPT-TRX-000", "Transaction report retrieved successfully"),
+    REPORT_MEMBER_SUCCESS("VYRA-RPT-MBR-000", "Member report retrieved successfully"),
+
+    // =========================================================================
+    // ADMIN AUDIT TRAIL
+    // =========================================================================
+    AUDIT_USER_LIST_SUCCESS("VYRA-AUD-USR-000", "User audit trail retrieved successfully"),
+    AUDIT_MEMBER_LIST_SUCCESS("VYRA-AUD-MBR-000", "Member audit trail retrieved successfully");
 
     private final String code;
     private final String message;

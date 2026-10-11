@@ -1,6 +1,7 @@
 package com.vyra.be_virtual_your_assets.config;
 
 import com.vyra.be_virtual_your_assets.constant.SecurityConstant;
+import com.vyra.be_virtual_your_assets.security.filter.AdminTokenFilter;
 import com.vyra.be_virtual_your_assets.security.filter.AuthTokenFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final AuthTokenFilter authTokenFilter;
+    private final AdminTokenFilter adminTokenFilter;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -47,11 +49,19 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers(SecurityConstant.WHITE_LIST_URL)
                                 .permitAll()
+                                .requestMatchers(SecurityConstant.ADMIN_WHITE_LIST_URL)
+                                .permitAll()
                                 .anyRequest()
                                 .authenticated()
                 )
+                // AuthTokenFilter authenticates mobile app members (and skips /api/v1/admin/**).
                 .addFilterBefore(
                         authTokenFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+                // AdminTokenFilter authenticates portal administrators on /api/v1/admin/** only.
+                .addFilterBefore(
+                        adminTokenFilter,
                         UsernamePasswordAuthenticationFilter.class
                 );
 

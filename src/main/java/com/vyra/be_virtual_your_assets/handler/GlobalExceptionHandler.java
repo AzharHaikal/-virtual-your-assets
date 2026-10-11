@@ -4,7 +4,9 @@ import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,6 +15,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<BaseResponse<Void>> handleForbiddenException(ForbiddenException ex) {
+        log.warn("ForbiddenException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                new BaseResponse<>(
+                        ex.getErrorConstant().getCode(),
+                        ex.getMessage(),
+                        null
+                )
+        );
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<BaseResponse<Void>> handleBusinessException(BusinessException ex) {

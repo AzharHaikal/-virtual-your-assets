@@ -1,8 +1,8 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.*;
@@ -42,7 +42,7 @@ public class WalletService {
         memberWallet.setPhoneNumber(request.getPhoneNumber());
         memberWallet.setCreatedBy(request.getPhoneNumber());
         memberWallet.setCreatedAt(LocalDateTime.now());
-        memberWallet.setStatus(MemberStatus.ACTIVE); // After revamp -> microservice this should be INACTIVE first
+        memberWallet.setStatus(ActiveStatus.ACTIVE); // After revamp -> microservice this should be INACTIVE first
         memberWalletRepository.save(memberWallet);
 
         WalletStatement walletStatement = new WalletStatement();

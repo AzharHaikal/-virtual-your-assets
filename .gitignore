@@ -31,3 +31,27 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secrets & local config ###
+.env
+.env.*
+!.env.example
+application-local.*
+application-secret.*
+.m2/settings.xml
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+### Build artifacts & reports ###
+*.jar
+*.jar.original
+*.war
+jacoco.exec
+*.log
+
+### OS ###
+.DS_Store
+Thumbs.db

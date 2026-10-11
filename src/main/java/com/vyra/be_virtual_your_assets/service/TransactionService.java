@@ -33,7 +33,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -178,12 +180,12 @@ public class TransactionService {
             }
 
         } catch (BusinessException e) {
-            log.error("[ERROR] create transaction {} encountered an exception: {}", phoneNumber, e.getMessage(), e);
+            log.warn("create transaction {} encountered an exception: {}", phoneNumber, e.getMessage());
             createMemberActivity(phoneNumber, MemberActivityEvent.FAILED_CREATE_TRANSACTION);
             throw new BusinessException(ErrorConstant.BAD_REQUEST);
 
         } catch (Exception e) {
-            log.error("[ERROR] Unexpected error during create transaction {}, message: {}", phoneNumber, e.getMessage(), e);
+            log.error("Unexpected error during create transaction {}, message: {}", phoneNumber, e.getMessage(), e);
             createMemberActivity(phoneNumber, MemberActivityEvent.FAILED_CREATE_TRANSACTION);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }

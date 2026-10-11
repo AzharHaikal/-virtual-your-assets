@@ -6,15 +6,15 @@ spring:
     name: VIRTUAL_YOUR_ASSET
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/vyra}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/vyra_assets}
     username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:qwerty}
+    password: ${DATABASE_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
 
     hikari:
-      maximum-pool-size: 5
-#      data-source-properties:
-#        sslmode: require
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  #      data-source-properties:
+  #        sslmode: require
 
   flyway:
     enabled: true
@@ -25,23 +25,26 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
+        # jdbc.batch_size: 500      # 💡 TAMBAHKAN: Kirim data per 500 baris sekaligus
+        # order_inserts: true       # 💡 TAMBAHKAN: Mengoptimalkan batch insert untuk entitas terkait
 
   mail:
     host: smtp.gmail.com
     port: 587
-    username: viraasst@gmail.com
-    password: rzrg qodc gfmd xspk
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${spring.application.name:},%.-12X{traceId},%.-8X{spanId}] %logger{36} : %msg%n"
@@ -57,4 +60,12 @@ management:
       probability: 1.0
 
 crypto:
-  secret-key: 1234567890123456
+  secret-key: ${CRYPTO_SECRET_KEY}
+
+vyra:
+  admin:
+    seed:
+      name: ${VYRA_ADMIN_SEED_NAME:Super Administrator}
+      email: ${VYRA_ADMIN_SEED_EMAIL:superadmin@vyra.local}
+      phone-number: ${VYRA_ADMIN_SEED_PHONE:628000000000}
+      password: ${VYRA_ADMIN_SEED_PASSWORD:ChangeMe123!}

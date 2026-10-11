@@ -18,7 +18,7 @@ public class MemberToken {
     private String memberTokenId;
 
     @Column(nullable = false)
-    private String memberId;
+    private String userId;
 
     @Column(nullable = false, unique = true)
     private String accessToken;

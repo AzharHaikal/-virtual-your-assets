@@ -1,6 +1,6 @@
 package com.vyra.be_virtual_your_assets.entity;
 
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,7 +9,11 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(schema = "idp", name = "member")
+@Table(schema = "idp", name = "member",
+        indexes = {
+                @Index(name = "idx_member_status_created_at", columnList = "status, created_at"),
+                @Index(name = "idx_member_created_at", columnList = "created_at")
+        })
 @Entity
 public class Member extends BaseEntity {
     @Id
@@ -32,5 +36,5 @@ public class Member extends BaseEntity {
     private String pin;
 
     @Enumerated(EnumType.STRING)
-    private MemberStatus status;
+    private ActiveStatus status;
 }

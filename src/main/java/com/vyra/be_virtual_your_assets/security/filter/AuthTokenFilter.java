@@ -33,6 +33,12 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String requestPath = request.getRequestURI();
 
+        // Admin/portal requests are authenticated exclusively by AdminTokenFilter.
+        if (pathMatcher.match(SecurityConstant.ADMIN_PATH_PREFIX, requestPath)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (isWhitelisted(requestPath)) {
             filterChain.doFilter(request, response);
             return;
@@ -57,7 +63,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             return;
         }
 
-        CustomUserDetails userDetails = new CustomUserDetails(memberToken.getMemberId(), memberToken.getAccessToken());
+        CustomUserDetails userDetails = new CustomUserDetails(memberToken.getUserId(), memberToken.getAccessToken());
 
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

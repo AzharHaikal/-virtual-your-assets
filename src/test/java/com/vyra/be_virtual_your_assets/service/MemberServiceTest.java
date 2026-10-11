@@ -13,6 +13,7 @@ import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.WalletUpdateRequest;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.repository.MemberActivityRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import com.vyra.be_virtual_your_assets.dto.activity.MemberActivityResponse;
+import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
+import com.vyra.be_virtual_your_assets.entity.MemberActivity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,6 +42,7 @@ import static org.mockito.Mockito.*;
 class MemberServiceTest {
 
     @Mock private TransactionRepository transactionRepository;
+    @Mock private MemberActivityRepository memberActivityRepository;
     @Mock private MemberActivityService memberActivityService;
     @Mock private TransactionService transactionService;
     @Mock private ValidationService validationService;
@@ -281,5 +289,31 @@ class MemberServiceTest {
         r.setTotalExpense(expense);
         r.setBalance(balance);
         return r;
+    }
+
+
+    // =========================================================================
+    // getMemberActivity
+    // =========================================================================
+    @Test
+    void getMemberActivity_shouldMapItemsAndClampPaging() {
+        MemberActivity activity = new MemberActivity();
+        activity.setId("act-1");
+        activity.setPhoneNumber("628123456789");
+        activity.setEvent("SUCCESS_LOGIN");
+        activity.setDescription("Member successfully logged in");
+        activity.setCreatedAt(LocalDateTime.of(2026, 6, 1, 9, 0));
+
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+        when(memberActivityRepository.findByPhoneNumber(eq("628123456789"), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(activity), PageRequest.of(0, 50), 1));
+
+        BaseResponse<PageResponse<MemberActivityResponse>> result =
+                memberService.getMemberActivity("member-uuid-001", -5, 1000);
+
+        assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.GET_MEMBER_ACTIVITY_SUCCESS.getCode());
+        assertThat(result.getData().getContent()).hasSize(1);
+        assertThat(result.getData().getContent().get(0).getEvent()).isEqualTo("SUCCESS_LOGIN");
+        verify(memberActivityRepository).findByPhoneNumber("628123456789", PageRequest.of(0, 50));
     }
 }

@@ -1,8 +1,8 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
 import com.vyra.be_virtual_your_assets.constant.OtpType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.auth.*;
@@ -54,7 +54,7 @@ public class AuthenticationService {
         BeanUtils.copyProperties(request, member);
         member.setEmail(request.getEmail().toLowerCase().trim());
         member.setPin(passwordEncoder.encode(request.getPin()));
-        member.setStatus(MemberStatus.INACTIVE);
+        member.setStatus(ActiveStatus.INACTIVE);
         member.setCreatedBy(request.getPhoneNumber());
         member.setCreatedAt(LocalDateTime.now());
         memberRepository.save(member);
@@ -76,16 +76,16 @@ public class AuthenticationService {
                 throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);
             }
         } catch (BusinessException e) {
-            log.error("[ERROR] register {} encountered an exception: {}", request.getPhoneNumber(), e.getMessage(), e);
+            log.warn("register {} encountered an exception: {}", request.getPhoneNumber(), e.getMessage());
             createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.FAILED_REGISTER);
             throw e;
         } catch (Exception e) {
-            log.error("[ERROR] Unexpected error during register {}, message: {}", request.getPhoneNumber(), e.getMessage(), e);
+            log.error("Unexpected error during register {}, message: {}", request.getPhoneNumber(), e.getMessage(), e);
             createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.FAILED_REGISTER);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }
 
-        log.info("Send async OTP to email. phoneNumber: {}, otp: {} ", request.getPhoneNumber(), otp);
+        log.info("Send async OTP to email. phoneNumber: {}", request.getPhoneNumber());
         createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_OTP_REGISTER);
 
         // Send OTP async
@@ -119,7 +119,7 @@ public class AuthenticationService {
         String otp = generateOtp(request.getOtpType(), member.getPhoneNumber());
         String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
 
-        log.info("Resend async otp to email. phoneNumber: {}, otp: {} ", member.getPhoneNumber(), otp);
+        log.info("Resend async OTP to email. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESEND_OTP);
 
         // Send OTP async
@@ -146,7 +146,7 @@ public class AuthenticationService {
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_VERIFY_OTP);
 
         MemberOtp memberOtp = validationService.verifyOtp(member, request);
-        member.setStatus(MemberStatus.ACTIVE);
+        member.setStatus(ActiveStatus.ACTIVE);
         memberRepository.save(member);
         memberOtpRepository.delete(memberOtp);
 
@@ -169,7 +169,7 @@ public class AuthenticationService {
         log.info("Attempt login member. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_LOGIN);
 
-        if (MemberStatus.ACTIVE != member.getStatus()) {
+        if (ActiveStatus.ACTIVE != member.getStatus()) {
             log.info("Login failed member not active. phoneNumber: {} ", member.getPhoneNumber());
             createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_LOGIN);
             throw new BusinessException(ErrorConstant.MEMBER_NOT_ACTIVE);
@@ -185,7 +185,7 @@ public class AuthenticationService {
         String refreshToken = TokenUtil.generateRefreshToken();
 
         MemberToken memberToken = new MemberToken();
-        memberToken.setMemberId(member.getId());
+        memberToken.setUserId(member.getId());
         memberToken.setAccessToken(accessToken);
         memberToken.setRefreshToken(refreshToken);
         memberToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
@@ -254,7 +254,7 @@ public class AuthenticationService {
         String otp = generateOtp(OtpType.FORGOT_PIN, member.getPhoneNumber());
         String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
 
-        log.info("Send async otp to email. phoneNumber: {}, otp: {} ", member.getPhoneNumber(), otp);
+        log.info("Send async OTP to email. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PIN);
 
         // Send OTP async

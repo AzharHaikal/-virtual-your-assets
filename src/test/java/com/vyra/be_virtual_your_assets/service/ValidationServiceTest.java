@@ -1,7 +1,7 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
-import com.vyra.be_virtual_your_assets.constant.MemberStatus;
 import com.vyra.be_virtual_your_assets.constant.OtpType;
 import com.vyra.be_virtual_your_assets.dto.auth.VerifyOtpRequest;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileRequest;
@@ -51,7 +51,7 @@ class ValidationServiceTest {
         member.setEmail("budi@example.com");
         member.setPhoneNumber("628123456789");
         member.setPin("hashed-pin");
-        member.setStatus(MemberStatus.ACTIVE);
+        member.setStatus(ActiveStatus.ACTIVE);
     }
 
     // =========================================================================
@@ -275,7 +275,7 @@ class ValidationServiceTest {
                 () -> validationService.verifyOtp(member, request));
 
         assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MAX_ATTEMPTS_REACHED);
-        assertThat(member.getStatus()).isEqualTo(MemberStatus.SUSPENDED);
+        assertThat(member.getStatus()).isEqualTo(ActiveStatus.SUSPENDED);
         verify(memberRepository).save(member);
         verify(memberOtpRepository).deleteByPhoneNumber(member.getPhoneNumber());
     }

@@ -12,4 +12,11 @@ public class SecurityConstant {
             "/api/v1/auth/forgot-pin",
             "/api/v1/auth/reset-pin",
     };
+
+    public static final String[] ADMIN_WHITE_LIST_URL = {
+            "/api/v1/admin/auth/login",
+            "/api/v1/admin/auth/refresh-token",
+    };
+
+    public static final String ADMIN_PATH_PREFIX = "/api/v1/admin/**";
 }

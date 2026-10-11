@@ -11,7 +11,13 @@ import com.vyra.be_virtual_your_assets.dto.member.ValidateIsUpdateProfile;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionUpdateRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.WalletUpdateRequest;
+import com.vyra.be_virtual_your_assets.dto.activity.MemberActivityResponse;
+import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
 import com.vyra.be_virtual_your_assets.entity.Member;
+import com.vyra.be_virtual_your_assets.entity.MemberActivity;
+import com.vyra.be_virtual_your_assets.repository.MemberActivityRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import io.micrometer.tracing.annotation.NewSpan;
@@ -34,6 +40,7 @@ import java.time.temporal.TemporalAdjusters;
 @Slf4j
 public class MemberService {
     private final TransactionRepository transactionRepository;
+    private final MemberActivityRepository memberActivityRepository;
     private final MemberActivityService memberActivityService;
     private final TransactionService transactionService;
     private final ValidationService validationService;
@@ -54,10 +61,10 @@ public class MemberService {
                 throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);
             }
         } catch (BusinessException e) {
-            log.error("[ERROR] get member wallet {} encountered an exception: {}", member.getPhoneNumber(), e.getMessage(), e);
+            log.warn("get member wallet {} encountered an exception: {}", member.getPhoneNumber(), e.getMessage());
             throw e;
         } catch (Exception e) {
-            log.error("[ERROR] Unexpected error during get member wallet {}, message: {}", member.getPhoneNumber(), e.getMessage(), e);
+            log.error("Unexpected error during get member wallet {}, message: {}", member.getPhoneNumber(), e.getMessage(), e);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }
 
@@ -67,6 +74,39 @@ public class MemberService {
         return new BaseResponse<>(
                 ErrorConstant.GET_MEMBER_SUCCESS.getCode(),
                 ErrorConstant.GET_MEMBER_SUCCESS.getMessage(),
+                response
+        );
+    }
+
+    @NewSpan
+    @Transactional(readOnly = true)
+    public BaseResponse<PageResponse<MemberActivityResponse>> getMemberActivity(String memberId, int page, int size) {
+        Member member = validationService.getMemberById(memberId);
+        log.info("[START] memberService.getMemberActivity phoneNumber: {} ", member.getPhoneNumber());
+
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        Page<MemberActivity> activities = memberActivityRepository.findByPhoneNumber(
+                member.getPhoneNumber(), PageRequest.of(safePage, safeSize));
+
+        PageResponse<MemberActivityResponse> response = PageResponse.from(
+                activities,
+                activities.getContent().stream()
+                        .map(a -> MemberActivityResponse.builder()
+                                .id(a.getId())
+                                .phoneNumber(a.getPhoneNumber())
+                                .event(a.getEvent())
+                                .description(a.getDescription())
+                                .createdAt(a.getCreatedAt())
+                                .build())
+                        .toList()
+        );
+
+        log.info("[END] memberService.getMemberActivity successfully phoneNumber: {} ", member.getPhoneNumber());
+
+        return new BaseResponse<>(
+                ErrorConstant.GET_MEMBER_ACTIVITY_SUCCESS.getCode(),
+                ErrorConstant.GET_MEMBER_ACTIVITY_SUCCESS.getMessage(),
                 response
         );
     }

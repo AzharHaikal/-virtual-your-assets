@@ -3,7 +3,10 @@ package com.vyra.be_virtual_your_assets.entity;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
@@ -14,7 +17,13 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(schema = "transaction_finance", name = "transaction")
+@Table(schema = "transaction_finance", name = "transaction",
+        indexes = {
+                @Index(name = "idx_transaction_member_date", columnList = "member_id, transaction_date"),
+                @Index(name = "idx_transaction_date", columnList = "transaction_date"),
+                @Index(name = "idx_transaction_type_status_date", columnList = "transaction_type, status, transaction_date"),
+                @Index(name = "idx_transaction_user_phone", columnList = "user_phone_number")
+        })
 @Entity
 public class Transaction extends BaseEntity {
     @Id
