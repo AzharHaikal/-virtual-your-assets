@@ -185,7 +185,14 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
 |---|---|
 | `transaction` | Data transaksi: memberId, phoneNumber, email, category, type, amount, status, referenceNumber |
 
-> ⚠️ **Migrasi database** dikelola oleh **Flyway** secara otomatis saat aplikasi start.
+> ⚠️ **Migrasi database** dikelola sepenuhnya oleh **Flyway** (`src/main/resources/db/migration`) saat aplikasi start. Hibernate berjalan dengan `ddl-auto: validate`: aplikasi **gagal start** bila entity tidak cocok dengan skema.
+
+### Aturan Migrasi
+- Setiap perubahan skema = file baru `V{n}__deskripsi_singkat.sql`. File yang sudah ter-apply **tidak boleh diedit** (checksum Flyway akan gagal).
+- Tulis DDL biasa (tanpa pola kondisional `to_regclass` seperti V2–V4). `V5__baseline_schema.sql` membuat semua tabel V1 pada database baru.
+- Index & constraint didefinisikan di migrasi. `@Table(indexes = ...)` di entity hanya dokumentasi.
+- Menambah nilai enum yang disimpan sebagai string (mis. `OtpType`, `TransactionStatus`) wajib disertai migrasi yang membuat ulang check constraint kolom tersebut.
+- Job CI `migration-check` membangun skema dari nol dan menjalankan `SchemaMigrationIT`.
 
 ---
 
@@ -347,10 +354,8 @@ cd be-virtual-your-assets
 ### 2. Siapkan Database PostgreSQL
 ```sql
 CREATE DATABASE vyra_db;
-CREATE SCHEMA idp;
-CREATE SCHEMA wallet;
-CREATE SCHEMA transaction_finance;
 ```
+Schema dan tabel dibuat otomatis oleh Flyway saat aplikasi pertama kali start.
 
 ### 3. Konfigurasi `application.yml`
 Sesuaikan koneksi database, mail server, dan `crypto.secret-key` seperti di atas.
@@ -392,6 +397,14 @@ DATABASE_URL=jdbc:postgresql://localhost:5432/vyra_scratch DATABASE_USERNAME=pos
 MAIL_USERNAME=x MAIL_PASSWORD=x CRYPTO_SECRET_KEY=0123456789abcdef0123456789abcdef \
 DB_LOCK_TIMEOUT_MS=1500 \
 mvn test -Dtest='WalletConcurrencyIT,SecurityHardeningIT' -Dvyra.it.db=true
+```
+
+`SchemaMigrationIT` builds the schema from the Flyway migrations alone and starts the application with `ddl-auto=validate`. Run it against an **empty** database (CI job `migration-check`):
+
+```bash
+DATABASE_URL=jdbc:postgresql://localhost:5432/vyra_empty DATABASE_USERNAME=postgres DATABASE_PASSWORD=... \
+MAIL_USERNAME=x MAIL_PASSWORD=x CRYPTO_SECRET_KEY=0123456789abcdef0123456789abcdef \
+mvn test -Dtest=SchemaMigrationIT -Dvyra.it.db=true
 ```
 
 ### Coverage Test
