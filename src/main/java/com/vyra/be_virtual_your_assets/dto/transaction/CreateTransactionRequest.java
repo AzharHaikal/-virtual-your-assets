@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Data
 public class CreateTransactionRequest {
@@ -16,6 +15,10 @@ public class CreateTransactionRequest {
     @NotNull(message = "Amount is required")
     @Positive(message = "Amount must be greater than zero")
     private BigDecimal amount;
-    private LocalDateTime transactionDate;
+    /**
+     * ISO-8601 date-time of the transaction. With an offset ({@code 2026-10-22T08:30:00+07:00} or {@code ...Z})
+     * it is exact; without one (older app versions) it is read in the member's time zone. Empty means now.
+     */
+    private String transactionDate;
     private String transactionDesc;
 }

@@ -32,6 +32,8 @@ public enum ErrorConstant {
     // Invalid
     INVALID_PIN("VYRA-INV-001", "Invalid PIN. Please try again"),
     INVALID_PIN_MISS_MATCH("VYRA-INV-002", "Wrong PIN. Please input with correct PIN"),
+    INVALID_TIMEZONE("VYRA-INV-003", "Invalid time zone. Use a region id such as Asia/Jakarta"),
+    INVALID_DATE_TIME("VYRA-INV-004", "Invalid date. Use ISO-8601, e.g. 2026-10-22T08:30:00+07:00"),
 
     // Not Found (generic to prevent enumeration)
     PHONE_NUMBER_NOT_FOUND("VYRA-DNF-001", "Invalid account. Please check your account details"),

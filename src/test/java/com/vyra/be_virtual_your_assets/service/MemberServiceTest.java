@@ -12,6 +12,7 @@ import com.vyra.be_virtual_your_assets.dto.transaction.TransactionUpdateRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.WalletUpdateRequest;
 import com.vyra.be_virtual_your_assets.entity.Member;
+import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.MemberActivityRepository;
@@ -22,10 +23,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.PageImpl;
@@ -53,6 +58,7 @@ class MemberServiceTest {
     @Mock private LockoutService lockoutService;
     @Mock private MemberTokenRepository memberTokenRepository;
     @Mock private ContactChangeService contactChangeService;
+    @Spy private TimeService timeService = new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
 
     @InjectMocks
     private MemberService memberService;
@@ -82,7 +88,9 @@ class MemberServiceTest {
 
         when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
         when(walletService.getMemberWallet("628123456789")).thenReturn(walletResp);
-        when(transactionRepository.getPreviousMonthIncome(anyString(), any(LocalDateTime.class), any(LocalDateTime.class)))
+        // Member in Jakarta, now = 23 Oct there: previous month is September.
+        when(transactionRepository.getPreviousMonthIncome("member-uuid-001",
+                java.time.LocalDate.of(2026, 9, 1), java.time.LocalDate.of(2026, 9, 30)))
                 .thenReturn(BigDecimal.valueOf(2000000));
 
         BaseResponse<GetMemberResponse> result = memberService.getMember("member-uuid-001");
@@ -188,6 +196,54 @@ class MemberServiceTest {
 
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.UPDATE_PROFILE_SUCCESS.getCode());
         verify(walletService, never()).updateMemberWallet(any());
+    }
+
+    // =========================================================================
+    // updateProfile — time zone
+    // =========================================================================
+    @Test
+    void updateProfile_timezoneOnly_shouldChangeZoneWithoutPinAndLogActivity() {
+        member.setTimezone("Asia/Jakarta");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setTimezone("Asia/Makassar");
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+        when(validationService.validateIsUpdateProfile(member, request)).thenReturn(new ValidateIsUpdateProfile());
+
+        BaseResponse<UpdateProfileResponse> result = memberService.updateProfile("member-uuid-001", request);
+
+        assertThat(member.getTimezone()).isEqualTo("Asia/Makassar");
+        assertThat(result.getData().getTimezone()).isEqualTo("Asia/Makassar");
+        verify(memberActivityService).createMemberActivity("628123456789", MemberActivityEvent.SUCCESS_UPDATE_TIMEZONE);
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    void updateProfile_sameTimezone_shouldNotLogTimezoneChange() {
+        member.setTimezone("Asia/Jakarta");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setTimezone("Asia/Jakarta");
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+        when(validationService.validateIsUpdateProfile(member, request)).thenReturn(new ValidateIsUpdateProfile());
+
+        memberService.updateProfile("member-uuid-001", request);
+
+        verify(memberActivityService, never()).createMemberActivity(anyString(), eq(MemberActivityEvent.SUCCESS_UPDATE_TIMEZONE));
+    }
+
+    @Test
+    void updateProfile_invalidTimezone_shouldThrowBeforeChangingAnything() {
+        member.setTimezone("Asia/Jakarta");
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setFirstName("Andi");
+        request.setTimezone("Mars/Base");
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> memberService.updateProfile("member-uuid-001", request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.INVALID_TIMEZONE);
+        assertThat(member.getTimezone()).isEqualTo("Asia/Jakarta");
+        verify(validationService, never()).validateIsUpdateProfile(any(), any());
     }
 
     // =========================================================================

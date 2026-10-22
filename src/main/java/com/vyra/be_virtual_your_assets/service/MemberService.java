@@ -24,6 +24,7 @@ import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -34,7 +35,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 
 @Service
@@ -51,6 +51,7 @@ public class MemberService {
     private final LockoutService lockoutService;
     private final MemberTokenRepository memberTokenRepository;
     private final ContactChangeService contactChangeService;
+    private final TimeService timeService;
 
     @NewSpan
     public BaseResponse<GetMemberResponse> getMember(String memberId) {
@@ -127,6 +128,10 @@ public class MemberService {
         log.info("[START] memberService.updateProfile phoneNumber: {}", existingPhone);
         createMemberActivity(existingPhone, MemberActivityEvent.ATTEMPT_UPDATE_PROFILE);
 
+        // Validated before anything is modified; applied below (no PIN needed).
+        String newTimezone = StringUtils.isBlank(request.getTimezone())
+                ? null : timeService.requireValidZoneId(request.getTimezone());
+
         // Checked before anything is modified. Only the sensitive fields need the PIN.
         if (isContactChange(member, request)) {
             lockoutService.assertPinNotLocked(member);
@@ -137,6 +142,12 @@ public class MemberService {
                 throw new BusinessException(ErrorConstant.INVALID_PIN_MISS_MATCH);
             }
             lockoutService.onPinSuccess(member);
+        }
+
+        // Past days keep their stored local_date; only new data follows the new zone.
+        if (newTimezone != null && !newTimezone.equals(member.getTimezone())) {
+            member.setTimezone(newTimezone);
+            createMemberActivity(existingPhone, MemberActivityEvent.SUCCESS_UPDATE_TIMEZONE);
         }
 
         if (isContactChange(member, request)) {
@@ -152,6 +163,7 @@ public class MemberService {
         response.setLastName(member.getLastName());
         response.setEmail(member.getEmail());
         response.setPhoneNumber(member.getPhoneNumber());
+        response.setTimezone(member.getTimezone());
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_UPDATE_PROFILE);
         log.info("[END] memberService.updateProfile successfully phoneNumber: {}", member.getPhoneNumber());
@@ -233,13 +245,14 @@ public class MemberService {
         response.setFullName(String.format("%s %s", member.getFirstName(), member.getLastName()).trim());
         response.setEmail(member.getEmail());
         response.setPhoneNumber(member.getPhoneNumber());
+        response.setTimezone(member.getTimezone());
         response.setTotalIncome(getWalletResponse.getData().getTotalIncome());
         response.setTotalExpense(getWalletResponse.getData().getTotalExpense());
         response.setBalance(getWalletResponse.getData().getBalance());
 
-        // Calculate Growth
-        LocalDateTime startDate = LocalDate.now().minusMonths(1).withDayOfMonth(1).atStartOfDay();
-        LocalDateTime endDate = LocalDate.now().minusMonths(1).with(TemporalAdjusters.lastDayOfMonth()).atTime(LocalTime.MAX);
+        // Calculate Growth: previous calendar month in the member's zone
+        LocalDate startDate = timeService.today(timeService.zoneOf(member)).minusMonths(1).withDayOfMonth(1);
+        LocalDate endDate = startDate.with(TemporalAdjusters.lastDayOfMonth());
         BigDecimal previousMonth = transactionRepository.getPreviousMonthIncome(member.getId(), startDate, endDate);
 
         response.setGrowthPercentage(calculateGrowth(getWalletResponse.getData().getBalance(), previousMonth));

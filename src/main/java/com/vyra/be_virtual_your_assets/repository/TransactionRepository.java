@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
@@ -29,13 +29,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     FROM Transaction t
     WHERE t.memberId = :memberId
     AND t.deletedAt IS NULL
-    AND t.transactionDate BETWEEN :startDate AND :endDate
+    AND t.localDate BETWEEN :startDate AND :endDate
     AND (:type IS NULL OR t.transactionType = :type)
     """)
     Page<Transaction> findTransactionHistory(
             @Param("memberId") String memberId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
             @Param("type") TransactionType type,
             Pageable pageable
     );
@@ -44,19 +44,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     SELECT COALESCE(SUM(t.amount), 0) AS net_balance
     FROM transaction_finance."transaction" t
     WHERE t.member_id = :memberId
-        AND t.transaction_date >= :startDate
-        AND t.transaction_date <= :endDate
+        AND t.local_date >= :startDate
+        AND t.local_date <= :endDate
         AND t.deleted_at IS NULL
     """, nativeQuery = true)
     BigDecimal getPreviousMonthIncome(
             @Param("memberId") String memberId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
     );
 
     @Query(value = """
     SELECT
-        DATE(t.transaction_date) AS label,
+        t.local_date AS label,
         COALESCE(
             SUM(
                 CASE
@@ -78,16 +78,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     FROM transaction_finance.transaction t
     WHERE 
         t.member_id = :memberId
-        AND t.transaction_date >= :startDate
+        AND t.local_date >= :startDate
         AND t.deleted_at IS NULL
-    GROUP BY DATE(t.transaction_date)
-    ORDER BY DATE(t.transaction_date)
+    GROUP BY t.local_date
+    ORDER BY t.local_date
     """, nativeQuery = true)
-    List<Object[]> getChartDaily(String memberId, LocalDateTime startDate);
+    List<Object[]> getChartDaily(String memberId, LocalDate startDate);
 
     @Query(value = """
     SELECT
-        TO_CHAR(DATE_TRUNC('week', t.transaction_date), 'YYYY-MM-DD') AS label,
+        TO_CHAR(CAST(DATE_TRUNC('week', t.local_date) AS date), 'YYYY-MM-DD') AS label,
         COALESCE(
             SUM(
                 CASE
@@ -109,16 +109,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     FROM transaction_finance.transaction t
     WHERE 
         t.member_id = :memberId
-        AND t.transaction_date >= :startDate
+        AND t.local_date >= :startDate
         AND t.deleted_at IS NULL
-    GROUP BY DATE_TRUNC('week', t.transaction_date)
-    ORDER BY DATE_TRUNC('week', t.transaction_date)
+    GROUP BY CAST(DATE_TRUNC('week', t.local_date) AS date)
+    ORDER BY CAST(DATE_TRUNC('week', t.local_date) AS date)
     """, nativeQuery = true)
-    List<Object[]> getChartWeekly(String memberId, LocalDateTime startDate);
+    List<Object[]> getChartWeekly(String memberId, LocalDate startDate);
 
     @Query(value = """
     SELECT
-        TO_CHAR(t.transaction_date, 'YYYY-MM') AS label,
+        TO_CHAR(t.local_date, 'YYYY-MM') AS label,
         COALESCE(
             SUM(
                 CASE
@@ -140,19 +140,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     FROM transaction_finance.transaction t
     WHERE 
         t.member_id = :memberId
-        AND t.transaction_date >= :startDate
+        AND t.local_date >= :startDate
         AND t.deleted_at IS NULL
-    GROUP BY TO_CHAR(t.transaction_date, 'YYYY-MM')
-    ORDER BY TO_CHAR(t.transaction_date, 'YYYY-MM')
+    GROUP BY TO_CHAR(t.local_date, 'YYYY-MM')
+    ORDER BY TO_CHAR(t.local_date, 'YYYY-MM')
     """, nativeQuery = true)
     List<Object[]> getChartMonthly(
             String memberId,
-            LocalDateTime startDate
+            LocalDate startDate
     );
 
     @Query(value = """
     SELECT
-        TO_CHAR(t.transaction_date, 'YYYY-MM') as label,
+        TO_CHAR(t.local_date, 'YYYY-MM') as label,
         COALESCE(
             SUM(
                 CASE
@@ -177,8 +177,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     WHERE 
         t.member_id = :memberId
         AND t.deleted_at IS NULL
-    GROUP BY TO_CHAR(t.transaction_date, 'YYYY-MM')
-    ORDER BY TO_CHAR(t.transaction_date, 'YYYY-MM')
+    GROUP BY TO_CHAR(t.local_date, 'YYYY-MM')
+    ORDER BY TO_CHAR(t.local_date, 'YYYY-MM')
     """, nativeQuery = true)
     List<Object[]> getChartMonthlyAll(@Param("memberId") String memberId);
 
@@ -211,16 +211,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     @Query(value = """
         SELECT
-            DATE_TRUNC('month', t.transaction_date) AS label,
+            TO_CHAR(t.local_date, 'YYYY-MM') AS label,
             COALESCE(SUM(CASE WHEN t.transaction_type = 'INCOME' THEN t.amount ELSE 0 END), 0) AS income,
             COALESCE(SUM(CASE WHEN t.transaction_type = 'EXPENSE' THEN t.amount ELSE 0 END), 0) AS expense
         FROM transaction_finance.transaction t
-        WHERE t.transaction_date >= :startDate
+        WHERE t.local_date >= :startDate
           AND t.deleted_at IS NULL
-        GROUP BY DATE_TRUNC('month', t.transaction_date)
-        ORDER BY DATE_TRUNC('month', t.transaction_date)
+        GROUP BY TO_CHAR(t.local_date, 'YYYY-MM')
+        ORDER BY TO_CHAR(t.local_date, 'YYYY-MM')
         """, nativeQuery = true)
-    List<Object[]> getPlatformMonthlyChart(@Param("startDate") LocalDateTime startDate);
+    List<Object[]> getPlatformMonthlyChart(@Param("startDate") LocalDate startDate);
 
     @Query(value = """
         SELECT t.transaction_category AS category, COALESCE(SUM(ABS(t.amount)), 0) AS total
@@ -233,7 +233,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     /**
      * Platform-wide transaction ledger for the portal report.
-     * - Half-open window [startDate, endDate): pass the first instant AFTER the last day.
+     * - Inclusive range of the members' local dates (transaction.local_date).
      * - Only the given statuses are returned (callers exclude INQUIRY/DELETED).
      * - No nullable parameters: pattern is a lower-cased LIKE pattern ("%" = everything).
      */
@@ -241,8 +241,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         SELECT t
         FROM Transaction t
         WHERE t.deletedAt IS NULL
-        AND t.transactionDate >= :startDate
-        AND t.transactionDate < :endDate
+        AND t.localDate >= :startDate
+        AND t.localDate <= :endDate
         AND t.transactionType IN :types
         AND t.status IN :statuses
         AND (
@@ -253,8 +253,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         ORDER BY t.transactionDate DESC
         """)
     Page<Transaction> findPlatformTransactions(
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
             @Param("types") List<TransactionType> types,
             @Param("statuses") List<TransactionStatus> statuses,
             @Param("pattern") String pattern,
@@ -263,24 +263,25 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     /**
      * Daily totals of SUCCESSFUL transactions of one type, aggregated in the
-     * database so the result is exact for any date range. Rows: [yyyy-MM-dd, total].
+     * database so the result is exact for any date range. Days are the members'
+     * local dates, range inclusive. Rows: [yyyy-MM-dd, total].
      */
     @Query(value = """
-        SELECT TO_CHAR(DATE(t.transaction_date), 'YYYY-MM-DD') AS period,
+        SELECT TO_CHAR(t.local_date, 'YYYY-MM-DD') AS period,
                COALESCE(SUM(t.amount), 0) AS total
         FROM transaction_finance."transaction" t
         WHERE t.deleted_at IS NULL
           AND t.status = 'SUCCESS'
           AND t.transaction_type = :type
-          AND t.transaction_date >= :startDate
-          AND t.transaction_date < :endDate
-        GROUP BY DATE(t.transaction_date)
-        ORDER BY DATE(t.transaction_date)
+          AND t.local_date >= :startDate
+          AND t.local_date <= :endDate
+        GROUP BY t.local_date
+        ORDER BY t.local_date
         """, nativeQuery = true)
     List<Object[]> sumPlatformAmountPerDay(
             @Param("type") String type,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
     );
 
     @Query("""

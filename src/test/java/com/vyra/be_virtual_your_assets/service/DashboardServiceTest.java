@@ -18,10 +18,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +42,7 @@ class DashboardServiceTest {
     @Mock private TransactionRepository transactionRepository;
     @Mock private WalletStatementRepository walletStatementRepository;
     @Mock private AdminAuthorizationService adminAuthorizationService;
+    @Spy private TimeService timeService = new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
 
     @InjectMocks
     private DashboardService dashboardService;

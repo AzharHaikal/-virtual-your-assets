@@ -12,6 +12,7 @@ import com.vyra.be_virtual_your_assets.dto.wallet.CreateWalletResponse;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberOtp;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
+import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.MemberOtpRepository;
@@ -26,6 +27,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -47,6 +51,7 @@ class AuthenticationServiceTest {
     @Mock private WalletService walletService;
     @Mock private BCryptPasswordEncoder passwordEncoder;
     @Mock private LockoutService lockoutService;
+    @Spy private TimeService timeService = new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
     @Spy private SecurityPolicy securityPolicy = new SecurityPolicy();
 
     @InjectMocks
@@ -93,6 +98,38 @@ class AuthenticationServiceTest {
         verify(memberRepository).save(any(Member.class));
         verify(walletService).createWallet(any(CreateWalletRequest.class));
         verify(otpService).sendOtp(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void registerMember_withTimezone_shouldStoreItAndDefaultOtherwise() {
+        CreateWalletResponse walletData = new CreateWalletResponse();
+        walletData.setMemberId("member-uuid-001");
+        when(walletService.createWallet(any(CreateWalletRequest.class))).thenReturn(
+                new BaseResponse<>(ErrorConstant.CREATE_WALLET_SUCCESS.getCode(), "ok", walletData));
+        when(passwordEncoder.encode("123456")).thenReturn("hashed-pin");
+        org.mockito.ArgumentCaptor<Member> saved = org.mockito.ArgumentCaptor.forClass(Member.class);
+        when(memberRepository.save(saved.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        RegisterRequest withZone = buildRegisterRequest();
+        withZone.setTimezone("Asia/Jayapura");
+        authenticationService.registerMember(withZone);
+        RegisterRequest withoutZone = buildRegisterRequest();
+        authenticationService.registerMember(withoutZone);
+
+        assertThat(saved.getAllValues().get(0).getTimezone()).isEqualTo("Asia/Jayapura");
+        assertThat(saved.getAllValues().get(1).getTimezone()).isEqualTo("Asia/Jakarta");
+    }
+
+    @Test
+    void registerMember_invalidTimezone_shouldThrowBeforeSaving() {
+        RegisterRequest request = buildRegisterRequest();
+        request.setTimezone("+07:00");
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> authenticationService.registerMember(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.INVALID_TIMEZONE);
+        verify(memberRepository, never()).save(any());
     }
 
     // =========================================================================

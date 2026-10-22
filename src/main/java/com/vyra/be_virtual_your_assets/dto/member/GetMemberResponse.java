@@ -11,6 +11,8 @@ public class GetMemberResponse {
     private String fullName;
     private String email;
     private String phoneNumber;
+    /** IANA time zone used for the member's days (charts, history filters). */
+    private String timezone;
     private BigDecimal totalIncome;
     private BigDecimal totalExpense;
     private BigDecimal balance;

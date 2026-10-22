@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,15 +67,13 @@ public class ReportService {
         // period -> [income, expense]
         Map<String, BigDecimal[]> grouped = new LinkedHashMap<>();
 
+        // Days are the members' local dates (transaction.local_date), both ends inclusive.
         if (!startDate.isAfter(endDate)) {
-            LocalDateTime start = startDate.atStartOfDay();
-            LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
-
             if (type == null || type == TransactionType.INCOME) {
-                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.INCOME.name(), start, endExclusive), 0);
+                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.INCOME.name(), startDate, endDate), 0);
             }
             if (type == null || type == TransactionType.EXPENSE) {
-                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.EXPENSE.name(), start, endExclusive), 1);
+                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.EXPENSE.name(), startDate, endDate), 1);
             }
         }
 
@@ -131,12 +128,10 @@ public class ReportService {
                     AdminActivityEvent.VIEW_MEMBER_TRANSACTIONS, "transaction report " + startDate + " to " + endDate, null, null);
         }
 
-        LocalDateTime start = startDate.atStartOfDay();
-        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
         String pattern = StringUtils.isBlank(keyword) ? "%" : "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
 
         Page<Transaction> transactionPage = transactionRepository.findPlatformTransactions(
-                start, endExclusive,
+                startDate, endDate,
                 type != null ? List.of(type) : ALL_TYPES,
                 status != null ? List.of(status) : LEDGER_STATUSES,
                 pattern,

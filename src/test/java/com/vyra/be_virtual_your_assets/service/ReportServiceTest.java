@@ -94,7 +94,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void getIncomeExpenseReport_shouldUseHalfOpenWindowEndingAfterEndDate() {
+    void getIncomeExpenseReport_shouldPassInclusiveLocalDateRange() {
         when(transactionRepository.sumPlatformAmountPerDay(any(), any(), any())).thenReturn(List.of());
 
         reportService.getIncomeExpenseReport(
@@ -102,8 +102,8 @@ class ReportServiceTest {
 
         verify(transactionRepository).sumPlatformAmountPerDay(
                 "INCOME",
-                LocalDate.of(2026, 6, 1).atStartOfDay(),
-                LocalDate.of(2026, 6, 2).atStartOfDay());
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 1));
     }
 
     @Test
@@ -173,8 +173,8 @@ class ReportServiceTest {
         reportService.getTransactionReport(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 1), null, "   ", 0, 10);
 
         verify(transactionRepository).findPlatformTransactions(
-                eq(LocalDate.of(2026, 6, 1).atStartOfDay()),
-                eq(LocalDate.of(2026, 6, 2).atStartOfDay()),
+                eq(LocalDate.of(2026, 6, 1)),
+                eq(LocalDate.of(2026, 6, 1)),
                 eq(List.of(TransactionType.INCOME, TransactionType.EXPENSE)),
                 eq(List.of(TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.SUSPECT)),
                 eq("%"),

@@ -14,6 +14,7 @@ import com.vyra.be_virtual_your_assets.dto.transaction.TransactionUpdateRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
 import com.vyra.be_virtual_your_assets.entity.Member;
+import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
@@ -22,13 +23,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,6 +51,11 @@ class TransactionServiceTest {
     @Mock private MemberActivityService memberActivityService;
     @Mock private ValidationService validationService;
     @Mock private WalletService walletService;
+
+    /** 2026-10-22 17:30 UTC = 2026-10-23 00:30 in Jakarta: "today" differs per zone. */
+    private static final Instant NOW = Instant.parse("2026-10-22T17:30:00Z");
+    private static final String TODAY_JAKARTA = "2026-10-23";
+    @Spy private TimeService timeService = new TimeService(Clock.fixed(NOW, ZoneOffset.UTC), "Asia/Jakarta");
 
     @InjectMocks
     private TransactionService transactionService;
@@ -65,12 +77,12 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_periodNull_shouldUseDefaultWeekly() {
-        when(transactionRepository.getChartDaily(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         BaseResponse<GetChartResponse> result = transactionService.getChart("member-uuid-001", null);
 
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.GET_CHART_SUCCESS.getCode());
-        verify(transactionRepository).getChartDaily(eq("member-uuid-001"), any(LocalDateTime.class));
+        verify(transactionRepository).getChartDaily(eq("member-uuid-001"), any(LocalDate.class));
     }
 
     // =========================================================================
@@ -78,11 +90,11 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_period1W_shouldCallGetChartDaily() {
-        when(transactionRepository.getChartDaily(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         transactionService.getChart("member-uuid-001", "1W");
 
-        verify(transactionRepository).getChartDaily(eq("member-uuid-001"), any(LocalDateTime.class));
+        verify(transactionRepository).getChartDaily(eq("member-uuid-001"), any(LocalDate.class));
     }
 
     // =========================================================================
@@ -90,11 +102,11 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_period1M_shouldCallGetChartDailyWithMonthOffset() {
-        when(transactionRepository.getChartDaily(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         transactionService.getChart("member-uuid-001", "1M");
 
-        verify(transactionRepository).getChartDaily(eq("member-uuid-001"), any(LocalDateTime.class));
+        verify(transactionRepository).getChartDaily(eq("member-uuid-001"), any(LocalDate.class));
     }
 
     // =========================================================================
@@ -102,11 +114,11 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_period3M_shouldCallGetChartWeekly() {
-        when(transactionRepository.getChartWeekly(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartWeekly(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         transactionService.getChart("member-uuid-001", "3M");
 
-        verify(transactionRepository).getChartWeekly(eq("member-uuid-001"), any(LocalDateTime.class));
+        verify(transactionRepository).getChartWeekly(eq("member-uuid-001"), any(LocalDate.class));
     }
 
     // =========================================================================
@@ -114,11 +126,11 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_period1Y_shouldCallGetChartMonthly() {
-        when(transactionRepository.getChartMonthly(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartMonthly(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         transactionService.getChart("member-uuid-001", "1Y");
 
-        verify(transactionRepository).getChartMonthly(eq("member-uuid-001"), any(LocalDateTime.class));
+        verify(transactionRepository).getChartMonthly(eq("member-uuid-001"), any(LocalDate.class));
     }
 
     // =========================================================================
@@ -138,11 +150,11 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_periodLowercase_shouldNormalizeAndUseWeekly() {
-        when(transactionRepository.getChartDaily(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         transactionService.getChart("member-uuid-001", "1w");
 
-        verify(transactionRepository).getChartDaily(anyString(), any(LocalDateTime.class));
+        verify(transactionRepository).getChartDaily(anyString(), any(LocalDate.class));
     }
 
     // =========================================================================
@@ -151,11 +163,11 @@ class TransactionServiceTest {
     @Test
     void getChart_1WWithSomeData_shouldBuildDailyChartAndTrimTrailingEmpty() {
         // Simulate one row for a date within the past 7 days
-        String todayLabel = java.time.LocalDate.now().toString();
+        String todayLabel = TODAY_JAKARTA;
         Object[] row = new Object[]{todayLabel, BigDecimal.valueOf(100), BigDecimal.valueOf(50)};
         List<Object[]> rowList = new ArrayList<>();
         rowList.add(row);
-        when(transactionRepository.getChartDaily(anyString(), any(LocalDateTime.class))).thenReturn(rowList);
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(rowList);
 
         BaseResponse<GetChartResponse> result = transactionService.getChart("member-uuid-001", "1W");
 
@@ -172,7 +184,7 @@ class TransactionServiceTest {
     // =========================================================================
     @Test
     void getChart_1WAllEmpty_shouldReturnFullRangeChart() {
-        when(transactionRepository.getChartDaily(anyString(), any(LocalDateTime.class))).thenReturn(List.of());
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(List.of());
 
         BaseResponse<GetChartResponse> result = transactionService.getChart("member-uuid-001", "1W");
 
@@ -185,7 +197,7 @@ class TransactionServiceTest {
 
     @Test
     void getChart_1W_incomeOnly_shouldCoverExpenseFalseCondition() {
-        String today = java.time.LocalDate.now().toString();
+        String today = TODAY_JAKARTA;
         Object[] row = new Object[]{today, BigDecimal.valueOf(100), BigDecimal.ZERO};
         when(transactionRepository.getChartDaily(anyString(), any())).thenReturn(List.<Object[]>of(row));
 
@@ -198,7 +210,7 @@ class TransactionServiceTest {
 
     @Test
     void getChart_1W_expenseOnly_shouldCoverIncomeFalseCondition() {
-        String today = java.time.LocalDate.now().toString();
+        String today = TODAY_JAKARTA;
         Object[] row = new Object[]{today, BigDecimal.ZERO, BigDecimal.valueOf(50)};
 
         when(transactionRepository.getChartDaily(anyString(), any())).thenReturn(List.<Object[]>of(row));
@@ -309,6 +321,113 @@ class TransactionServiceTest {
     }
 
     // =========================================================================
+    // createTransaction — time zones
+    // =========================================================================
+    @Test
+    void createTransaction_withOffset_shouldStoreUtcInstantAndMembersLocalDate() {
+        member.setTimezone("Asia/Makassar");
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.EXPENSE, BigDecimal.valueOf(10000));
+        request.setTransactionDate("2026-10-23T00:30:00+08:00");
+
+        Transaction saved = createAndCaptureFirstSave(request);
+
+        assertThat(saved.getTransactionDate()).isEqualTo(LocalDateTime.of(2026, 10, 22, 16, 30));
+        assertThat(saved.getLocalDate()).isEqualTo(LocalDate.of(2026, 10, 23));
+        assertThat(saved.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 10, 22, 17, 30));
+    }
+
+    @Test
+    void createTransaction_sameInstantInAnotherZone_shouldKeepThatMembersDay() {
+        member.setTimezone("Asia/Jakarta");
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.EXPENSE, BigDecimal.valueOf(10000));
+        request.setTransactionDate("2026-10-22T16:30:00Z");
+
+        Transaction saved = createAndCaptureFirstSave(request);
+
+        assertThat(saved.getLocalDate()).isEqualTo(LocalDate.of(2026, 10, 22)); // 23:30 in Jakarta
+    }
+
+    @Test
+    void createTransaction_withoutOffset_shouldReadTimeInMembersZone() {
+        member.setTimezone("Asia/Jayapura");
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.INCOME, BigDecimal.valueOf(10000));
+        request.setTransactionDate("2026-10-23T08:00:00");
+
+        Transaction saved = createAndCaptureFirstSave(request);
+
+        assertThat(saved.getTransactionDate()).isEqualTo(LocalDateTime.of(2026, 10, 22, 23, 0));
+        assertThat(saved.getLocalDate()).isEqualTo(LocalDate.of(2026, 10, 23));
+    }
+
+    @Test
+    void createTransaction_withoutDate_shouldUseNowAndTodayOfMember() {
+        member.setTimezone("Asia/Jakarta");
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.INCOME, BigDecimal.valueOf(10000));
+        request.setTransactionDate(null);
+
+        Transaction saved = createAndCaptureFirstSave(request);
+
+        assertThat(saved.getTransactionDate()).isEqualTo(LocalDateTime.of(2026, 10, 22, 17, 30));
+        assertThat(saved.getLocalDate()).isEqualTo(LocalDate.of(2026, 10, 23));
+    }
+
+    @Test
+    void createTransaction_invalidDate_shouldThrowBadRequestBeforeSaving() {
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.INCOME, BigDecimal.valueOf(10000));
+        request.setTransactionDate("kemarin");
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> transactionService.createTransaction("member-uuid-001", request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.INVALID_DATE_TIME);
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void getChart_shouldCountDaysInMembersZone() {
+        member.setTimezone("Asia/Jakarta");
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+        when(transactionRepository.getChartDaily(anyString(), any(LocalDate.class))).thenReturn(List.of());
+
+        BaseResponse<GetChartResponse> jakarta = transactionService.getChart("member-uuid-001", "1W");
+        verify(transactionRepository).getChartDaily("member-uuid-001", LocalDate.of(2026, 10, 17));
+        assertThat(jakarta.getData().getChart().get(6).getLabel()).isEqualTo("2026-10-23");
+
+        member.setTimezone("Europe/London"); // still 22 Oct there
+        BaseResponse<GetChartResponse> london = transactionService.getChart("member-uuid-001", "1W");
+        verify(transactionRepository).getChartDaily("member-uuid-001", LocalDate.of(2026, 10, 16));
+        assertThat(london.getData().getChart().get(6).getLabel()).isEqualTo("2026-10-22");
+    }
+
+    @Test
+    void getTransactionHistory_shouldFilterOnMembersLocalDates() {
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+        when(transactionRepository.findTransactionHistory(any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        transactionService.getTransactionHistory("2026-10-22", "2026-10-23", null, 0, 10, "member-uuid-001");
+
+        verify(transactionRepository).findTransactionHistory(eq("member-uuid-001"),
+                eq(LocalDate.of(2026, 10, 22)), eq(LocalDate.of(2026, 10, 23)), isNull(), any(Pageable.class));
+    }
+
+    private Transaction createAndCaptureFirstSave(CreateTransactionRequest request) {
+        TransactionWalletResponse walletData = buildWalletResponse(BigDecimal.valueOf(1000));
+        BaseResponse<TransactionWalletResponse> walletResp = new BaseResponse<>(
+                ErrorConstant.CREATE_TRANSACTION_WALLET_SUCCESS.getCode(), "ok", walletData);
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(walletService.createTransactionWallet(any(TransactionWalletRequest.class))).thenReturn(walletResp);
+
+        transactionService.createTransaction("member-uuid-001", request);
+
+        ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues().get(0);
+    }
+
+    // =========================================================================
     // createTransaction — EXPENSE success (amount negated)
     // =========================================================================
     @Test
@@ -414,7 +533,7 @@ class TransactionServiceTest {
 
         when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
         when(transactionRepository.findTransactionHistory(
-                eq("member-uuid-001"), any(LocalDateTime.class), any(LocalDateTime.class),
+                eq("member-uuid-001"), any(LocalDate.class), any(LocalDate.class),
                 eq(TransactionType.INCOME), any(Pageable.class)))
                 .thenReturn(page);
 
@@ -435,7 +554,7 @@ class TransactionServiceTest {
         Page<Transaction> emptyPage = new PageImpl<>(List.of());
         when(validationService.getMemberById("member-uuid-001")).thenReturn(member);
         when(transactionRepository.findTransactionHistory(
-                eq("member-uuid-001"), any(LocalDateTime.class), any(LocalDateTime.class),
+                eq("member-uuid-001"), any(LocalDate.class), any(LocalDate.class),
                 isNull(), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
@@ -513,7 +632,7 @@ class TransactionServiceTest {
         r.setCategory(TransactionCategory.SALARY);
         r.setType(type);
         r.setAmount(amount);
-        r.setTransactionDate(LocalDateTime.now());
+        r.setTransactionDate("2026-10-22T23:30:00+07:00");
         r.setTransactionDesc("Test");
         return r;
     }

@@ -24,6 +24,10 @@ public class UpdateProfileRequest {
     @Size(min = 10, max = 15, message = "Phone number must contain 10 to 15 digits")
     private String phoneNumber;
 
+    /** Optional IANA time zone (e.g. Asia/Makassar). Does not need the PIN. */
+    @Size(max = 64, message = "Time zone must not exceed 64 characters")
+    private String timezone;
+
     /**
      * Current PIN. Required whenever the e-mail address or phone number is being changed:
      * those are where OTPs are delivered, so changing them with only an access token would

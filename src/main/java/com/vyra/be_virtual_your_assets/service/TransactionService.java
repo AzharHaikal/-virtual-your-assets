@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,20 +46,23 @@ public class TransactionService {
     private final MemberActivityService memberActivityService;
     private final ValidationService validationService;
     private final WalletService walletService;
+    private final TimeService timeService;
 
     @NewSpan
     public BaseResponse<GetChartResponse> getChart(String memberId, String period) {
         String normalizedPeriod = period == null ? "1W" : period.toUpperCase();
+        // Buckets are the member's own days (transaction.local_date), so "today" is in their zone.
+        LocalDate today = timeService.today(timeService.zoneOf(validationService.getMemberById(memberId)));
 
         List<Object[]> results = switch (normalizedPeriod) {
-            case "1M" -> transactionRepository.getChartDaily(memberId, LocalDateTime.now().minusMonths(1));
-            case "3M" -> transactionRepository.getChartWeekly(memberId, LocalDateTime.now().minusMonths(3));
-            case "1Y" -> transactionRepository.getChartMonthly(memberId, LocalDateTime.now().minusYears(1));
+            case "1M" -> transactionRepository.getChartDaily(memberId, today.minusMonths(1));
+            case "3M" -> transactionRepository.getChartWeekly(memberId, today.minusMonths(3));
+            case "1Y" -> transactionRepository.getChartMonthly(memberId, today.minusYears(1));
             case "ALL" -> transactionRepository.getChartMonthlyAll(memberId);
-            default   -> transactionRepository.getChartDaily(memberId, LocalDateTime.now().minusWeeks(1));
+            default   -> transactionRepository.getChartDaily(memberId, today.minusDays(6));
         };
 
-        List<ChartItemResponse> chart = buildChartWithEmptyBucket(normalizedPeriod, results);
+        List<ChartItemResponse> chart = buildChartWithEmptyBucket(normalizedPeriod, results, today);
 
         GetChartResponse response = new GetChartResponse();
         response.setChart(chart);
@@ -131,8 +134,9 @@ public class TransactionService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
 
-        LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
-        LocalDateTime end = LocalDate.parse(endDate).atTime(LocalTime.MAX);
+        // Dates are the member's own days (transaction.local_date), both inclusive.
+        LocalDate start = LocalDate.parse(startDate);
+        LocalDate end = LocalDate.parse(endDate);
 
         Page<Transaction> transactions = transactionRepository.findTransactionHistory(memberId, start, end, type, pageable);
         Page<TransactionHistoryResponse> responses = transactions.map(this::mapToHistoryResponse);
@@ -147,6 +151,8 @@ public class TransactionService {
     }
 
     private Transaction createTransaction(CreateTransactionRequest request, Member member, String ref) {
+        ZoneId zone = timeService.zoneOf(member);
+        LocalDateTime occurredAt = timeService.parseClientDateTime(request.getTransactionDate(), zone);
         return Transaction.builder()
                 .memberId(member.getId())
                 .userPhoneNumber(member.getPhoneNumber())
@@ -156,9 +162,10 @@ public class TransactionService {
                 .amount(request.getAmount())
                 .transactionDesc(request.getTransactionDesc())
                 .referenceNumber(ref)
-                .transactionDate(request.getTransactionDate())
+                .transactionDate(occurredAt)
+                .localDate(timeService.toLocalDate(occurredAt, zone))
                 .createdBy(member.getPhoneNumber())
-                .createdAt(LocalDateTime.now())
+                .createdAt(timeService.nowUtc())
                 .status(TransactionStatus.INQUIRY)
                 .build();
     }
@@ -240,10 +247,10 @@ public class TransactionService {
         return response;
     }
 
-    private List<ChartItemResponse> buildChartWithEmptyBucket(String period, List<Object[]> results) {
+    private List<ChartItemResponse> buildChartWithEmptyBucket(String period, List<Object[]> results, LocalDate today) {
         return switch (period) {
-            case "1W" -> buildDailyChart(LocalDate.now().minusDays(6), LocalDate.now(), results);
-            case "1M" -> buildDailyChart(LocalDate.now().minusMonths(1), LocalDate.now(), results);
+            case "1W" -> buildDailyChart(today.minusDays(6), today, results);
+            case "1M" -> buildDailyChart(today.minusMonths(1), today, results);
             case "3M" -> buildWeeklyChart(results);
             default -> buildMonthlyChart(results);
         };

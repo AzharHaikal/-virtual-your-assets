@@ -194,6 +194,20 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
 - Menambah nilai enum yang disimpan sebagai string (mis. `OtpType`, `TransactionStatus`) wajib disertai migrasi yang membuat ulang check constraint kolom tersebut.
 - Job CI `migration-check` membangun skema dari nol dan menjalankan `SchemaMigrationIT`.
 
+### Zona Waktu
+Semua perhitungan waktu lewat `TimeService` agar member di zona berbeda tidak saling konflik.
+
+| Aturan | Implementasi |
+|---|---|
+| Semua momen disimpan sebagai UTC | Kolom `timestamptz`; JVM, sesi JDBC & Hibernate dipaksa UTC (`main()`, `-Duser.timezone=UTC`, `hibernate.jdbc.time_zone`). Setiap `LocalDateTime` di kode = UTC |
+| Response JSON jelas zonanya | `LocalDateTime` dikirim sebagai `2026-10-22T16:30:00Z` (`TimeConfig`) |
+| Zona per member | `member.timezone` (IANA, default `Asia/Jakarta`), dikirim saat register / ubah profil |
+| Hari milik member | `transaction.local_date` dihitung dari zona member **saat ditulis** dan tidak dihitung ulang bila zona diganti. Chart, filter history, growth % dan laporan harian memakai `local_date` |
+| Input dari app | `transactionDate` ISO-8601 dengan offset; tanpa offset dibaca di zona member (app versi lama) |
+| Filter tanggal admin (audit, dashboard "hari ini") | Hari di `vyra.time.default-zone` (env `VYRA_DEFAULT_TIMEZONE`, default `Asia/Jakarta`) |
+
+Migrasi `V7__timezone_support.sql` mengonversi data lama: kolom audit dianggap ditulis di `VYRA_LEGACY_SERVER_TIMEZONE` (default `UTC`, zona server Render/Docker), `transaction_date` di `VYRA_LEGACY_CLIENT_TIMEZONE` (default `Asia/Jakarta`, jam HP). **Database lokal yang dulu dijalankan dengan JVM WIB** perlu `VYRA_LEGACY_SERVER_TIMEZONE=Asia/Jakarta` sebelum migrasi V7 pertama kali jalan.
+
 ---
 
 ## 🔒 Keamanan
