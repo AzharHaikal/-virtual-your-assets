@@ -8,6 +8,7 @@ public class UpdateProfileResponse {
     private String lastName;
     private String email;
     private String phoneNumber;
+    private String timezone;
 
     /** True when an e-mail / phone change was requested and still waits for its OTP. */
     private boolean contactChangePending;

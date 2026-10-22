@@ -29,6 +29,8 @@
 
 	<properties>
 		<java.version>17</java.version>
+		<!-- Filled by jacoco:prepare-agent; empty when JaCoCo is skipped. -->
+		<argLine></argLine>
 		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
 		<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
 		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
@@ -107,6 +109,12 @@
 			<version>3.14.0</version>
 		</dependency>
 
+		<!-- OpenAPI / Swagger UI (served only when VYRA_API_DOCS_ENABLED=true) -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.8.13</version>
+		</dependency>
 		<!-- Flyway -->
 		<dependency>
 			<groupId>org.flywaydb</groupId>
@@ -138,6 +146,10 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.2.5</version>
+				<configuration>
+					<!-- Same zone as production (VirtualYourAssetApplication.main forces UTC). -->
+					<argLine>@{argLine} -Duser.timezone=UTC</argLine>
+				</configuration>
 			</plugin>
 
 			<plugin>

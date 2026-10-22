@@ -21,6 +21,7 @@ import com.vyra.be_virtual_your_assets.util.OtpUtil;
 import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.beans.BeanUtils;
@@ -44,6 +45,7 @@ public class AuthenticationService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final LockoutService lockoutService;
     private final SecurityPolicy securityPolicy;
+    private final TimeService timeService;
 
     @NewSpan
     @Transactional
@@ -53,9 +55,12 @@ public class AuthenticationService {
 
         log.info("Validate member already exist. phoneNumber: {} ", request.getPhoneNumber());
         validationService.validateDataExistRegister(request.getPhoneNumber(), request.getEmail());
+        String timezone = StringUtils.isBlank(request.getTimezone())
+                ? timeService.defaultZone().getId() : timeService.requireValidZoneId(request.getTimezone());
 
         Member member = new Member();
         BeanUtils.copyProperties(request, member);
+        member.setTimezone(timezone);
         member.setEmail(request.getEmail().toLowerCase().trim());
         member.setPin(passwordEncoder.encode(request.getPin()));
         member.setStatus(ActiveStatus.INACTIVE);

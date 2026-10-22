@@ -14,6 +14,13 @@ All responses follow the standard wrapper:
 
 Authentication uses **Bearer Token** in the `Authorization` header (except endpoints marked as *public*).
 
+### Dates & time zones
+
+- Every date-time in a response is a **UTC instant** in ISO-8601 with a trailing `Z`, e.g. `"2026-10-22T16:30:00Z"`. Clients convert it to local time for display.
+- Every date-time sent by a client should include its offset, e.g. `"2026-10-22T23:30:00+07:00"`. A value without offset is read in the member's time zone (compatibility with older app versions).
+- Each member has an IANA `timezone` (default `Asia/Jakarta`). It decides the member's "today" and the **local date** of each transaction, fixed when the transaction is saved: changing the time zone later never moves past transactions to another day.
+- Date filters (`yyyy-MM-dd`) on member endpoints refer to those local dates, both ends inclusive.
+
 ---
 
 ## Table of Contents
@@ -48,6 +55,7 @@ Register a new member account.
 | `email` | string | ✅ | Valid email, max 30 chars |
 | `phoneNumber` | string | ✅ | Must start with `628`, 10–15 digits |
 | `pin` | string | ✅ | Exactly 6 digits |
+| `timezone` | string | ❌ | IANA region id of the device, e.g. `Asia/Jakarta` (default). Invalid → `400 VYRA-INV-003` |
 
 **Request Example**
 
@@ -351,6 +359,7 @@ Retrieve the authenticated member's profile and financial summary.
     "fullName": "Budi Santoso",
     "email": "budi@example.com",
     "phoneNumber": "628123456789",
+    "timezone": "Asia/Jakarta",
     "totalIncome": 5000000.00,
     "totalExpense": 2000000.00,
     "balance": 3000000.00,
@@ -380,6 +389,7 @@ Update the authenticated member's profile information. All fields are optional.
 | `email` | string | Valid email, max 30 chars |
 | `phoneNumber` | string | Must start with `62`, 10–15 digits |
 | `pin` | string | Exactly 6 digits; **required** when `email` or `phoneNumber` changes |
+| `timezone` | string | IANA region id, e.g. `Asia/Makassar`; no PIN needed. Only new transactions use the new zone. Invalid → `400 VYRA-INV-003` |
 
 **Request Example**
 
@@ -589,7 +599,7 @@ Record a new income or expense transaction for the authenticated member.
 | `category` | `TransactionCategory` | ❌ | See [Enums](#5-enums) |
 | `type` | `TransactionType` | ❌ | `INCOME` or `EXPENSE` |
 | `amount` | decimal | ✅ | Must be greater than 0 |
-| `transactionDate` | datetime | ❌ | ISO 8601 format |
+| `transactionDate` | string | ❌ | ISO-8601 with offset (`2026-06-10T09:00:00+07:00`). Without offset it is read in the member's time zone; empty = now. Invalid → `400 VYRA-INV-004` |
 | `transactionDesc` | string | ❌ | Transaction description |
 
 **Request Example**
@@ -599,7 +609,7 @@ Record a new income or expense transaction for the authenticated member.
   "category": "SALARY",
   "type": "INCOME",
   "amount": 5000000.00,
-  "transactionDate": "2026-06-10T09:00:00",
+  "transactionDate": "2026-06-10T09:00:00+07:00",
   "transactionDesc": "Monthly salary"
 }
 ```
@@ -667,8 +677,8 @@ Retrieve paginated transaction history for the authenticated member with date ra
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `startDate` | string | ✅ | — | Start date (ISO 8601) |
-| `endDate` | string | ✅ | — | End date (ISO 8601) |
+| `startDate` | string | ✅ | — | First local date (`yyyy-MM-dd`, member's time zone) |
+| `endDate` | string | ✅ | — | Last local date (`yyyy-MM-dd`, inclusive) |
 | `type` | `TransactionType` | ❌ | — | Filter by `INCOME` or `EXPENSE` |
 | `page` | integer | ❌ | `0` | Page index (0-based) |
 | `size` | integer | ❌ | `10` | Number of items per page |
@@ -689,7 +699,7 @@ Retrieve paginated transaction history for the authenticated member with date ra
         "status": "SUCCESS",
         "amount": 5000000.00,
         "transactionDesc": "Monthly salary",
-        "transactionDate": "2026-06-10T09:00:00"
+        "transactionDate": "2026-06-10T02:00:00Z"
       }
     ],
     "totalElements": 25,
@@ -790,6 +800,8 @@ Retrieve paginated transaction history for the authenticated member with date ra
 | `VYRA-TKN-004` | Your refresh session has expired. Please log in again | Refresh token expired |
 | `VYRA-INV-001` | Invalid PIN. Please try again | PIN format invalid |
 | `VYRA-INV-002` | Wrong PIN. Please input with correct PIN | PIN mismatch |
+| `VYRA-INV-003` | Invalid time zone. Use a region id such as Asia/Jakarta | `timezone` is not an IANA region id |
+| `VYRA-INV-004` | Invalid date. Use ISO-8601, e.g. 2026-10-22T08:30:00+07:00 | `transactionDate` cannot be parsed |
 | `VYRA-DNF-001` | Invalid account. Please check your account details | Phone number not found |
 | `VYRA-DNF-002` | Invalid account. Please check your account details | Email not found |
 | `VYRA-DNF-003` | Invalid account. Please check your account details | Member not found |

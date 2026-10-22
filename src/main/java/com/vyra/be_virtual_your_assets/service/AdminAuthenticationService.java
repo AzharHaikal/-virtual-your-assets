@@ -38,6 +38,7 @@ public class AdminAuthenticationService {
     private final AdminRepository adminRepository;
     private final AdminTokenRepository adminTokenRepository;
     private final AdminActivityService adminActivityService;
+    private final AdminAuthorizationService adminAuthorizationService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final SecurityPolicy securityPolicy;
 
@@ -117,7 +118,7 @@ public class AdminAuthenticationService {
         response.setEmail(admin.getEmail());
         response.setRole(admin.getRole());
         response.setPermissions(
-                RolePermissionMapper.getPermissions(admin.getRole())
+                adminAuthorizationService.effectivePermissions(admin.getRole())
                         .stream()
                         .map(AdminPermission::name)
                         .collect(Collectors.toSet())

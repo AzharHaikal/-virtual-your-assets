@@ -58,9 +58,10 @@ public class AdminMemberService {
                 PageRequest.of(page, size)
         );
 
+        boolean showBalance = adminAuthorizationService.canViewMemberTransactions();
         List<AdminMemberListItemResponse> items = memberPage.getContent()
                 .stream()
-                .map(this::toListItemResponse)
+                .map(member -> toListItemResponse(member, showBalance))
                 .collect(Collectors.toList());
 
         return new BaseResponse<>(
@@ -85,14 +86,17 @@ public class AdminMemberService {
         response.setStatus(member.getStatus());
         response.setJoinDate(member.getCreatedAt());
 
-        if (walletStatement != null) {
-            response.setBalance(walletStatement.getBalance());
-            response.setTotalIncome(walletStatement.getTotalIncome());
-            response.setTotalExpense(walletStatement.getTotalExpense());
-        } else {
-            response.setBalance(BigDecimal.ZERO);
-            response.setTotalIncome(BigDecimal.ZERO);
-            response.setTotalExpense(BigDecimal.ZERO);
+        // Balance and totals are member-level financial data: left null unless the admin may see them.
+        if (adminAuthorizationService.canViewMemberTransactions()) {
+            if (walletStatement != null) {
+                response.setBalance(walletStatement.getBalance());
+                response.setTotalIncome(walletStatement.getTotalIncome());
+                response.setTotalExpense(walletStatement.getTotalExpense());
+            } else {
+                response.setBalance(BigDecimal.ZERO);
+                response.setTotalIncome(BigDecimal.ZERO);
+                response.setTotalExpense(BigDecimal.ZERO);
+            }
         }
 
         response.setTotalTransactions(transactionRepository.findByMemberIdForAdmin(member.getId(), PageRequest.of(0, 1)).getTotalElements());
@@ -108,9 +112,12 @@ public class AdminMemberService {
     }
 
     public BaseResponse<PageResponse<AdminMemberTransactionResponse>> getMemberTransactions(String memberId, int page, int size) {
-        adminAuthorizationService.requirePermission(AdminPermission.MEMBER_VIEW);
+        adminAuthorizationService.requireMemberTransactionAccess();
 
         Member member = getMemberOrThrow(memberId);
+        CustomAdminDetails currentAdmin = adminAuthorizationService.getCurrentAdmin();
+        adminActivityService.createAdminActivity(currentAdmin.getAdminId(), null,
+                AdminActivityEvent.VIEW_MEMBER_TRANSACTIONS, "member " + member.getId(), null, null);
         Page<Transaction> transactionPage = transactionRepository.findByMemberIdForAdmin(member.getId(), PageRequest.of(page, size));
 
         List<AdminMemberTransactionResponse> items = transactionPage.getContent()
@@ -192,7 +199,8 @@ public class AdminMemberService {
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
     }
 
-    private AdminMemberListItemResponse toListItemResponse(Member member) {
+    /** The balance is member-level financial data: left null unless {@code showBalance}. */
+    private AdminMemberListItemResponse toListItemResponse(Member member, boolean showBalance) {
         AdminMemberListItemResponse response = new AdminMemberListItemResponse();
         response.setMemberId(member.getId());
         response.setFullName(member.getFirstName() + " " + member.getLastName());
@@ -201,11 +209,13 @@ public class AdminMemberService {
         response.setStatus(member.getStatus());
         response.setJoinDate(member.getCreatedAt());
 
-        walletStatementRepository.findByPhoneNumber(member.getPhoneNumber())
-                .ifPresentOrElse(
-                        ws -> response.setBalance(ws.getBalance()),
-                        () -> response.setBalance(BigDecimal.ZERO)
-                );
+        if (showBalance) {
+            walletStatementRepository.findByPhoneNumber(member.getPhoneNumber())
+                    .ifPresentOrElse(
+                            ws -> response.setBalance(ws.getBalance()),
+                            () -> response.setBalance(BigDecimal.ZERO)
+                    );
+        }
 
         return response;
     }

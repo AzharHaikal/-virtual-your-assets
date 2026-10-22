@@ -19,7 +19,8 @@ spring:
       data-source-properties:
         # Bound how long a statement may wait for a row lock (e.g. a wallet being updated by
         # another request) or run at all, instead of hanging until the HTTP client gives up.
-        options: "-c lock_timeout=${DB_LOCK_TIMEOUT_MS:5000} -c statement_timeout=${DB_STATEMENT_TIMEOUT_MS:30000}"
+        # TimeZone=UTC: timestamptz values are read and written as UTC (see TimeService).
+        options: "-c TimeZone=UTC -c lock_timeout=${DB_LOCK_TIMEOUT_MS:5000} -c statement_timeout=${DB_STATEMENT_TIMEOUT_MS:30000}"
   #      data-source-properties:
   #        sslmode: require
 
@@ -28,17 +29,29 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     default-schema: flyway
+    placeholders:
+      # V7 (timestamp -> timestamptz): zone of the values written before V7.
+      # legacyServerZone = JVM zone of the machine that wrote created_at/updated_at (development laptops: WIB).
+      # legacyClientZone = zone the mobile app sent transaction_date in (device local time, WIB).
+      legacyServerZone: ${VYRA_LEGACY_SERVER_TIMEZONE:Asia/Jakarta}
+      legacyClientZone: ${VYRA_LEGACY_CLIENT_TIMEZONE:Asia/Jakarta}
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # Flyway owns the schema (db/migration); Hibernate only checks the entities match it.
+      ddl-auto: validate
     show-sql: false
     open-in-view: false
     properties:
       hibernate:
         format_sql: false
+        jdbc:
+          time_zone: UTC
         # jdbc.batch_size: 500      # 💡 TAMBAHKAN: Kirim data per 500 baris sekaligus
         # order_inserts: true       # 💡 TAMBAHKAN: Mengoptimalkan batch insert untuk entitas terkait
+
+  jackson:
+    time-zone: UTC
 
   mail:
     host: smtp.gmail.com
@@ -66,10 +79,21 @@ management:
     sampling:
       probability: 1.0
 
+# OpenAPI spec (/v3/api-docs) and Swagger UI (/swagger-ui.html): off unless enabled (never in production).
+springdoc:
+  api-docs:
+    enabled: ${VYRA_API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${VYRA_API_DOCS_ENABLED:false}
+
 crypto:
   secret-key: ${CRYPTO_SECRET_KEY}
 
 vyra:
+  time:
+    # Zone for new members without one, for legacy requests without an offset and for
+    # day-based admin reports/filters (portal admins are in Indonesia).
+    default-zone: ${VYRA_DEFAULT_TIMEZONE:Asia/Jakarta}
   security:
     pin:
       max-attempts: ${VYRA_PIN_MAX_ATTEMPTS:5}

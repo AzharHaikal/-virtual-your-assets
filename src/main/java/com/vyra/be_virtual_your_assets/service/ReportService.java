@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.AdminActivityEvent;
 import com.vyra.be_virtual_your_assets.constant.AdminPermission;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
@@ -14,6 +15,7 @@ import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import com.vyra.be_virtual_your_assets.repository.WalletStatementRepository;
+import com.vyra.be_virtual_your_assets.security.model.CustomAdminDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -24,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +48,7 @@ public class ReportService {
     private final MemberRepository memberRepository;
     private final WalletStatementRepository walletStatementRepository;
     private final AdminAuthorizationService adminAuthorizationService;
+    private final AdminActivityService adminActivityService;
 
     private static final int MAX_PAGE_SIZE = 500;
     private static final List<TransactionType> ALL_TYPES = List.of(TransactionType.INCOME, TransactionType.EXPENSE);
@@ -65,15 +67,13 @@ public class ReportService {
         // period -> [income, expense]
         Map<String, BigDecimal[]> grouped = new LinkedHashMap<>();
 
+        // Days are the members' local dates (transaction.local_date), both ends inclusive.
         if (!startDate.isAfter(endDate)) {
-            LocalDateTime start = startDate.atStartOfDay();
-            LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
-
             if (type == null || type == TransactionType.INCOME) {
-                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.INCOME.name(), start, endExclusive), 0);
+                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.INCOME.name(), startDate, endDate), 0);
             }
             if (type == null || type == TransactionType.EXPENSE) {
-                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.EXPENSE.name(), start, endExclusive), 1);
+                accumulate(grouped, transactionRepository.sumPlatformAmountPerDay(TransactionType.EXPENSE.name(), startDate, endDate), 1);
             }
         }
 
@@ -120,13 +120,18 @@ public class ReportService {
             String keyword, int page, int size
     ) {
         adminAuthorizationService.requirePermission(AdminPermission.REPORT_VIEW);
+        // One row per member transaction: member-level data. Aggregates stay on getIncomeExpenseReport.
+        adminAuthorizationService.requireMemberTransactionAccess();
+        if (page <= 0) {
+            CustomAdminDetails currentAdmin = adminAuthorizationService.getCurrentAdmin();
+            adminActivityService.createAdminActivity(currentAdmin.getAdminId(), null,
+                    AdminActivityEvent.VIEW_MEMBER_TRANSACTIONS, "transaction report " + startDate + " to " + endDate, null, null);
+        }
 
-        LocalDateTime start = startDate.atStartOfDay();
-        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
         String pattern = StringUtils.isBlank(keyword) ? "%" : "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
 
         Page<Transaction> transactionPage = transactionRepository.findPlatformTransactions(
-                start, endExclusive,
+                startDate, endDate,
                 type != null ? List.of(type) : ALL_TYPES,
                 status != null ? List.of(status) : LEDGER_STATUSES,
                 pattern,
@@ -152,10 +157,14 @@ public class ReportService {
         Page<Member> memberPage = memberRepository.searchMembers("", null, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE)));
 
         List<Member> members = memberPage.getContent();
+        // Balances are member-level financial data: left null unless the admin may see them.
         Map<String, BigDecimal> balances = new HashMap<>();
-        walletStatementRepository.findByPhoneNumberIn(
-                members.stream().map(Member::getPhoneNumber).collect(Collectors.toSet())
-        ).forEach(ws -> balances.put(ws.getPhoneNumber(), ws.getBalance()));
+        boolean showBalance = adminAuthorizationService.canViewMemberTransactions();
+        if (showBalance) {
+            walletStatementRepository.findByPhoneNumberIn(
+                    members.stream().map(Member::getPhoneNumber).collect(Collectors.toSet())
+            ).forEach(ws -> balances.put(ws.getPhoneNumber(), ws.getBalance()));
+        }
 
         Map<String, Long> transactionCounts = new HashMap<>();
         if (!members.isEmpty()) {
@@ -166,7 +175,7 @@ public class ReportService {
         }
 
         List<MemberReportItemResponse> items = members.stream()
-                .map(m -> toMemberReportItem(m, balances, transactionCounts))
+                .map(m -> toMemberReportItem(m, showBalance ? balances : null, transactionCounts))
                 .collect(Collectors.toList());
 
         return new BaseResponse<>(
@@ -218,7 +227,7 @@ public class ReportService {
         response.setEmail(member.getEmail());
         response.setStatus(member.getStatus());
         response.setJoinDate(member.getCreatedAt());
-        response.setBalance(balances.getOrDefault(member.getPhoneNumber(), BigDecimal.ZERO));
+        response.setBalance(balances == null ? null : balances.getOrDefault(member.getPhoneNumber(), BigDecimal.ZERO));
         response.setTotalTransactions(transactionCounts.getOrDefault(member.getId(), 0L));
         return response;
     }

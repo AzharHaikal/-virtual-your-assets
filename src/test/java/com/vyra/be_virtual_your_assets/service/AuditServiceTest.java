@@ -18,12 +18,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,6 +51,7 @@ class AuditServiceTest {
     @Mock private MemberActivityRepository memberActivityRepository;
     @Mock private AdminRepository adminRepository;
     @Mock private AdminAuthorizationService adminAuthorizationService;
+    @Spy private TimeService timeService = new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
 
     @InjectMocks
     private AuditService auditService;
@@ -117,8 +122,9 @@ class AuditServiceTest {
 
         verify(adminActivityRepository).search(
                 any(), any(),
-                eq(LocalDate.of(2026, 6, 1).atStartOfDay()),
-                eq(LocalDate.of(2026, 6, 6).atStartOfDay()),   // exclusive upper bound
+                // days in the default zone (Asia/Jakarta, UTC+7) as UTC instants
+                eq(LocalDateTime.of(2026, 5, 31, 17, 0)),
+                eq(LocalDateTime.of(2026, 6, 5, 17, 0)),   // exclusive upper bound
                 any(Pageable.class)
         );
     }
@@ -197,8 +203,9 @@ class AuditServiceTest {
         verify(memberActivityRepository).search(
                 eq("%keyword%"),
                 eq("%keyword%"),
-                eq(LocalDate.of(2026, 6, 1).atStartOfDay()),
-                eq(LocalDate.of(2026, 6, 6).atStartOfDay()),
+                // days in the default zone (Asia/Jakarta, UTC+7) as UTC instants
+                eq(LocalDateTime.of(2026, 5, 31, 17, 0)),
+                eq(LocalDateTime.of(2026, 6, 5, 17, 0)),
                 any(Pageable.class)
         );
     }

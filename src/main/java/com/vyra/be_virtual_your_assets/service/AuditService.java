@@ -47,6 +47,7 @@ public class AuditService {
     private final MemberActivityRepository memberActivityRepository;
     private final AdminRepository adminRepository;
     private final AdminAuthorizationService adminAuthorizationService;
+    private final TimeService timeService;
 
     public BaseResponse<PageResponse<AdminAuditItemResponse>> getUserAuditTrail(String keyword, LocalDate startDate, LocalDate endDate, int page, int size) {
         adminAuthorizationService.requirePermission(AdminPermission.AUDIT_VIEW);
@@ -113,13 +114,14 @@ public class AuditService {
         return pattern.replace(' ', '_');
     }
 
-    private static LocalDateTime startOf(LocalDate date) {
-        return date != null ? date.atStartOfDay() : MIN_DATE;
+    /** Filter dates are days in the default zone; activity timestamps are UTC. */
+    private LocalDateTime startOf(LocalDate date) {
+        return date != null ? timeService.startOfDayUtc(date, timeService.defaultZone()) : MIN_DATE;
     }
 
     /** First instant AFTER the selected end date, used with a strict "<". */
-    private static LocalDateTime endExclusive(LocalDate date) {
-        return date != null ? date.plusDays(1).atStartOfDay() : MAX_DATE;
+    private LocalDateTime endExclusive(LocalDate date) {
+        return date != null ? timeService.startOfDayUtc(date.plusDays(1), timeService.defaultZone()) : MAX_DATE;
     }
 
     private AdminAuditItemResponse toAdminAuditItem(AdminActivity activity, Map<String, String> nameCache) {

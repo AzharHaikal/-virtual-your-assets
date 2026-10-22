@@ -9,7 +9,7 @@ WORKDIR /app
 COPY --from=build /target/*.jar app.jar
 
 # Optimasi RAM untuk Free Tier Render (512MB)
-ENV JAVA_OPTS="-Xmx300m -Xms300m"
+ENV JAVA_OPTS="-Xmx300m -Xms300m -Duser.timezone=UTC"
 
 EXPOSE 8000
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

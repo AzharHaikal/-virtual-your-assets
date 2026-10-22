@@ -296,7 +296,7 @@ public class AdminService {
         response.setRole(admin.getRole());
         response.setStatus(admin.getStatus());
         response.setPermissions(
-                RolePermissionMapper.getPermissions(admin.getRole())
+                adminAuthorizationService.effectivePermissions(admin.getRole())
                         .stream()
                         .map(AdminPermission::name)
                         .collect(Collectors.toSet())

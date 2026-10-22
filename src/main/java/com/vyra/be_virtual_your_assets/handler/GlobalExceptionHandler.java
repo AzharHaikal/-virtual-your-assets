@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @Slf4j
@@ -87,6 +88,18 @@ public class GlobalExceptionHandler {
                 new BaseResponse<>(
                         ErrorConstant.INTERNAL_SERVER_ERROR.getCode(),
                         ErrorConstant.INTERNAL_SERVER_ERROR.getMessage(),
+                        null
+                )
+        );
+    }
+
+    /** Unknown path (or a disabled one such as /swagger-ui.html in production): 404, not 500. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<BaseResponse<Void>> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                new BaseResponse<>(
+                        ErrorConstant.DATA_NOT_FOUND.getCode(),
+                        ErrorConstant.DATA_NOT_FOUND.getMessage(),
                         null
                 )
         );

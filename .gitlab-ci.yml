@@ -43,6 +43,30 @@ run-tests:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
+# Builds the schema from db/migration on an empty PostgreSQL and starts the app with
+# ddl-auto=validate: fails when an entity changes without a matching migration.
+migration-check:
+  stage: unit-test
+  image: maven:3.9.6-eclipse-temurin-17
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+  variables:
+    POSTGRES_DB: vyra_ci
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    DATABASE_URL: jdbc:postgresql://postgres:5432/vyra_ci
+    DATABASE_USERNAME: postgres
+    DATABASE_PASSWORD: postgres
+    MAIL_USERNAME: ci
+    MAIL_PASSWORD: ci
+    CRYPTO_SECRET_KEY: 0123456789abcdef0123456789abcdef
+  script:
+    - mvn test -Dtest=SchemaMigrationIT -Dvyra.it.db=true -Dsurefire.failIfNoSpecifiedTests=false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
 build-jar:
   stage: code-build
   image: maven:3.9.6-eclipse-temurin-17

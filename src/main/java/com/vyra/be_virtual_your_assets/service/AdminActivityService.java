@@ -36,13 +36,21 @@ public class AdminActivityService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createAdminActivity(String adminId, String adminName, AdminActivityEvent event, String ipAddress, String device) {
+        createAdminActivity(adminId, adminName, event, null, ipAddress, device);
+    }
+
+    /** Same as above, with the target of the action appended to the description (e.g. "member 123"). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void createAdminActivity(String adminId, String adminName, AdminActivityEvent event, String detail,
+                                    String ipAddress, String device) {
         HttpServletRequest request = currentRequest();
 
         AdminActivity activity = new AdminActivity();
         activity.setAdminId(StringUtils.defaultIfBlank(adminId, UNKNOWN_ADMIN_ID));
         activity.setAdminName(StringUtils.abbreviate(resolveAdminName(adminId, adminName), ADMIN_NAME_MAX));
         activity.setEvent(event.name());
-        activity.setDescription(event.getDescription());
+        activity.setDescription(StringUtils.truncate(
+                StringUtils.isBlank(detail) ? event.getDescription() : event.getDescription() + ": " + detail, TEXT_MAX));
         activity.setIpAddress(StringUtils.truncate(
                 StringUtils.defaultIfBlank(ipAddress, request != null ? clientIp(request) : null), TEXT_MAX));
         activity.setDevice(StringUtils.truncate(

@@ -32,6 +32,8 @@ public enum ErrorConstant {
     // Invalid
     INVALID_PIN("VYRA-INV-001", "Invalid PIN. Please try again"),
     INVALID_PIN_MISS_MATCH("VYRA-INV-002", "Wrong PIN. Please input with correct PIN"),
+    INVALID_TIMEZONE("VYRA-INV-003", "Invalid time zone. Use a region id such as Asia/Jakarta"),
+    INVALID_DATE_TIME("VYRA-INV-004", "Invalid date. Use ISO-8601, e.g. 2026-10-22T08:30:00+07:00"),
 
     // Not Found (generic to prevent enumeration)
     PHONE_NUMBER_NOT_FOUND("VYRA-DNF-001", "Invalid account. Please check your account details"),
@@ -110,6 +112,15 @@ public enum ErrorConstant {
     ADMIN_INVALID_REFRESH_TOKEN("VYRA-ADM-TKN-001", "Invalid refresh token"),
     ADMIN_REFRESH_TOKEN_EXPIRED("VYRA-ADM-TKN-002", "Your session has expired. Please log in again"),
     ADMIN_UNAUTHORIZED("VYRA-ADM-AUT-001", "You don't have permission to perform this action"),
+    MEMBER_TRANSACTION_ACCESS_DISABLED("VYRA-ADM-AUT-002", "Access to member transaction details is turned off in Settings"),
+
+    // =========================================================================
+    // ADMIN SYSTEM SETTINGS
+    // =========================================================================
+    SYSTEM_CONFIG_LIST_SUCCESS("VYRA-CFG-LST-000", "Settings retrieved successfully"),
+    SYSTEM_CONFIG_UPDATE_SUCCESS("VYRA-CFG-UPD-000", "Setting updated successfully"),
+    SYSTEM_CONFIG_NOT_FOUND("VYRA-CFG-DNF-001", "Setting could not be found"),
+    SYSTEM_CONFIG_INVALID_VALUE("VYRA-CFG-VAL-001", "Invalid value for this setting"),
 
     // =========================================================================
     // ADMIN MANAGEMENT (CRUD admin users / RBAC)

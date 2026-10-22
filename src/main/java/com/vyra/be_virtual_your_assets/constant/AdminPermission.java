@@ -12,6 +12,12 @@ public enum AdminPermission {
 
     MEMBER_VIEW,
     MEMBER_MANAGE,
+    /**
+     * Member-level financial data: a member's transactions, balance and the per-transaction
+     * report. SUPER_ADMIN only, and only while the system setting
+     * {@link SystemConfigKey#MEMBER_TRANSACTION_DETAIL_ENABLED} is on.
+     */
+    MEMBER_TRANSACTION_VIEW,
 
     REPORT_VIEW,
     REPORT_EXPORT,

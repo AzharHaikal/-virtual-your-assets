@@ -32,4 +32,7 @@ public class RegisterRequest {
     @Pattern(regexp = "^\\d{6}$", message = "PIN must consist of exactly 6 digits")
     private String pin;
 
+    /** Optional IANA time zone of the device (e.g. Asia/Jakarta); the default zone when empty. */
+    @Size(max = 64, message = "Time zone must not exceed 64 characters")
+    private String timezone;
 }

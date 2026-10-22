@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -37,6 +37,7 @@ public class DashboardService {
     private final TransactionRepository transactionRepository;
     private final WalletStatementRepository walletStatementRepository;
     private final AdminAuthorizationService adminAuthorizationService;
+    private final TimeService timeService;
 
     public BaseResponse<DashboardSummaryResponse> getSummary() {
         adminAuthorizationService.requirePermission(AdminPermission.DASHBOARD_VIEW);
@@ -54,8 +55,11 @@ public class DashboardService {
         response.setTotalMembers(memberRepository.count());
         response.setActiveMembers(memberRepository.countByStatus(ActiveStatus.ACTIVE));
 
-        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfToday = LocalDate.now().atTime(LocalTime.MAX);
+        // "Today" for the portal is a day in the default zone (vyra.time.default-zone).
+        ZoneId zone = timeService.defaultZone();
+        LocalDate today = timeService.today(zone);
+        LocalDateTime startOfToday = timeService.startOfDayUtc(today, zone);
+        LocalDateTime endOfToday = timeService.startOfDayUtc(today.plusDays(1), zone).minusNanos(1);
         response.setNewMembersToday(memberRepository.countByCreatedAtBetween(startOfToday, endOfToday));
 
         response.setTotalTransactions(transactionRepository.countByDeletedAtIsNull());
@@ -71,10 +75,9 @@ public class DashboardService {
         adminAuthorizationService.requirePermission(AdminPermission.DASHBOARD_VIEW);
 
         int lookbackMonths = months <= 0 ? 6 : months;
-        LocalDateTime startDate = LocalDate.now()
+        LocalDate startDate = timeService.today(timeService.defaultZone())
                 .minusMonths(lookbackMonths - 1L)
-                .withDayOfMonth(1)
-                .atStartOfDay();
+                .withDayOfMonth(1);
 
         List<Object[]> rows = transactionRepository.getPlatformMonthlyChart(startDate);
         DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -115,6 +118,8 @@ public class DashboardService {
 
     public BaseResponse<List<RecentTransactionResponse>> getRecentTransactions() {
         adminAuthorizationService.requirePermission(AdminPermission.DASHBOARD_VIEW);
+        // Lists individual member transactions, not aggregates.
+        adminAuthorizationService.requireMemberTransactionAccess();
 
         List<RecentTransactionResponse> items = transactionRepository.findRecentTransactions()
                 .stream()

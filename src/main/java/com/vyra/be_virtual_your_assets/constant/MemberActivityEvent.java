@@ -57,6 +57,7 @@ public enum MemberActivityEvent {
     SUCCESS_UPDATE_PROFILE("Member successfully updated the profile"),
     FAILED_UPDATE_PROFILE("Member failed to update the profile"),
     REQUEST_CHANGE_CONTACT("Member requested to change e-mail address or phone number"),
+    SUCCESS_UPDATE_TIMEZONE("Member changed the time zone"),
 
     // TRANSACTION
     ATTEMPT_CREATE_TRANSACTION("Member attempted to create a transaction"),

@@ -75,6 +75,19 @@ class AuthTokenFilterTest {
     }
 
     @Test
+    void apiDocsPaths_shouldPassWithoutToken() throws Exception {
+        for (String path : new String[]{"/v3/api-docs", "/v3/api-docs/swagger-config", "/swagger-ui/index.html"}) {
+            MockHttpServletRequest request = memberRequest(path, null);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            authTokenFilter.doFilter(request, response, filterChain);
+
+            verify(filterChain).doFilter(request, response);
+            assertThat(response.getStatus()).as(path).isEqualTo(200);
+        }
+    }
+
+    @Test
     void missingAuthorizationHeader_shouldReturn401() throws Exception {
         MockHttpServletRequest request = memberRequest("/api/v1/member", null);
         MockHttpServletResponse response = new MockHttpServletResponse();

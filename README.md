@@ -185,7 +185,28 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
 |---|---|
 | `transaction` | Data transaksi: memberId, phoneNumber, email, category, type, amount, status, referenceNumber |
 
-> ⚠️ **Migrasi database** dikelola oleh **Flyway** secara otomatis saat aplikasi start.
+> ⚠️ **Migrasi database** dikelola sepenuhnya oleh **Flyway** (`src/main/resources/db/migration`) saat aplikasi start. Hibernate berjalan dengan `ddl-auto: validate`: aplikasi **gagal start** bila entity tidak cocok dengan skema.
+
+### Aturan Migrasi
+- Setiap perubahan skema = file baru `V{n}__deskripsi_singkat.sql`. File yang sudah ter-apply **tidak boleh diedit** (checksum Flyway akan gagal).
+- Tulis DDL biasa (tanpa pola kondisional `to_regclass` seperti V2–V4). `V5__baseline_schema.sql` membuat semua tabel V1 pada database baru.
+- Index & constraint didefinisikan di migrasi. `@Table(indexes = ...)` di entity hanya dokumentasi.
+- Menambah nilai enum yang disimpan sebagai string (mis. `OtpType`, `TransactionStatus`) wajib disertai migrasi yang membuat ulang check constraint kolom tersebut.
+- Job CI `migration-check` membangun skema dari nol dan menjalankan `SchemaMigrationIT`.
+
+### Zona Waktu
+Semua perhitungan waktu lewat `TimeService` agar member di zona berbeda tidak saling konflik.
+
+| Aturan | Implementasi |
+|---|---|
+| Semua momen disimpan sebagai UTC | Kolom `timestamptz`; JVM, sesi JDBC & Hibernate dipaksa UTC (`main()`, `-Duser.timezone=UTC`, `hibernate.jdbc.time_zone`). Setiap `LocalDateTime` di kode = UTC |
+| Response JSON jelas zonanya | `LocalDateTime` dikirim sebagai `2026-10-22T16:30:00Z` (`TimeConfig`) |
+| Zona per member | `member.timezone` (IANA, default `Asia/Jakarta`), dikirim saat register / ubah profil |
+| Hari milik member | `transaction.local_date` dihitung dari zona member **saat ditulis** dan tidak dihitung ulang bila zona diganti. Chart, filter history, growth % dan laporan harian memakai `local_date` |
+| Input dari app | `transactionDate` ISO-8601 dengan offset; tanpa offset dibaca di zona member (app versi lama) |
+| Filter tanggal admin (audit, dashboard "hari ini") | Hari di `vyra.time.default-zone` (env `VYRA_DEFAULT_TIMEZONE`, default `Asia/Jakarta`) |
+
+Migrasi `V7__timezone_support.sql` mengonversi data lama (database development yang dibuat sebelum V7): kolom audit dianggap ditulis di `VYRA_LEGACY_SERVER_TIMEZONE` (default `Asia/Jakarta`, zona laptop development), `transaction_date` di `VYRA_LEGACY_CLIENT_TIMEZONE` (default `Asia/Jakarta`, jam HP). Database baru tidak terpengaruh. Jika suatu database lama ditulis oleh server UTC, set `VYRA_LEGACY_SERVER_TIMEZONE=UTC` sebelum V7 pertama kali jalan.
 
 ---
 
@@ -231,6 +252,18 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
 - Alamat klien diambil dari `X-Forwarded-For` (`FORWARD_HEADERS_STRATEGY=native`, default) — pastikan backend berada di belakang reverse proxy tepercaya.
 - Timeout database: `DB_LOCK_TIMEOUT_MS` (default 5000) dan `DB_STATEMENT_TIMEOUT_MS` (default 30000) dipasang di setiap koneksi; request yang menunggu baris terkunci terlalu lama dijawab `503 VYRA-ERR503` (bukan menggantung).
 - Ubah e-mail / nomor telepon: PIN **dan** OTP. OTP dikirim ke e-mail baru (atau e-mail saat ini bila hanya telepon yang berubah); perubahan baru berlaku setelah `POST /member/update-profile/verify`, dan sesi lain dihentikan.
+
+### Akses Data Keuangan Member (Admin Portal)
+Data keuangan **per member** (daftar transaksi member, saldo, total income/expense member, laporan transaksi per baris, recent transactions) hanya bisa dilihat oleh **SUPER_ADMIN**, dan hanya selama setting `privacy.member_transaction_detail.enabled` bernilai `true` (default).
+
+| Role | Detail transaksi & saldo member | Data agregat (dashboard summary, chart, distribusi kategori, laporan income/expense per hari) |
+|---|---|---|
+| SUPER_ADMIN | ✅ bila setting aktif · `403 VYRA-ADM-AUT-002` bila nonaktif | ✅ |
+| ADMINISTRATOR / OPERATOR / VIEWER | ❌ `403 VYRA-ADM-AUT-001` · saldo di daftar/detail member & member report bernilai `null` | ✅ |
+
+- Permission: `MEMBER_TRANSACTION_VIEW` (hanya SUPER_ADMIN). Saat setting nonaktif, permission ini tidak dikirim di `/admin/me` & login, sehingga portal menyembunyikan menunya.
+- Setting dikelola lewat `GET /api/v1/admin/settings` (`SETTINGS_VIEW`) dan `PUT /api/v1/admin/settings/{configKey}` body `{"value":"true|false"}` (`SETTINGS_MANAGE`, hanya SUPER_ADMIN).
+- Audit: `VIEW_MEMBER_TRANSACTIONS` (member yang dilihat / periode laporan) dan `UPDATE_SYSTEM_CONFIG`.
 
 ### Public Endpoints (Whitelist)
 Endpoint berikut tidak memerlukan autentikasi:
@@ -294,7 +327,11 @@ Semua response menggunakan format:
 | `GET` | `/get-top-history` | ✅ | Riwayat transaksi terbaru (tanpa pagination) |
 | `GET` | `/get-history` | ✅ | Riwayat transaksi dengan pagination & filter |
 
-> Dokumentasi lengkap request/response ada di `API_Specification.md`
+> Dokumentasi lengkap request/response ada di [`docs/api-spec.md`](docs/api-spec.md).
+> OpenAPI/Swagger UI tersedia di `/swagger-ui.html` (spec: `/v3/api-docs`) bila `VYRA_API_DOCS_ENABLED=true` — aktifkan hanya di lokal/staging. Saat nonaktif path tersebut mengembalikan 404.
+
+### 💾 Backup & Restore
+Backup harian (`scripts/db-backup.sh`, retensi ≥ 7 hari) dan uji restore bulanan (`scripts/db-restore-check.sh`). Prosedur lengkap: [`docs/backup-restore.md`](docs/backup-restore.md).
 
 ---
 
@@ -347,10 +384,8 @@ cd be-virtual-your-assets
 ### 2. Siapkan Database PostgreSQL
 ```sql
 CREATE DATABASE vyra_db;
-CREATE SCHEMA idp;
-CREATE SCHEMA wallet;
-CREATE SCHEMA transaction_finance;
 ```
+Schema dan tabel dibuat otomatis oleh Flyway saat aplikasi pertama kali start.
 
 ### 3. Konfigurasi `application.yml`
 Sesuaikan koneksi database, mail server, dan `crypto.secret-key` seperti di atas.
@@ -392,6 +427,14 @@ DATABASE_URL=jdbc:postgresql://localhost:5432/vyra_scratch DATABASE_USERNAME=pos
 MAIL_USERNAME=x MAIL_PASSWORD=x CRYPTO_SECRET_KEY=0123456789abcdef0123456789abcdef \
 DB_LOCK_TIMEOUT_MS=1500 \
 mvn test -Dtest='WalletConcurrencyIT,SecurityHardeningIT' -Dvyra.it.db=true
+```
+
+`SchemaMigrationIT` builds the schema from the Flyway migrations alone and starts the application with `ddl-auto=validate`. Run it against an **empty** database (CI job `migration-check`):
+
+```bash
+DATABASE_URL=jdbc:postgresql://localhost:5432/vyra_empty DATABASE_USERNAME=postgres DATABASE_PASSWORD=... \
+MAIL_USERNAME=x MAIL_PASSWORD=x CRYPTO_SECRET_KEY=0123456789abcdef0123456789abcdef \
+mvn test -Dtest=SchemaMigrationIT -Dvyra.it.db=true
 ```
 
 ### Coverage Test
