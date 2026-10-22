@@ -8,6 +8,7 @@ import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
 import com.vyra.be_virtual_your_assets.dto.member.GetMemberResponse;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileRequest;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileResponse;
+import com.vyra.be_virtual_your_assets.dto.member.VerifyContactChangeRequest;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.MemberService;
 import jakarta.validation.Valid;
@@ -48,12 +49,27 @@ public class MemberController {
         return memberService.updateProfile(user.getMemberId(), request);
     }
 
+    @PostMapping(UPDATE_PROFILE_VERIFY)
+    public BaseResponse<UpdateProfileResponse> verifyContactChange(
+            Authentication authentication,
+            @Valid @RequestBody VerifyContactChangeRequest request
+    ) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return memberService.verifyContactChange(user.getMemberId(), request, user.getAccessToken());
+    }
+
+    @PostMapping(UPDATE_PROFILE_RESEND_OTP)
+    public BaseResponse<UpdateProfileResponse> resendContactChangeOtp(Authentication authentication) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return memberService.resendContactChangeOtp(user.getMemberId());
+    }
+
     @PatchMapping(CHANGE_PIN)
     public BaseResponse<Void> updateProfile(
             Authentication authentication,
             @Valid @RequestBody ChangePinRequest request
     ) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
-        return memberService.changePin(user.getMemberId(), request);
+        return memberService.changePin(user.getMemberId(), request, user.getAccessToken());
     }
 }

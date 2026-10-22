@@ -167,6 +167,11 @@ public class AdminService {
 
         Admin admin = getAdminOrThrow(adminId);
         admin.setStatus(request.getStatus());
+        if (request.getStatus() == ActiveStatus.ACTIVE) {
+            // Re-activating also lifts a temporary login lock.
+            admin.setFailedLoginAttempts(0);
+            admin.setLockedUntil(null);
+        }
         admin.setModifiedBy(currentAdmin.getAdminId());
         admin.setUpdatedAt(LocalDateTime.now());
         adminRepository.save(admin);
@@ -191,6 +196,8 @@ public class AdminService {
 
         Admin admin = getAdminOrThrow(adminId);
         admin.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        admin.setFailedLoginAttempts(0);
+        admin.setLockedUntil(null);
         admin.setModifiedBy(currentAdmin.getAdminId());
         admin.setUpdatedAt(LocalDateTime.now());
         adminRepository.save(admin);

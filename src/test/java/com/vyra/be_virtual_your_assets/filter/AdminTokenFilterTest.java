@@ -150,6 +150,28 @@ class AdminTokenFilterTest {
         verify(filterChain, never()).doFilter(any(), any());
     }
 
+    @Test
+    void doFilterInternal_validTokenButAdminSuspended_shouldReturn401() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/admin/dashboard/summary");
+        request.addHeader("Authorization", "Bearer valid-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AdminToken token = new AdminToken();
+        token.setAdminId("admin-id-001");
+        token.setAccessToken("valid-token");
+        token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(5));
+        Admin admin = new Admin();
+        admin.setId("admin-id-001");
+        admin.setStatus(ActiveStatus.SUSPENDED);
+        when(adminTokenRepository.findByAccessToken("valid-token")).thenReturn(Optional.of(token));
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+
+        adminTokenFilter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        verify(filterChain, never()).doFilter(any(), any());
+    }
+
     // =========================================================================
     // Valid token -> authentication set, filter chain continues
     // =========================================================================

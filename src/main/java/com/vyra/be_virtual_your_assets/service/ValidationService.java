@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.auth.VerifyOtpRequest;
@@ -25,6 +26,7 @@ public class ValidationService {
     private final MemberRepository memberRepository;
     private final MemberOtpRepository memberOtpRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final SecurityPolicy securityPolicy;
 
     public void validateDataExistRegister(String phoneNumber, String email) {
         if (memberRepository.findByPhoneNumber(phoneNumber).isPresent()) throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST);
@@ -64,18 +66,42 @@ public class ValidationService {
             int remainingAttempts = maxAttempts - currentAttempts;
 
             if (currentAttempts >= maxAttempts) {
-                log.info("Executing account to suspend member: {}", member.getPhoneNumber());
-                member.setStatus(ActiveStatus.SUSPENDED);
+                // A temporary lock instead of suspending: suspending let anyone who knows an e-mail
+                // address take the account offline for good by sending wrong codes.
+                member.setOtpLockedUntil(LocalDateTime.now().plusMinutes(securityPolicy.getOtpLockMinutes()));
                 memberRepository.save(member);
                 memberOtpRepository.deleteByPhoneNumber(member.getPhoneNumber());
-                log.warn("Max attempts {} reached for {}. account has been suspended.", currentAttempts, member.getPhoneNumber());
-                throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED);
+                log.warn("Max attempts {} reached for {}. OTP verification locked for {} minutes.",
+                        currentAttempts, member.getPhoneNumber(), securityPolicy.getOtpLockMinutes());
+                throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED,
+                        securityPolicy.getOtpLockMinutes() + " minutes.");
             } else {
                 memberOtpRepository.save(memberOtp);
                 throw new BusinessException(ErrorConstant.OTP_INVALID, String.valueOf(remainingAttempts));
             }
         }
         return memberOtp;
+    }
+
+    /**
+     * The new e-mail address / phone number (either may be null) must not belong to another member.
+     * Same rules and error codes as the profile update, used by the verified contact change flow.
+     */
+    public void assertContactAvailable(Member member, String newEmail, String newPhoneNumber) {
+        if (StringUtils.isNotBlank(newEmail)) {
+            memberRepository.findByEmailIgnoreCase(newEmail)
+                    .filter(existing -> !existing.getId().equals(member.getId()))
+                    .ifPresent(existing -> {
+                        throw new BusinessException(ErrorConstant.EMAIL_ALREADY_EXIST_V2);
+                    });
+        }
+        if (StringUtils.isNotBlank(newPhoneNumber)) {
+            memberRepository.findByPhoneNumber(newPhoneNumber)
+                    .filter(existing -> !existing.getId().equals(member.getId()))
+                    .ifPresent(existing -> {
+                        throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST_V2);
+                    });
+        }
     }
 
     public ValidateIsUpdateProfile validateIsUpdateProfile(Member member, UpdateProfileRequest request) {

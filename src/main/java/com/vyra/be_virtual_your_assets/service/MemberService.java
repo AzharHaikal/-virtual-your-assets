@@ -7,6 +7,7 @@ import com.vyra.be_virtual_your_assets.dto.auth.ChangePinRequest;
 import com.vyra.be_virtual_your_assets.dto.member.GetMemberResponse;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileRequest;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileResponse;
+import com.vyra.be_virtual_your_assets.dto.member.VerifyContactChangeRequest;
 import com.vyra.be_virtual_your_assets.dto.member.ValidateIsUpdateProfile;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionUpdateRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
@@ -19,6 +20,7 @@ import com.vyra.be_virtual_your_assets.repository.MemberActivityRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,9 @@ public class MemberService {
     private final ValidationService validationService;
     private final WalletService walletService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final LockoutService lockoutService;
+    private final MemberTokenRepository memberTokenRepository;
+    private final ContactChangeService contactChangeService;
 
     @NewSpan
     public BaseResponse<GetMemberResponse> getMember(String memberId) {
@@ -122,6 +127,22 @@ public class MemberService {
         log.info("[START] memberService.updateProfile phoneNumber: {}", existingPhone);
         createMemberActivity(existingPhone, MemberActivityEvent.ATTEMPT_UPDATE_PROFILE);
 
+        // Checked before anything is modified. Only the sensitive fields need the PIN.
+        if (isContactChange(member, request)) {
+            lockoutService.assertPinNotLocked(member);
+            if (request.getPin() == null || !passwordEncoder.matches(request.getPin(), member.getPin())) {
+                log.warn("Profile contact change rejected, PIN missing or wrong. phoneNumber: {}", existingPhone);
+                createMemberActivity(existingPhone, MemberActivityEvent.FAILED_UPDATE_PROFILE);
+                lockoutService.onPinFailure(member); // throws 429 when this attempt reaches the limit
+                throw new BusinessException(ErrorConstant.INVALID_PIN_MISS_MATCH);
+            }
+            lockoutService.onPinSuccess(member);
+        }
+
+        if (isContactChange(member, request)) {
+            return stageContactChange(member, request);
+        }
+
         ValidateIsUpdateProfile isUpdate = updateTransactionAndWallet(member, request, existingPhone, existingEmail);
         member.setModifiedBy(isUpdate.isPhoneChanged() ? request.getPhoneNumber(): existingPhone);
         member.setUpdatedAt(LocalDateTime.now());
@@ -169,20 +190,31 @@ public class MemberService {
 
     @NewSpan
     @Transactional
-    public BaseResponse<Void> changePin(String memberId, ChangePinRequest request) {
+    public BaseResponse<Void> changePin(String memberId, ChangePinRequest request, String currentAccessToken) {
         Member member = validationService.getMemberById(memberId);
         log.info("[START] authenticationService.changePin phoneNumber: {} ", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CHANGE_PIN);
 
+        lockoutService.assertPinNotLocked(member);
+
         if (!passwordEncoder.matches(request.getOldPin(), member.getPin())) {
             log.info("Failed pin doesn't match. phoneNumber: {} ", member.getPhoneNumber());
             createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_CHANGE_PIN);
+            lockoutService.onPinFailure(member); // throws 429 when this attempt reaches the limit
             throw new BusinessException(ErrorConstant.INVALID_PIN_MISS_MATCH);
         }
+        lockoutService.onPinSuccess(member);
 
         member.setModifiedBy(member.getPhoneNumber());
         member.setUpdatedAt(LocalDateTime.now());
         member.setPin(passwordEncoder.encode(request.getNewPin()));
+
+        // Other devices / stolen sessions must log in again with the new PIN; this one stays signed in.
+        if (currentAccessToken != null) {
+            memberTokenRepository.deleteByUserIdAndAccessTokenNot(member.getId(), currentAccessToken);
+        } else {
+            memberTokenRepository.deleteByUserId(member.getId());
+        }
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_CHANGE_PIN);
         log.info("[END] authenticationService.changePin successfully phoneNumber: {} ", member.getPhoneNumber());
@@ -212,6 +244,83 @@ public class MemberService {
 
         response.setGrowthPercentage(calculateGrowth(getWalletResponse.getData().getBalance(), previousMonth));
         return response;
+    }
+
+    /**
+     * Names are saved now; a new e-mail address / phone number is only recorded and confirmed
+     * by an OTP (see {@link ContactChangeService}). The member keeps logging in with the old
+     * values until the OTP is verified.
+     */
+    private BaseResponse<UpdateProfileResponse> stageContactChange(Member member, UpdateProfileRequest request) {
+        UpdateProfileRequest namesOnly = new UpdateProfileRequest();
+        namesOnly.setFirstName(request.getFirstName());
+        namesOnly.setLastName(request.getLastName());
+        validationService.validateIsUpdateProfile(member, namesOnly);
+        member.setUpdatedAt(LocalDateTime.now());
+
+        boolean emailChange = request.getEmail() != null && !request.getEmail().isBlank()
+                && !request.getEmail().trim().equalsIgnoreCase(member.getEmail());
+        boolean phoneChange = request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()
+                && !request.getPhoneNumber().equals(member.getPhoneNumber());
+
+        String sentTo = contactChangeService.stage(
+                member,
+                emailChange ? request.getEmail().trim().toLowerCase() : null,
+                phoneChange ? request.getPhoneNumber() : null);
+
+        UpdateProfileResponse response = new UpdateProfileResponse();
+        response.setFirstName(member.getFirstName());
+        response.setLastName(member.getLastName());
+        response.setEmail(member.getEmail());
+        response.setPhoneNumber(member.getPhoneNumber());
+        response.setContactChangePending(true);
+        response.setVerificationSentTo(maskEmail(sentTo));
+
+        return new BaseResponse<>(
+                ErrorConstant.UPDATE_PROFILE_PENDING.getCode(),
+                ErrorConstant.UPDATE_PROFILE_PENDING.getMessage(),
+                response
+        );
+    }
+
+    @NewSpan
+    public BaseResponse<UpdateProfileResponse> verifyContactChange(String memberId, VerifyContactChangeRequest request, String currentAccessToken) {
+        UpdateProfileResponse response = contactChangeService.verify(memberId, request.getOtpCode(), currentAccessToken);
+        return new BaseResponse<>(
+                ErrorConstant.UPDATE_PROFILE_SUCCESS.getCode(),
+                ErrorConstant.UPDATE_PROFILE_SUCCESS.getMessage(),
+                response
+        );
+    }
+
+    @NewSpan
+    public BaseResponse<UpdateProfileResponse> resendContactChangeOtp(String memberId) {
+        String sentTo = contactChangeService.resend(memberId);
+        UpdateProfileResponse response = new UpdateProfileResponse();
+        response.setContactChangePending(true);
+        response.setVerificationSentTo(maskEmail(sentTo));
+        return new BaseResponse<>(
+                ErrorConstant.UPDATE_PROFILE_PENDING.getCode(),
+                ErrorConstant.UPDATE_PROFILE_PENDING.getMessage(),
+                response
+        );
+    }
+
+    /** "budi@example.com" becomes "b***@example.com". */
+    static String maskEmail(String email) {
+        if (email == null) return null;
+        int at = email.indexOf('@');
+        if (at <= 1) return "***" + (at >= 0 ? email.substring(at) : "");
+        return email.charAt(0) + "***" + email.substring(at);
+    }
+
+    /** True when the request would change the e-mail address or phone number. */
+    private boolean isContactChange(Member member, UpdateProfileRequest request) {
+        boolean emailChange = request.getEmail() != null && !request.getEmail().isBlank()
+                && !request.getEmail().trim().equalsIgnoreCase(member.getEmail());
+        boolean phoneChange = request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()
+                && !request.getPhoneNumber().equals(member.getPhoneNumber());
+        return emailChange || phoneChange;
     }
 
     private BigDecimal calculateGrowth(BigDecimal current, BigDecimal previous) {

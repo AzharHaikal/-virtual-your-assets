@@ -4,6 +4,8 @@ import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @Builder
@@ -37,4 +39,13 @@ public class Member extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     private ActiveStatus status;
+
+    /** Consecutive wrong PINs (login, change PIN, contact change). Null is treated as 0. */
+    private Integer failedPinAttempts;
+
+    /** While in the future every PIN-based action is refused with HTTP 429. */
+    private LocalDateTime pinLockedUntil;
+
+    /** While in the future OTP verification and OTP e-mails are refused with HTTP 429. */
+    private LocalDateTime otpLockedUntil;
 }

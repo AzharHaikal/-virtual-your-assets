@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.dto.auth.ChangePinRequest;
 import com.vyra.be_virtual_your_assets.dto.member.GetMemberResponse;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileRequest;
 import com.vyra.be_virtual_your_assets.dto.member.UpdateProfileResponse;
+import com.vyra.be_virtual_your_assets.dto.member.VerifyContactChangeRequest;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.MemberService;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +81,34 @@ class MemberControllerTest {
     }
 
     // =========================================================================
+    // contact change verification
+    // =========================================================================
+    @Test
+    void verifyContactChange_shouldPassTheCurrentAccessTokenSoOtherSessionsCanBeEnded() {
+        VerifyContactChangeRequest request = new VerifyContactChangeRequest();
+        request.setOtpCode("123456");
+        BaseResponse<UpdateProfileResponse> expected = new BaseResponse<>("VYRA-UPS-000", "ok", new UpdateProfileResponse());
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+        when(memberService.verifyContactChange(MEMBER_ID, request, ACCESS_TOKEN)).thenReturn(expected);
+
+        BaseResponse<UpdateProfileResponse> result = memberController.verifyContactChange(authentication, request);
+
+        assertThat(result).isSameAs(expected);
+        verify(memberService).verifyContactChange(MEMBER_ID, request, ACCESS_TOKEN);
+    }
+
+    @Test
+    void resendContactChangeOtp_shouldDelegateWithThePrincipalMemberId() {
+        BaseResponse<UpdateProfileResponse> expected = new BaseResponse<>("VYRA-UPS-001", "sent", new UpdateProfileResponse());
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+        when(memberService.resendContactChangeOtp(MEMBER_ID)).thenReturn(expected);
+
+        BaseResponse<UpdateProfileResponse> result = memberController.resendContactChangeOtp(authentication);
+
+        assertThat(result).isSameAs(expected);
+    }
+
+    // =========================================================================
     // changePin (mapped to PATCH /change-pin, method name 'updateProfile' overload)
     // =========================================================================
     @Test
@@ -87,13 +116,13 @@ class MemberControllerTest {
         ChangePinRequest request = new ChangePinRequest();
         BaseResponse<Void> expected = new BaseResponse<>("VYRA-CPS-000", "PIN changed", null);
         when(authentication.getPrincipal()).thenReturn(userDetails);
-        when(memberService.changePin(MEMBER_ID, request)).thenReturn(expected);
+        when(memberService.changePin(MEMBER_ID, request, ACCESS_TOKEN)).thenReturn(expected);
 
         BaseResponse<Void> result = memberController.updateProfile(authentication, request);
 
         assertThat(result).isSameAs(expected);
         verify(authentication).getPrincipal();
-        verify(memberService).changePin(MEMBER_ID, request);
+        verify(memberService).changePin(MEMBER_ID, request, ACCESS_TOKEN);
     }
 
 

@@ -16,4 +16,9 @@ public class OtpUtil {
     public static LocalDateTime getExpiredTime() {
         return LocalDateTime.now().plusMinutes(5);
     }
+
+    /** How long a verified FORGOT_PIN OTP may be exchanged for a new PIN. */
+    public static LocalDateTime getResetWindowExpiredTime() {
+        return LocalDateTime.now().plusMinutes(5);
+    }
 }

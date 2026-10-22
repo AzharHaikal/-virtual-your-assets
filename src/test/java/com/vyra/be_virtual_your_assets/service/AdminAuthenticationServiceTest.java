@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.AdminActivityEvent;
 import com.vyra.be_virtual_your_assets.constant.AdminRole;
@@ -12,6 +13,7 @@ import com.vyra.be_virtual_your_assets.dto.admin.AdminRefreshTokenResponse;
 import com.vyra.be_virtual_your_assets.entity.Admin;
 import com.vyra.be_virtual_your_assets.entity.AdminToken;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.AdminRepository;
 import com.vyra.be_virtual_your_assets.repository.AdminTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
@@ -37,6 +40,7 @@ class AdminAuthenticationServiceTest {
     @Mock private AdminTokenRepository adminTokenRepository;
     @Mock private AdminActivityService adminActivityService;
     @Mock private BCryptPasswordEncoder passwordEncoder;
+    @Spy private SecurityPolicy securityPolicy = new SecurityPolicy();
 
     @InjectMocks
     private AdminAuthenticationService adminAuthenticationService;
@@ -145,6 +149,7 @@ class AdminAuthenticationServiceTest {
         existingToken.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(10));
 
         when(adminTokenRepository.findByRefreshToken("old-refresh-token")).thenReturn(Optional.of(existingToken));
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
         when(adminTokenRepository.save(any(AdminToken.class))).thenReturn(existingToken);
 
         BaseResponse<AdminRefreshTokenResponse> result = adminAuthenticationService.refreshToken(request);
@@ -153,6 +158,25 @@ class AdminAuthenticationServiceTest {
         assertThat(result.getData().getAccessToken()).isNotBlank();
         assertThat(result.getData().getAccessToken()).isNotEqualTo("old-access-token");
         verify(adminTokenRepository).save(existingToken);
+    }
+
+    @Test
+    void refreshToken_suspendedAdmin_shouldRefuseAndRemoveTheToken() {
+        AdminRefreshTokenRequest request = new AdminRefreshTokenRequest();
+        request.setRefreshToken("old-refresh-token");
+        AdminToken existingToken = new AdminToken();
+        existingToken.setAdminId("admin-id-001");
+        existingToken.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(10));
+        admin.setStatus(ActiveStatus.SUSPENDED);
+        when(adminTokenRepository.findByRefreshToken("old-refresh-token")).thenReturn(Optional.of(existingToken));
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> adminAuthenticationService.refreshToken(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_NOT_ACTIVE);
+        verify(adminTokenRepository).delete(existingToken);
+        verify(adminTokenRepository, never()).save(any());
     }
 
     // =========================================================================
@@ -225,6 +249,68 @@ class AdminAuthenticationServiceTest {
     // =========================================================================
     // helpers
     // =========================================================================
+    // =========================================================================
+    // login — lock-out
+    // =========================================================================
+    @Test
+    void login_wrongPasswordBelowLimit_shouldCountAttemptAndKeepUnlocked() {
+        admin.setFailedLoginAttempts(2);
+        when(adminRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
+        when(passwordEncoder.matches("Secret123!", "hashed-password")).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> adminAuthenticationService.login(buildLoginRequest()));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_INVALID_CREDENTIALS);
+        assertThat(admin.getFailedLoginAttempts()).isEqualTo(3);
+        assertThat(admin.getLockedUntil()).isNull();
+        verify(adminRepository).save(admin);
+    }
+
+    @Test
+    void login_fifthWrongPassword_shouldLockAdminAndRespond429() {
+        admin.setFailedLoginAttempts(4);
+        when(adminRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
+        when(passwordEncoder.matches("Secret123!", "hashed-password")).thenReturn(false);
+
+        TooManyRequestsException ex = assertThrows(TooManyRequestsException.class,
+                () -> adminAuthenticationService.login(buildLoginRequest()));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ACCOUNT_LOCKED);
+        assertThat(ex.getRetryAfterSeconds()).isEqualTo(15 * 60);
+        assertThat(admin.getLockedUntil()).isAfter(LocalDateTime.now().plusMinutes(14));
+        assertThat(admin.getFailedLoginAttempts()).isZero();
+        verify(adminRepository).save(admin);
+        verify(adminTokenRepository, never()).save(any(AdminToken.class));
+        verify(adminActivityService).createAdminActivity(eq("admin-id-001"), eq("Budi Admin"), eq(AdminActivityEvent.LOGIN_LOCKED), any(), any());
+    }
+
+    @Test
+    void login_whileLocked_shouldBeRefusedEvenWithCorrectPassword() {
+        admin.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+        when(adminRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
+
+        assertThrows(TooManyRequestsException.class, () -> adminAuthenticationService.login(buildLoginRequest()));
+
+        verify(passwordEncoder, never()).matches(any(), any());
+        verify(adminTokenRepository, never()).save(any(AdminToken.class));
+    }
+
+    @Test
+    void login_afterLockExpired_shouldAcceptCorrectPasswordAndResetCounters() {
+        admin.setLockedUntil(LocalDateTime.now().minusMinutes(1));
+        admin.setFailedLoginAttempts(0);
+        when(adminRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
+        when(passwordEncoder.matches("Secret123!", "hashed-password")).thenReturn(true);
+        when(adminTokenRepository.save(any(AdminToken.class))).thenReturn(new AdminToken());
+
+        BaseResponse<AdminLoginResponse> result = adminAuthenticationService.login(buildLoginRequest());
+
+        assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.ADMIN_LOGIN_SUCCESS.getCode());
+        assertThat(admin.getLockedUntil()).isNull();
+        assertThat(admin.getFailedLoginAttempts()).isZero();
+    }
+
     private AdminLoginRequest buildLoginRequest() {
         AdminLoginRequest request = new AdminLoginRequest();
         request.setEmail("admin@example.com");

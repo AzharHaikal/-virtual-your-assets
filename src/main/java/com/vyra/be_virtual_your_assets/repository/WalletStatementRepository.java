@@ -1,7 +1,10 @@
 package com.vyra.be_virtual_your_assets.repository;
 
 import com.vyra.be_virtual_your_assets.entity.WalletStatement;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Query;
 
 import java.math.BigDecimal;
@@ -10,6 +13,17 @@ import java.util.Optional;
 
 public interface WalletStatementRepository extends JpaRepository<WalletStatement, String> {
     Optional<WalletStatement> findByPhoneNumber(String phoneNumber);
+
+    /**
+     * Same lookup, but takes a row lock (SELECT ... FOR UPDATE) that is held until the
+     * surrounding transaction ends. Every read-modify-write of a wallet (balance, totals,
+     * phone number) must use this method: with a plain read two concurrent requests both
+     * start from the same balance and the later commit silently overwrites the earlier one.
+     * Must be called inside a transaction.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM WalletStatement w WHERE w.phoneNumber = :phoneNumber")
+    Optional<WalletStatement> findByPhoneNumberForUpdate(@Param("phoneNumber") String phoneNumber);
 
     List<WalletStatement> findByPhoneNumberIn(java.util.Collection<String> phoneNumbers);
 

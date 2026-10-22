@@ -2,6 +2,9 @@ package com.vyra.be_virtual_your_assets.security.filter;
 
 import com.vyra.be_virtual_your_assets.constant.SecurityConstant;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
+import com.vyra.be_virtual_your_assets.entity.Member;
+import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import jakarta.servlet.FilterChain;
@@ -26,6 +29,7 @@ import java.util.Arrays;
 public class AuthTokenFilter extends OncePerRequestFilter {
 
     private final MemberTokenRepository memberTokenRepository;
+    private final MemberRepository memberRepository;
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
@@ -60,6 +64,13 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
         if (memberToken.getAccessTokenExpiredAt().isBefore(LocalDateTime.now())) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access Token Expired");
+            return;
+        }
+
+        // A suspended / deleted / unverified member must not keep working with a token issued earlier.
+        Member member = memberRepository.findById(memberToken.getUserId()).orElse(null);
+        if (member == null || member.getStatus() != ActiveStatus.ACTIVE) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid Token");
             return;
         }
 

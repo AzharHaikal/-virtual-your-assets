@@ -16,6 +16,7 @@ public enum AdminActivityEvent {
     ATTEMPT_LOGIN("Admin attempted to log in"),
     SUCCESS_LOGIN("Admin successfully logged in"),
     FAILED_LOGIN("Admin failed to log in"),
+    LOGIN_LOCKED("Admin account temporarily locked after repeated failed logins"),
     SUCCESS_LOGOUT("Admin successfully logged out"),
 
     // ADMIN MANAGEMENT

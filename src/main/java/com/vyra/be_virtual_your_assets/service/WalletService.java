@@ -6,6 +6,7 @@ import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.*;
+import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberWallet;
 import com.vyra.be_virtual_your_assets.entity.WalletStatement;
 import com.vyra.be_virtual_your_assets.entity.WalletStatementHistory;
@@ -30,11 +31,20 @@ public class WalletService {
     private final WalletStatementRepository walletStatementRepository;
     private final WalletStatementHistoryRepository walletStatementHistoryRepository;
     private final MemberActivityService memberActivityService;
+    private final ValidationService validationService;
 
     @Transactional
     @NewSpan
     public BaseResponse<CreateWalletResponse> createWallet(CreateWalletRequest request) {
         log.info("[START] walletService.createMemberWallet phoneNumber: {} ", request.getPhoneNumber());
+
+        // One wallet per member / phone number. A second row would make every lookup by
+        // phone number fail for that member.
+        if (memberWalletRepository.existsByMemberId(request.getMemberId())
+                || memberWalletRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()) {
+            log.warn("Wallet already exists. phoneNumber: {} ", request.getPhoneNumber());
+            throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);
+        }
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CREATE_WALLET);
 
         MemberWallet memberWallet = new MemberWallet();
@@ -70,6 +80,35 @@ public class WalletService {
         );
     }
 
+    /**
+     * Wallet creation requested through the API. A member may only create a wallet for
+     * itself; any mismatch is answered exactly like an unknown account.
+     */
+    @NewSpan
+    public BaseResponse<CreateWalletResponse> createOwnWallet(String authenticatedMemberId, CreateWalletRequest request) {
+        Member member = validationService.getMemberById(authenticatedMemberId);
+        if (!member.getId().equals(request.getMemberId())
+                || !member.getPhoneNumber().equals(request.getPhoneNumber())) {
+            log.warn("Rejected wallet creation for another member. memberId: {} ", authenticatedMemberId);
+            throw new BusinessException(ErrorConstant.MEMBER_NOT_FOUND);
+        }
+        return createWallet(request);
+    }
+
+    /**
+     * Wallet lookup requested through the API: only the caller's own wallet can be read.
+     * Someone else's phone number gets the same answer as a number that does not exist.
+     */
+    @NewSpan
+    public BaseResponse<GetMemberWalletResponse> getOwnWallet(String authenticatedMemberId, String phoneNumber) {
+        Member member = validationService.getMemberById(authenticatedMemberId);
+        if (!member.getPhoneNumber().equals(phoneNumber)) {
+            log.warn("Rejected wallet lookup for another member. memberId: {} ", authenticatedMemberId);
+            throw new BusinessException(ErrorConstant.MEMBER_NOT_FOUND);
+        }
+        return getMemberWallet(phoneNumber);
+    }
+
     @NewSpan
     public BaseResponse<GetMemberWalletResponse> getMemberWallet(String phoneNumber) {
         log.info("[START] walletService.getMemberWallet. phoneNumber: {} ", phoneNumber);
@@ -97,7 +136,7 @@ public class WalletService {
     public void updateMemberWallet(WalletUpdateRequest request) {
         log.info("[START] walletService.updateMemberWallet. searching by old phone: {} ", request.getOldPhoneNumber());
 
-        WalletStatement walletStatement = walletStatementRepository.findByPhoneNumber(request.getOldPhoneNumber())
+        WalletStatement walletStatement = walletStatementRepository.findByPhoneNumberForUpdate(request.getOldPhoneNumber())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
         walletStatement.setPhoneNumber(request.getNewPhoneNumber());
@@ -120,7 +159,8 @@ public class WalletService {
         log.info("[START] walletService.createTransactionWallet phoneNumber: {} ", request.getPhoneNumber());
         createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_INSERT_WALLET_STATEMENT);
 
-        WalletStatement wallet = walletStatementRepository.findByPhoneNumber(request.getPhoneNumber())
+        // Row lock: serialises concurrent transactions on the same wallet (no lost balance updates).
+        WalletStatement wallet = walletStatementRepository.findByPhoneNumberForUpdate(request.getPhoneNumber())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
 
         BigDecimal amount = request.getAmount();

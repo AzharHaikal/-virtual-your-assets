@@ -203,7 +203,7 @@ Authenticate a member using email **or** phone number (not both) and PIN.
 
 `POST /api/v1/auth/refresh-token` · *Public*
 
-Exchange a valid refresh token for a new access token.
+Exchange a valid refresh token for a new access token. The refresh token is rotated. Refused (and the token deleted) when the member is no longer `ACTIVE` (suspended, deleted, not verified) with `VYRA-DNF-004`.
 
 **Request Body**
 
@@ -274,13 +274,15 @@ Initiate the PIN reset flow by sending an OTP to the member's email.
 
 Reset the member's PIN after OTP verification.
 
+**Precondition:** a `FORGOT_PIN` OTP for this member must have been successfully verified with `POST /auth/verify-otp` (`otpType: FORGOT_PIN`) within the last 5 minutes. The verification is single-use: a successful reset consumes it and revokes every active session of the member. Without it the call fails with `VYRA-OTP-002` (no verified OTP) or `VYRA-OTP-003` (reset window expired). Only `ACTIVE` members can reset a PIN (`VYRA-DNF-004`).
+
 **Request Body**
 
 | Field | Type | Required |
 |-------|------|----------|
-| `phoneNumber` | string | ❌ |
-| `email` | string | ❌ |
-| `newPin` | string | ✅ |
+| `phoneNumber` | string | One of `email`/`phoneNumber` | Must start with `62`, 10–15 digits |
+| `email` | string | One of `email`/`phoneNumber` | Valid email, max 30 chars |
+| `newPin` | string | ✅ | Exactly 6 digits |
 
 **Request Example**
 
@@ -365,6 +367,10 @@ Retrieve the authenticated member's profile and financial summary.
 
 Update the authenticated member's profile information. All fields are optional.
 
+**Changing the e-mail address or phone number requires the current PIN** (`pin`), because OTPs are delivered to those contact details. A missing or wrong PIN is rejected with `VYRA-INV-002` and nothing is changed. Name-only updates do not need a PIN. Re-sending the member's current e-mail / phone is not treated as a change.
+
+**Contact changes are confirmed with an OTP.** Names are saved immediately. A new e-mail / phone is only recorded as a *pending change*; the response is `VYRA-UPS-001` with `contactChangePending: true` and `verificationSentTo` (masked e-mail), and a 6-digit OTP is e-mailed — to the **new** address when the e-mail changes, otherwise to the current address (OTPs are delivered by e-mail only). The member keeps the old e-mail / phone until `POST /member/update-profile/verify` succeeds. See 2.3a / 2.3b below.
+
 **Request Body**
 
 | Field | Type | Validation |
@@ -373,13 +379,15 @@ Update the authenticated member's profile information. All fields are optional.
 | `lastName` | string | Max 20 chars, letters only |
 | `email` | string | Valid email, max 30 chars |
 | `phoneNumber` | string | Must start with `62`, 10–15 digits |
+| `pin` | string | Exactly 6 digits; **required** when `email` or `phoneNumber` changes |
 
 **Request Example**
 
 ```json
 {
   "firstName": "Budi",
-  "email": "budi.new@example.com"
+  "email": "budi.new@example.com",
+  "pin": "123456"
 }
 ```
 
@@ -400,11 +408,29 @@ Update the authenticated member's profile information. All fields are optional.
 
 ---
 
+### 2.2a Verify contact change
+
+`POST /api/v1/member/update-profile/verify` · 🔒 *Requires Auth*
+
+Confirms the pending e-mail / phone change with the OTP. On success the change is applied, wallet and transaction records are synchronised and **every other session of the member is ended** (the calling session stays signed in).
+
+| Field | Type | Required | Validation |
+|-------|------|----------|------------|
+| `otpCode` | string | ✅ | Exactly 6 digits |
+
+Response `VYRA-UPS-000` with `firstName`, `lastName`, `email`, `phoneNumber`. Errors: `VYRA-OTP-002` (nothing pending / no OTP), `VYRA-OTP-003` (expired), `VYRA-OTP-004` (wrong code, remaining attempts), `VYRA-OTP-005` (4th wrong code, verification locked 10 minutes), `VYRA-LCK-002` (429, locked), `VYRA-EXS-003/004` (address / number registered by someone else in the meantime).
+
+### 2.2b Resend contact-change OTP
+
+`POST /api/v1/member/update-profile/resend-otp` · 🔒 *Requires Auth* · no body
+
+Sends a new OTP for the pending change (at most one per 60 seconds: `VYRA-RTL-002`, HTTP 429). Response `VYRA-UPS-001` with `verificationSentTo`.
+
 ### 2.3 Change PIN
 
 `PATCH /api/v1/member/change-pin`
 
-Change the authenticated member's PIN.
+Change the authenticated member's PIN. On success every other session of the member (other devices, stolen tokens) is ended; the session making this call stays signed in. Wrong old PINs count towards the PIN lock-out (HTTP 429 `VYRA-LCK-001`).
 
 **Request Body**
 
@@ -442,9 +468,9 @@ Base path: `/api/v1/wallet`
 
 ### 3.1 Create Wallet
 
-`POST /api/v1/wallet/create` · *Public*
+`POST /api/v1/wallet/create` · 🔒 *Requires Auth*
 
-Create a new wallet linked to a member account.
+Create a wallet linked to the **authenticated** member. `memberId` and `phoneNumber` must belong to the caller, otherwise the call is answered like an unknown account (`VYRA-DNF-003`). A member can only have one wallet; a second call fails with `VYRA-WLT-001`. The wallet is normally created automatically at registration. The body is JSON.
 
 **Request Body**
 
@@ -480,9 +506,9 @@ Create a new wallet linked to a member account.
 
 ### 3.2 Get Member Wallet
 
-`GET /api/v1/wallet/get-wallet/{phoneNumber}` · *Public*
+`GET /api/v1/wallet/get-wallet/{phoneNumber}` · 🔒 *Requires Auth*
 
-Retrieve wallet details for a member by phone number.
+Retrieve the wallet of the **authenticated** member. `phoneNumber` must be the caller's own number; any other number is answered like an unknown account (`VYRA-DNF-003`).
 
 **Path Parameter**
 
@@ -728,6 +754,8 @@ Retrieve paginated transaction history for the authenticated member with date ra
 
 ## 6. Error Codes
 
+> **Lock-out and rate limiting (HTTP 429).** `429` responses use the normal envelope and carry a `Retry-After` header (seconds). Brute-force-prone endpoints (`/auth/login`, `/auth/verify-otp`, `/auth/resend-otp`, `/auth/forgot-pin`, `/auth/reset-pin`, `/auth/register`, `/auth/refresh-token`, `/admin/auth/login`, `/admin/auth/refresh-token`) are limited per client address. After 5 consecutive wrong PINs (login, change PIN, e-mail/phone change) a member is locked for 15 minutes; after 4 wrong OTPs OTP verification is locked for 10 minutes; admins are locked for 15 minutes after 5 wrong passwords. A new OTP e-mail of the same type can be requested once per 60 seconds.
+
 ### Success Codes
 
 | Code | Message |
@@ -772,7 +800,13 @@ Retrieve paginated transaction history for the authenticated member with date ra
 | `VYRA-OTP-002` | Invalid or expired OTP | OTP not found |
 | `VYRA-OTP-003` | The OTP has expired. Please request a new one | OTP expired |
 | `VYRA-OTP-004` | Invalid OTP. Please enter the OTP correctly. Remaining attempts - | Wrong OTP code |
-| `VYRA-OTP-005` | You've reached the maximum attempts. Your account has been suspended | Max OTP attempts reached |
+| `VYRA-OTP-005` | You've reached the maximum attempts. Verification is temporarily locked. Please try again in 10 minutes. | Max OTP attempts reached (HTTP 400) |
+| `VYRA-LCK-001` | Too many failed attempts. Your account is temporarily locked. Please try again in N minutes. | HTTP 429 – PIN / admin password lock-out |
+| `VYRA-LCK-002` | Too many invalid codes. Verification is temporarily locked. Please try again in N minutes. | HTTP 429 – OTP lock |
+| `VYRA-RTL-001` | Too many requests. Please try again in N seconds. | HTTP 429 – per-address rate limit |
+| `VYRA-UPS-001` | A verification code has been sent. Enter it to confirm the change… | Contact change staged (HTTP 200) |
+| `VYRA-ERR503` | The system is busy right now. Please try again in a moment | HTTP 503 – database lock / statement timeout |
+| `VYRA-RTL-002` | A code was sent recently. Please wait before requesting another one. Try again in N seconds. | HTTP 429 – OTP e-mail cool-down |
 | `VYRA-ERR400` | Something went wrong with your request | Bad request / validation error |
 | `VYRA-ERR404` | The requested data could not be found | Data not found |
 | `VYRA-ERR500` | We are experiencing a system issue. Please try again later | Internal server error |

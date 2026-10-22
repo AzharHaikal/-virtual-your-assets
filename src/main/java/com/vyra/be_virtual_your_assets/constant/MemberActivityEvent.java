@@ -41,6 +41,11 @@ public enum MemberActivityEvent {
     SUCCESS_GENERATE_FORGOT_PIN("OTP for PIN reset was successfully generated"),
     ATTEMPT_RESET_PIN("Member attempted to reset the PIN"),
     SUCCESS_RESET_PIN("Member successfully reset the PIN"),
+    FAILED_RESET_PIN("Member failed to reset the PIN"),
+
+    // LOCK-OUT
+    ACCOUNT_LOCKED("Account temporarily locked after repeated wrong PINs"),
+    OTP_LOCKED("Verification temporarily locked after repeated invalid codes"),
 
     // CHANGE PIN
     ATTEMPT_CHANGE_PIN("Member requested to change PIN"),
@@ -50,6 +55,8 @@ public enum MemberActivityEvent {
     // UPDATE PROFILE
     ATTEMPT_UPDATE_PROFILE("Member attempted to update profile"),
     SUCCESS_UPDATE_PROFILE("Member successfully updated the profile"),
+    FAILED_UPDATE_PROFILE("Member failed to update the profile"),
+    REQUEST_CHANGE_CONTACT("Member requested to change e-mail address or phone number"),
 
     // TRANSACTION
     ATTEMPT_CREATE_TRANSACTION("Member attempted to create a transaction"),

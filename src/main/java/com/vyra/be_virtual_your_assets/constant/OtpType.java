@@ -3,5 +3,7 @@ package com.vyra.be_virtual_your_assets.constant;
 public enum OtpType {
     REGISTER,
     FORGOT_PIN,
-    LOGIN
+    LOGIN,
+    /** Confirms a new e-mail address / phone number; only used through the authenticated profile flow. */
+    CHANGE_CONTACT
 }

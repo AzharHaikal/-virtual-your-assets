@@ -197,7 +197,9 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
   ```
   Authorization: Bearer <accessToken>
   ```
-- `AuthTokenFilter` memvalidasi token ke database di setiap request
+- `AuthTokenFilter` memvalidasi token ke database di setiap request **dan memastikan member masih `ACTIVE`** (member yang di-suspend/dihapus langsung ditolak, `401`)
+- Refresh token juga ditolak (dan dihapus) untuk member/admin yang tidak `ACTIVE`
+- Sesi dicabut otomatis: admin suspend/hapus member → semua token member dihapus; reset PIN → semua sesi dihapus; ganti PIN → semua sesi **lain** dihapus (sesi yang sedang dipakai tetap)
 - Access token expire dalam **5 menit**, refresh token dalam **30 hari**
 
 ### Enkripsi & Hashing
@@ -210,7 +212,25 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
 ### OTP Security
 - OTP 6 digit, generated via `SecureRandom`
 - Berlaku selama **5 menit**
-- Maksimum **4 kali percobaan** — jika melebihi, akun otomatis **SUSPENDED**
+- Maksimum **4 kali percobaan** per OTP — jika melebihi, OTP dihapus dan verifikasi/kirim ulang OTP **dikunci 10 menit** (akun tidak lagi di-SUSPEND)
+- OTP e-mail dengan tipe yang sama hanya bisa diminta **1x per 60 detik** per member
+- OTP `FORGOT_PIN` harus diverifikasi (`verify-otp`) sebelum `/auth/reset-pin`; verifikasi berlaku 5 menit, sekali pakai, dan semua sesi member dicabut setelah reset
+
+### Lock-out & Rate Limiting
+| Proteksi | Aturan | Respons |
+|---|---|---|
+| Lock PIN member | 5 PIN salah berturut-turut (login, change PIN, ubah email/telepon) → kunci 15 menit | HTTP 429 `VYRA-LCK-001` |
+| Lock OTP member | 4 OTP salah → kunci 10 menit | HTTP 400 `VYRA-OTP-005`, lalu 429 `VYRA-LCK-002` |
+| Lock login admin | 5 password salah berturut-turut → kunci 15 menit (audit `LOGIN_LOCKED`) | HTTP 429 `VYRA-LCK-001` |
+| Cool-down OTP | 1 e-mail OTP per tipe per 60 detik | HTTP 429 `VYRA-RTL-002` |
+| Rate limit per IP | login 10/mnt, verify-otp 10/mnt, resend-otp + forgot-pin 5/mnt, reset-pin 5/mnt, register 10/10 mnt, refresh 30/mnt, admin login 10/mnt | HTTP 429 `VYRA-RTL-001` + `Retry-After` |
+
+- Lock otomatis berakhir; admin yang meng-aktifkan kembali member/admin (atau reset password admin) langsung membuka kunci.
+- Semua batas dapat diatur lewat env: `VYRA_PIN_MAX_ATTEMPTS`, `VYRA_PIN_LOCK_MINUTES`, `VYRA_OTP_LOCK_MINUTES`, `VYRA_OTP_RESEND_COOLDOWN_SECONDS`, `VYRA_ADMIN_MAX_ATTEMPTS`, `VYRA_ADMIN_LOCK_MINUTES`, `VYRA_RATE_LIMIT_ENABLED`.
+- Rate limit disimpan di **PostgreSQL** (`idp.rate_limit_bucket`, satu upsert atomik per request) sehingga **dibagi antar instance**; bila database gagal dipakai, request dihitung secara lokal (in-memory). `VYRA_RATE_LIMIT_STORE=memory` memaksa hitung lokal. Lock PIN/OTP/admin juga tersimpan di database.
+- Alamat klien diambil dari `X-Forwarded-For` (`FORWARD_HEADERS_STRATEGY=native`, default) — pastikan backend berada di belakang reverse proxy tepercaya.
+- Timeout database: `DB_LOCK_TIMEOUT_MS` (default 5000) dan `DB_STATEMENT_TIMEOUT_MS` (default 30000) dipasang di setiap koneksi; request yang menunggu baris terkunci terlalu lama dijawab `503 VYRA-ERR503` (bukan menggantung).
+- Ubah e-mail / nomor telepon: PIN **dan** OTP. OTP dikirim ke e-mail baru (atau e-mail saat ini bila hanya telepon yang berubah); perubahan baru berlaku setelah `POST /member/update-profile/verify`, dan sesi lain dihentikan.
 
 ### Public Endpoints (Whitelist)
 Endpoint berikut tidak memerlukan autentikasi:
@@ -255,15 +275,15 @@ Semua response menggunakan format:
 | Method | Endpoint | Auth | Deskripsi |
 |---|---|---|---|
 | `GET` | `/get-member` | ✅ | Get profil + ringkasan keuangan |
-| `PATCH` | `/update-profile` | ✅ | Update nama/email/nomor telepon |
+| `PATCH` | `/update-profile` | ✅ | Update nama/email/nomor telepon (ubah email/telepon wajib kirim `pin`) |
 | `PATCH` | `/change-pin` | ✅ | Ganti PIN dengan validasi PIN lama |
 
 ### 💼 Wallet — `/api/v1/wallet`
 
 | Method | Endpoint | Auth | Deskripsi |
 |---|---|---|---|
-| `POST` | `/create` | ❌ | Buat wallet (dipanggil otomatis saat register) |
-| `GET` | `/get-wallet/{phoneNumber}` | ❌ | Get data wallet berdasarkan nomor telepon |
+| `POST` | `/create` | ✅ | Buat wallet milik member yang login (otomatis saat register; satu wallet per member) |
+| `GET` | `/get-wallet/{phoneNumber}` | ✅ | Get wallet milik sendiri (nomor telepon harus milik member yang login) |
 
 ### 💸 Transaction — `/api/v1/transaction`
 
@@ -362,6 +382,16 @@ mvn test
 
 # Laporan tersedia di
 target/surefire-reports/
+```
+
+### Real-database tests
+`WalletConcurrencyIT` fires parallel transactions at one wallet and checks that no balance update is lost (the wallet row is locked with `SELECT ... FOR UPDATE`). `SecurityHardeningIT` checks the cross-instance rate limiter, the database lock timeout and the OTP-verified e-mail / phone change (run it with `DB_LOCK_TIMEOUT_MS=1500`). Both need PostgreSQL, so they are skipped unless enabled. Use a **scratch database** — the application schema is created there and test rows are written:
+
+```bash
+DATABASE_URL=jdbc:postgresql://localhost:5432/vyra_scratch DATABASE_USERNAME=postgres DATABASE_PASSWORD=... \
+MAIL_USERNAME=x MAIL_PASSWORD=x CRYPTO_SECRET_KEY=0123456789abcdef0123456789abcdef \
+DB_LOCK_TIMEOUT_MS=1500 \
+mvn test -Dtest='WalletConcurrencyIT,SecurityHardeningIT' -Dvyra.it.db=true
 ```
 
 ### Coverage Test

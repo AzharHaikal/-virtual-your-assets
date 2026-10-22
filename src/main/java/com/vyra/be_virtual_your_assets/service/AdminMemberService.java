@@ -15,6 +15,7 @@ import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.entity.WalletStatement;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
+import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import com.vyra.be_virtual_your_assets.repository.WalletStatementRepository;
 import com.vyra.be_virtual_your_assets.security.model.CustomAdminDetails;
@@ -46,6 +47,7 @@ public class AdminMemberService {
     private final WalletStatementRepository walletStatementRepository;
     private final AdminActivityService adminActivityService;
     private final AdminAuthorizationService adminAuthorizationService;
+    private final MemberTokenRepository memberTokenRepository;
 
     public BaseResponse<PageResponse<AdminMemberListItemResponse>> getMemberList(String keyword, ActiveStatus status, int page, int size) {
         adminAuthorizationService.requirePermission(AdminPermission.MEMBER_VIEW);
@@ -129,9 +131,20 @@ public class AdminMemberService {
 
         Member member = getMemberOrThrow(memberId);
         member.setStatus(request.getStatus());
+        if (request.getStatus() == ActiveStatus.ACTIVE) {
+            // Re-activating also lifts temporary PIN / OTP locks.
+            member.setFailedPinAttempts(0);
+            member.setPinLockedUntil(null);
+            member.setOtpLockedUntil(null);
+        }
         member.setModifiedBy(currentAdmin.getAdminId());
         member.setUpdatedAt(LocalDateTime.now());
         memberRepository.save(member);
+
+        if (request.getStatus() != ActiveStatus.ACTIVE) {
+            // Suspended / inactive / deleted: end every session now instead of waiting for token expiry.
+            memberTokenRepository.deleteByUserId(member.getId());
+        }
 
         adminActivityService.createAdminActivity(
                 currentAdmin.getAdminId(),
@@ -157,6 +170,7 @@ public class AdminMemberService {
         member.setStatus(ActiveStatus.DELETED);
         member.setModifiedBy(currentAdmin.getAdminId());
         memberRepository.save(member);
+        memberTokenRepository.deleteByUserId(member.getId());
 
         adminActivityService.createAdminActivity(
                 currentAdmin.getAdminId(),

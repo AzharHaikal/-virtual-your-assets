@@ -37,4 +37,7 @@ public class MemberOtp {
     private LocalDateTime expiredAt;
 
     private LocalDateTime createdAt;
+
+    /** Set when a FORGOT_PIN OTP has been verified; required (and single-use) for /auth/reset-pin. */
+    private LocalDateTime verifiedAt;
 }

@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.OtpType;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
@@ -36,6 +38,9 @@ class ValidationServiceTest {
     private MemberOtpRepository memberOtpRepository;
     @Mock
     private BCryptPasswordEncoder passwordEncoder;
+
+    @Spy
+    private SecurityPolicy securityPolicy = new SecurityPolicy();
 
     @InjectMocks
     private ValidationService validationService;
@@ -260,10 +265,10 @@ class ValidationServiceTest {
     }
 
     // =========================================================================
-    // verifyOtp — wrong OTP, attempts reach 4 → suspend
+    // verifyOtp — wrong OTP, attempts reach 4 → temporary OTP lock (not a suspension)
     // =========================================================================
     @Test
-    void verifyOtp_wrongOtp_attemptsReach4_shouldSuspendMemberAndThrowMaxAttempts() {
+    void verifyOtp_wrongOtp_attemptsReach4_shouldLockOtpTemporarilyAndThrowMaxAttempts() {
         VerifyOtpRequest request = buildVerifyRequest("wrong", OtpType.REGISTER);
         MemberOtp otp = buildOtp("hashed", OtpType.REGISTER, LocalDateTime.now().plusMinutes(5), 3);
         when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
@@ -275,7 +280,10 @@ class ValidationServiceTest {
                 () -> validationService.verifyOtp(member, request));
 
         assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MAX_ATTEMPTS_REACHED);
-        assertThat(member.getStatus()).isEqualTo(ActiveStatus.SUSPENDED);
+        assertThat(ex.getMessage()).contains("10 minutes");
+        // Not suspended: anyone knowing an e-mail address could otherwise lock the member out for good.
+        assertThat(member.getStatus()).isEqualTo(ActiveStatus.ACTIVE);
+        assertThat(member.getOtpLockedUntil()).isAfter(LocalDateTime.now().plusMinutes(9));
         verify(memberRepository).save(member);
         verify(memberOtpRepository).deleteByPhoneNumber(member.getPhoneNumber());
     }

@@ -1,5 +1,8 @@
 server:
   port: ${PORT:8000}
+  # Behind a reverse proxy (Render, nginx, ...) the real client address comes from X-Forwarded-For.
+  # Rate limiting keys on it; without this every client would share the proxy's address.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
 
 spring:
   application:
@@ -13,6 +16,10 @@ spring:
 
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:10}
+      data-source-properties:
+        # Bound how long a statement may wait for a row lock (e.g. a wallet being updated by
+        # another request) or run at all, instead of hanging until the HTTP client gives up.
+        options: "-c lock_timeout=${DB_LOCK_TIMEOUT_MS:5000} -c statement_timeout=${DB_STATEMENT_TIMEOUT_MS:30000}"
   #      data-source-properties:
   #        sslmode: require
 
@@ -63,6 +70,20 @@ crypto:
   secret-key: ${CRYPTO_SECRET_KEY}
 
 vyra:
+  security:
+    pin:
+      max-attempts: ${VYRA_PIN_MAX_ATTEMPTS:5}
+      lock-minutes: ${VYRA_PIN_LOCK_MINUTES:15}
+    otp:
+      lock-minutes: ${VYRA_OTP_LOCK_MINUTES:10}
+      resend-cooldown-seconds: ${VYRA_OTP_RESEND_COOLDOWN_SECONDS:60}
+    admin-login:
+      max-attempts: ${VYRA_ADMIN_MAX_ATTEMPTS:5}
+      lock-minutes: ${VYRA_ADMIN_LOCK_MINUTES:15}
+    rate-limit:
+      enabled: ${VYRA_RATE_LIMIT_ENABLED:true}
+      # database = counters shared by all instances (default); memory = per instance only
+      store: ${VYRA_RATE_LIMIT_STORE:database}
   admin:
     seed:
       name: ${VYRA_ADMIN_SEED_NAME:Super Administrator}

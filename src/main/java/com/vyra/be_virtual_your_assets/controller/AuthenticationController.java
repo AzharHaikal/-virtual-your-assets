@@ -52,7 +52,7 @@ public class AuthenticationController {
     }
 
     @PostMapping(RESET_PIN)
-    public BaseResponse<Void> resetPin(@RequestBody ResetPinRequest request) {
+    public BaseResponse<Void> resetPin(@Valid @RequestBody ResetPinRequest request) {
         return authenticationService.resetPin(request);
     }
 

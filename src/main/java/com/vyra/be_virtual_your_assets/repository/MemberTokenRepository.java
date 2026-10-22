@@ -11,4 +11,9 @@ public interface MemberTokenRepository extends JpaRepository<MemberToken, String
     Optional<MemberToken> findByRefreshToken(String refreshToken);
 
     void deleteByAccessToken(String accessToken);
+
+    void deleteByUserId(String userId);
+
+    /** Ends every session of a member except the one identified by {@code accessToken}. */
+    void deleteByUserIdAndAccessTokenNot(String userId, String accessToken);
 }

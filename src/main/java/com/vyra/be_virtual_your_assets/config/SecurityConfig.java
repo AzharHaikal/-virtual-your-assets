@@ -2,6 +2,7 @@ package com.vyra.be_virtual_your_assets.config;
 
 import com.vyra.be_virtual_your_assets.constant.SecurityConstant;
 import com.vyra.be_virtual_your_assets.security.filter.AdminTokenFilter;
+import com.vyra.be_virtual_your_assets.ratelimit.RateLimitFilter;
 import com.vyra.be_virtual_your_assets.security.filter.AuthTokenFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class SecurityConfig {
 
     private final AuthTokenFilter authTokenFilter;
     private final AdminTokenFilter adminTokenFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -63,6 +65,11 @@ public class SecurityConfig {
                 .addFilterBefore(
                         adminTokenFilter,
                         UsernamePasswordAuthenticationFilter.class
+                )
+                // Throttles brute-force-prone endpoints before anything else looks at the request.
+                .addFilterBefore(
+                        rateLimitFilter,
+                        AuthTokenFilter.class
                 );
 
         return http.build();
