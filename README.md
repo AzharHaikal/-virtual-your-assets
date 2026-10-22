@@ -206,7 +206,7 @@ Semua perhitungan waktu lewat `TimeService` agar member di zona berbeda tidak sa
 | Input dari app | `transactionDate` ISO-8601 dengan offset; tanpa offset dibaca di zona member (app versi lama) |
 | Filter tanggal admin (audit, dashboard "hari ini") | Hari di `vyra.time.default-zone` (env `VYRA_DEFAULT_TIMEZONE`, default `Asia/Jakarta`) |
 
-Migrasi `V7__timezone_support.sql` mengonversi data lama: kolom audit dianggap ditulis di `VYRA_LEGACY_SERVER_TIMEZONE` (default `UTC`, zona server Render/Docker), `transaction_date` di `VYRA_LEGACY_CLIENT_TIMEZONE` (default `Asia/Jakarta`, jam HP). **Database lokal yang dulu dijalankan dengan JVM WIB** perlu `VYRA_LEGACY_SERVER_TIMEZONE=Asia/Jakarta` sebelum migrasi V7 pertama kali jalan.
+Migrasi `V7__timezone_support.sql` mengonversi data lama (database development yang dibuat sebelum V7): kolom audit dianggap ditulis di `VYRA_LEGACY_SERVER_TIMEZONE` (default `Asia/Jakarta`, zona laptop development), `transaction_date` di `VYRA_LEGACY_CLIENT_TIMEZONE` (default `Asia/Jakarta`, jam HP). Database baru tidak terpengaruh. Jika suatu database lama ditulis oleh server UTC, set `VYRA_LEGACY_SERVER_TIMEZONE=UTC` sebelum V7 pertama kali jalan.
 
 ---
 

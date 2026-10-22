@@ -31,9 +31,9 @@ spring:
     default-schema: flyway
     placeholders:
       # V7 (timestamp -> timestamptz): zone of the values written before V7.
-      # legacyServerZone = JVM zone of the server that wrote created_at/updated_at (Render/Docker: UTC).
+      # legacyServerZone = JVM zone of the machine that wrote created_at/updated_at (development laptops: WIB).
       # legacyClientZone = zone the mobile app sent transaction_date in (device local time, WIB).
-      legacyServerZone: ${VYRA_LEGACY_SERVER_TIMEZONE:UTC}
+      legacyServerZone: ${VYRA_LEGACY_SERVER_TIMEZONE:Asia/Jakarta}
       legacyClientZone: ${VYRA_LEGACY_CLIENT_TIMEZONE:Asia/Jakarta}
 
   jpa:
