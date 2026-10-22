@@ -8,7 +8,9 @@ import com.vyra.be_virtual_your_assets.dto.admin.AdminRefreshTokenRequest;
 import com.vyra.be_virtual_your_assets.dto.admin.AdminRefreshTokenResponse;
 import com.vyra.be_virtual_your_assets.entity.Admin;
 import com.vyra.be_virtual_your_assets.entity.AdminToken;
+import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.AdminRepository;
 import com.vyra.be_virtual_your_assets.repository.AdminTokenRepository;
 import com.vyra.be_virtual_your_assets.util.TokenUtil;
@@ -37,9 +39,10 @@ public class AdminAuthenticationService {
     private final AdminTokenRepository adminTokenRepository;
     private final AdminActivityService adminActivityService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final SecurityPolicy securityPolicy;
 
     @NewSpan
-    @Transactional(noRollbackFor = BusinessException.class)
+    @Transactional(noRollbackFor = {BusinessException.class, TooManyRequestsException.class})
     public BaseResponse<AdminLoginResponse> login(AdminLoginRequest request) {
         log.info("[START] adminAuthenticationService.login email: {}", request.getEmail());
 
@@ -57,11 +60,38 @@ public class AdminAuthenticationService {
             throw new BusinessException(ErrorConstant.ADMIN_NOT_ACTIVE);
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        if (admin.getLockedUntil() != null) {
+            if (admin.getLockedUntil().isAfter(now)) {
+                // Refused without checking the password, so a lock cannot be used as a guessing oracle.
+                createAdminActivity(admin.getId(), admin.getName(), AdminActivityEvent.LOGIN_LOCKED, request.getIpAddress(), request.getDeviceName());
+                throw new TooManyRequestsException(ErrorConstant.ACCOUNT_LOCKED,
+                        Math.max(1, java.time.Duration.between(now, admin.getLockedUntil()).getSeconds()));
+            }
+            // Lock expired: start counting from zero again.
+            admin.setLockedUntil(null);
+            admin.setFailedLoginAttempts(0);
+        }
+
         if (!passwordEncoder.matches(request.getPassword(), admin.getPassword())) {
             log.info("Login failed, invalid password. email: {}", request.getEmail());
             createAdminActivity(admin.getId(), admin.getName(), AdminActivityEvent.FAILED_LOGIN, request.getIpAddress(), request.getDeviceName());
+
+            int attempts = (admin.getFailedLoginAttempts() == null ? 0 : admin.getFailedLoginAttempts()) + 1;
+            if (attempts >= securityPolicy.getAdminMaxAttempts()) {
+                admin.setFailedLoginAttempts(0);
+                admin.setLockedUntil(now.plusMinutes(securityPolicy.getAdminLockMinutes()));
+                adminRepository.save(admin);
+                log.warn("Admin locked after {} failed logins. email: {}", attempts, request.getEmail());
+                createAdminActivity(admin.getId(), admin.getName(), AdminActivityEvent.LOGIN_LOCKED, request.getIpAddress(), request.getDeviceName());
+                throw new TooManyRequestsException(ErrorConstant.ACCOUNT_LOCKED, securityPolicy.getAdminLockMinutes() * 60L);
+            }
+            admin.setFailedLoginAttempts(attempts);
+            adminRepository.save(admin);
             throw new BusinessException(ErrorConstant.ADMIN_INVALID_CREDENTIALS);
         }
+        admin.setFailedLoginAttempts(0);
+        admin.setLockedUntil(null);
 
         String accessToken = TokenUtil.generateAccessToken();
         String refreshToken = TokenUtil.generateRefreshToken();
@@ -108,13 +138,20 @@ public class AdminAuthenticationService {
     }
 
     @NewSpan
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public BaseResponse<AdminRefreshTokenResponse> refreshToken(AdminRefreshTokenRequest request) {
         AdminToken adminToken = adminTokenRepository.findByRefreshToken(request.getRefreshToken())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.ADMIN_INVALID_REFRESH_TOKEN));
 
         if (adminToken.getRefreshTokenExpiredAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorConstant.ADMIN_REFRESH_TOKEN_EXPIRED);
+        }
+
+        // A suspended / deleted admin cannot renew a session; the dead token is removed.
+        Admin tokenOwner = adminRepository.findById(adminToken.getAdminId()).orElse(null);
+        if (tokenOwner == null || tokenOwner.getStatus() != ActiveStatus.ACTIVE) {
+            adminTokenRepository.delete(adminToken);
+            throw new BusinessException(ErrorConstant.ADMIN_NOT_ACTIVE);
         }
 
         String newAccessToken = TokenUtil.generateAccessToken();

@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.entity.Member;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +17,22 @@ public interface MemberRepository extends JpaRepository<Member, String> {
     Optional<Member> findByPhoneNumber(String phoneNumber);
 
     Optional<Member> findByEmailIgnoreCase(String email);
+
+    // Atomic lock-out bookkeeping (always run in their own transaction by LockoutService).
+    @Modifying
+    @Query("UPDATE Member m SET m.failedPinAttempts = COALESCE(m.failedPinAttempts, 0) + 1 WHERE m.id = :id")
+    int incrementFailedPinAttempts(@Param("id") String id);
+
+    @Query("SELECT COALESCE(m.failedPinAttempts, 0) FROM Member m WHERE m.id = :id")
+    int getFailedPinAttempts(@Param("id") String id);
+
+    @Modifying
+    @Query("UPDATE Member m SET m.pinLockedUntil = :until WHERE m.id = :id")
+    int lockPin(@Param("id") String id, @Param("until") LocalDateTime until);
+
+    @Modifying
+    @Query("UPDATE Member m SET m.failedPinAttempts = 0, m.pinLockedUntil = NULL WHERE m.id = :id")
+    int clearPinLock(@Param("id") String id);
 
 
     long countByStatus(ActiveStatus status);

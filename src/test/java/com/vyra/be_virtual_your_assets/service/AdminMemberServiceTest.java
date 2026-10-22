@@ -14,6 +14,7 @@ import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.entity.WalletStatement;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
+import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import com.vyra.be_virtual_your_assets.repository.WalletStatementRepository;
 import com.vyra.be_virtual_your_assets.security.model.CustomAdminDetails;
@@ -45,6 +46,7 @@ class AdminMemberServiceTest {
     @Mock private WalletStatementRepository walletStatementRepository;
     @Mock private AdminActivityService adminActivityService;
     @Mock private AdminAuthorizationService adminAuthorizationService;
+    @Mock private MemberTokenRepository memberTokenRepository;
 
     @InjectMocks
     private AdminMemberService adminMemberService;
@@ -208,6 +210,22 @@ class AdminMemberServiceTest {
         assertThat(member.getStatus()).isEqualTo(ActiveStatus.SUSPENDED);
         assertThat(member.getModifiedBy()).isEqualTo("admin-id-001");
         verify(adminActivityService).createAdminActivity(eq("admin-id-001"), anyString(), eq(AdminActivityEvent.UPDATE_MEMBER_STATUS), any(), any());
+        // The member is thrown out immediately, not when the token happens to expire.
+        verify(memberTokenRepository).deleteByUserId("member-id-001");
+    }
+
+    @Test
+    void updateMemberStatus_reactivate_shouldNotTouchSessions() {
+        doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_MANAGE);
+        when(memberRepository.findById("member-id-001")).thenReturn(Optional.of(member));
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminMemberStatusUpdateRequest request = new AdminMemberStatusUpdateRequest();
+        request.setStatus(ActiveStatus.ACTIVE);
+
+        adminMemberService.updateMemberStatus("member-id-001", request, currentAdmin);
+
+        verify(memberTokenRepository, never()).deleteByUserId(any());
     }
 
     @Test
@@ -239,6 +257,7 @@ class AdminMemberServiceTest {
         assertThat(member.getStatus()).isEqualTo(ActiveStatus.DELETED);
         assertThat(member.getDeletedAt()).isNotNull();
         verify(adminActivityService).createAdminActivity(eq("admin-id-001"), anyString(), eq(AdminActivityEvent.DELETE_MEMBER), any(), any());
+        verify(memberTokenRepository).deleteByUserId("member-id-001");
     }
 
     @Test

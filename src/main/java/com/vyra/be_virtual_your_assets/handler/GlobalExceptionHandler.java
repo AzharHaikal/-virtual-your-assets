@@ -4,6 +4,9 @@ import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,6 +29,31 @@ public class GlobalExceptionHandler {
                         null
                 )
         );
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<BaseResponse<Void>> handleTooManyRequests(TooManyRequestsException ex) {
+        log.warn("TooManyRequestsException: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(new BaseResponse<>(
+                        ex.getErrorConstant().getCode(),
+                        ex.getMessage(),
+                        null
+                ));
+    }
+
+    @ExceptionHandler({PessimisticLockingFailureException.class, QueryTimeoutException.class})
+    public ResponseEntity<BaseResponse<Void>> handleLockTimeout(Exception ex) {
+        // A wallet row (or another row) stayed locked longer than lock_timeout / statement_timeout.
+        log.warn("Database lock or statement timeout: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header("Retry-After", "2")
+                .body(new BaseResponse<>(
+                        ErrorConstant.SYSTEM_BUSY.getCode(),
+                        ErrorConstant.SYSTEM_BUSY.getMessage(),
+                        null
+                ));
     }
 
     @ExceptionHandler(BusinessException.class)

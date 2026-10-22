@@ -46,4 +46,10 @@ public class Admin extends BaseEntity {
 
     private LocalDateTime lastLoginAt;
 
+    /** Consecutive failed logins. Null is treated as 0. */
+    private Integer failedLoginAttempts;
+
+    /** While in the future login is refused with HTTP 429. */
+    private LocalDateTime lockedUntil;
+
 }

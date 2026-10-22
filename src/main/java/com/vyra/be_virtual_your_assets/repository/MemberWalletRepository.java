@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface MemberWalletRepository extends JpaRepository<MemberWallet, String> {
     Optional<MemberWallet> findByPhoneNumber(String phoneNumber);
 
+    boolean existsByMemberId(String memberId);
+
 }

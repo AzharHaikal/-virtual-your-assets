@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
@@ -12,6 +13,7 @@ import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberOtp;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
@@ -43,6 +46,8 @@ class AuthenticationServiceTest {
     @Mock private ValidationService validationService;
     @Mock private WalletService walletService;
     @Mock private BCryptPasswordEncoder passwordEncoder;
+    @Mock private LockoutService lockoutService;
+    @Spy private SecurityPolicy securityPolicy = new SecurityPolicy();
 
     @InjectMocks
     private AuthenticationService authenticationService;
@@ -269,8 +274,11 @@ class AuthenticationServiceTest {
         request.setRefreshToken("valid-refresh");
 
         MemberToken token = new MemberToken();
+        token.setUserId("member-uuid-001");
         token.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(1));
+        member.setStatus(ActiveStatus.ACTIVE);
         when(memberTokenRepository.findByRefreshToken("valid-refresh")).thenReturn(Optional.of(token));
+        when(memberRepository.findById("member-uuid-001")).thenReturn(Optional.of(member));
         lenient().when(memberTokenRepository.save(any())).thenReturn(token);
 
         BaseResponse<RefreshTokenResponse> result = authenticationService.refreshToken(request);
@@ -278,6 +286,38 @@ class AuthenticationServiceTest {
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.REFRESH_TOKEN_SUCCESS.getCode());
         assertThat(result.getData().getAccessToken()).isNotBlank();
         assertThat(result.getData().getRefreshToken()).isNotBlank();
+    }
+
+    @Test
+    void refreshToken_suspendedMember_shouldRefuseAndRemoveTheToken() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("valid-refresh");
+        MemberToken token = new MemberToken();
+        token.setUserId("member-uuid-001");
+        token.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(20));
+        member.setStatus(ActiveStatus.SUSPENDED);
+        when(memberTokenRepository.findByRefreshToken("valid-refresh")).thenReturn(Optional.of(token));
+        when(memberRepository.findById("member-uuid-001")).thenReturn(Optional.of(member));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.refreshToken(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MEMBER_NOT_ACTIVE);
+        verify(memberTokenRepository).delete(token);
+    }
+
+    @Test
+    void refreshToken_deletedMember_shouldRefuse() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("valid-refresh");
+        MemberToken token = new MemberToken();
+        token.setUserId("gone");
+        token.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(20));
+        when(memberTokenRepository.findByRefreshToken("valid-refresh")).thenReturn(Optional.of(token));
+        when(memberRepository.findById("gone")).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class, () -> authenticationService.refreshToken(request));
+
+        verify(memberTokenRepository).delete(token);
     }
 
     // =========================================================================
@@ -320,6 +360,7 @@ class AuthenticationServiceTest {
     void forgotPin_success_shouldGenerateOtpAndSendToEmail() {
         ForgotPinRequest request = new ForgotPinRequest();
         request.setEmail("budi@example.com");
+        member.setStatus(ActiveStatus.ACTIVE);
         when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
         when(memberOtpRepository.save(any())).thenReturn(new MemberOtp());
         doNothing().when(otpService).sendOtp(anyString(), anyString(), anyString(), anyString());
@@ -328,6 +369,7 @@ class AuthenticationServiceTest {
         BaseResponse<Void> result = authenticationService.forgotPin(request);
 
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.FORGOT_PIN_OTP_SENT.getCode());
+        verify(memberOtpRepository).deleteByPhoneNumberAndOtpType(member.getPhoneNumber(), OtpType.FORGOT_PIN);
         verify(otpService).sendOtp(anyString(), anyString(), anyString(), anyString());
         verify(memberActivityService).createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_GENERATE_FORGOT_PIN);
         verify(memberActivityService).createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_GENERATE_FORGOT_PIN);
@@ -337,20 +379,302 @@ class AuthenticationServiceTest {
     // resetPin
     // =========================================================================
     @Test
-    void resetPin_success_shouldEncodeNewPinAndSaveMember() {
-        ResetPinRequest request = new ResetPinRequest();
-        request.setEmail("budi@example.com");
-        request.setNewPin("654321");
+    void resetPin_verifiedOtp_shouldEncodeNewPinConsumeOtpAndRevokeSessions() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        ResetPinRequest request = resetPinRequest();
+        MemberOtp otp = verifiedOtp(LocalDateTime.now().plusMinutes(3));
         when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.FORGOT_PIN))
+                .thenReturn(Optional.of(otp));
         when(passwordEncoder.encode("654321")).thenReturn("new-hashed-pin");
         when(memberRepository.save(member)).thenReturn(member);
-        doNothing().when(memberActivityService).createMemberActivity(anyString(), any());
 
         BaseResponse<Void> result = authenticationService.resetPin(request);
 
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.RESET_PIN_SUCCESS.getCode());
         assertThat(member.getPin()).isEqualTo("new-hashed-pin");
         verify(memberRepository).save(member);
+        verify(memberOtpRepository).delete(otp);
+        verify(memberTokenRepository).deleteByUserId("member-uuid-001");
+    }
+
+    @Test
+    void resetPin_noOtpAtAll_shouldRejectAndKeepPin() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.FORGOT_PIN))
+                .thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.resetPin(resetPinRequest()));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_NOT_FOUND);
+        assertPinNotChanged();
+    }
+
+    @Test
+    void resetPin_otpIssuedButNeverVerified_shouldRejectAndKeepPin() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        MemberOtp otp = new MemberOtp();
+        otp.setExpiredAt(LocalDateTime.now().plusMinutes(3));
+        otp.setVerifiedAt(null);
+        when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.FORGOT_PIN))
+                .thenReturn(Optional.of(otp));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.resetPin(resetPinRequest()));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_NOT_FOUND);
+        assertPinNotChanged();
+        verify(memberOtpRepository, never()).delete(any(MemberOtp.class));
+    }
+
+    @Test
+    void resetPin_verifiedOtpPastResetWindow_shouldRejectAndKeepPin() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        MemberOtp otp = verifiedOtp(LocalDateTime.now().minusSeconds(1));
+        when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.FORGOT_PIN))
+                .thenReturn(Optional.of(otp));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.resetPin(resetPinRequest()));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_EXPIRED);
+        assertPinNotChanged();
+    }
+
+    @Test
+    void resetPin_memberNotActive_shouldRejectBeforeLookingAtOtp() {
+        member.setStatus(ActiveStatus.SUSPENDED);
+        when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.resetPin(resetPinRequest()));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MEMBER_NOT_ACTIVE);
+        verify(memberOtpRepository, never()).findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(any(), any());
+        assertPinNotChanged();
+    }
+
+    // =========================================================================
+    // Lock-out and cool-down
+    // =========================================================================
+    @Test
+    void loginMember_correctPin_shouldClearFailureCounters() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        LoginRequest request = buildLoginRequest();
+        when(validationService.getMemberByEmailOrPhoneNumber(any(), any())).thenReturn(member);
+        when(passwordEncoder.matches(any(), any())).thenReturn(true);
+        when(memberTokenRepository.save(any(MemberToken.class))).thenReturn(new MemberToken());
+
+        authenticationService.loginMember(request);
+
+        verify(lockoutService).assertPinNotLocked(member);
+        verify(lockoutService).onPinSuccess(member);
+        verify(lockoutService, never()).onPinFailure(any());
+    }
+
+    @Test
+    void loginMember_wrongPin_shouldRecordFailureAndPropagateLock() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        LoginRequest request = buildLoginRequest();
+        when(validationService.getMemberByEmailOrPhoneNumber(any(), any())).thenReturn(member);
+        when(passwordEncoder.matches(any(), any())).thenReturn(false);
+        doThrow(new TooManyRequestsException(ErrorConstant.ACCOUNT_LOCKED, 900))
+                .when(lockoutService).onPinFailure(member);
+
+        TooManyRequestsException ex = assertThrows(TooManyRequestsException.class,
+                () -> authenticationService.loginMember(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ACCOUNT_LOCKED);
+        assertThat(ex.getRetryAfterSeconds()).isEqualTo(900);
+        verify(memberTokenRepository, never()).save(any(MemberToken.class));
+    }
+
+    @Test
+    void loginMember_lockedMember_shouldBeRefusedWithoutCheckingPin() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        LoginRequest request = buildLoginRequest();
+        when(validationService.getMemberByEmailOrPhoneNumber(any(), any())).thenReturn(member);
+        doThrow(new TooManyRequestsException(ErrorConstant.ACCOUNT_LOCKED, 600))
+                .when(lockoutService).assertPinNotLocked(member);
+
+        assertThrows(TooManyRequestsException.class, () -> authenticationService.loginMember(request));
+
+        verify(passwordEncoder, never()).matches(any(), any());
+        verify(memberTokenRepository, never()).save(any(MemberToken.class));
+    }
+
+    @Test
+    void resendOtp_withinCooldown_shouldBeRefusedAndSendNothing() {
+        member.setStatus(ActiveStatus.INACTIVE);
+        ResendOtpRequest request = new ResendOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpType(OtpType.REGISTER);
+        MemberOtp recent = new MemberOtp();
+        recent.setCreatedAt(LocalDateTime.now().minusSeconds(10));
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.REGISTER))
+                .thenReturn(Optional.of(recent));
+
+        TooManyRequestsException ex = assertThrows(TooManyRequestsException.class,
+                () -> authenticationService.resendOtp(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_COOLDOWN);
+        assertThat(ex.getRetryAfterSeconds()).isBetween(40L, 60L);
+        verify(memberOtpRepository, never()).deleteByPhoneNumberAndOtpType(any(), any());
+        verify(otpService, never()).sendOtp(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void resendOtp_afterCooldown_shouldSend() {
+        member.setStatus(ActiveStatus.INACTIVE);
+        ResendOtpRequest request = new ResendOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpType(OtpType.REGISTER);
+        MemberOtp old = new MemberOtp();
+        old.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.REGISTER))
+                .thenReturn(Optional.of(old));
+
+        authenticationService.resendOtp(request);
+
+        verify(otpService).sendOtp(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void forgotPin_withinCooldown_shouldBeRefused() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        ForgotPinRequest request = new ForgotPinRequest();
+        request.setEmail("budi@example.com");
+        MemberOtp recent = new MemberOtp();
+        recent.setCreatedAt(LocalDateTime.now().minusSeconds(5));
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.FORGOT_PIN))
+                .thenReturn(Optional.of(recent));
+
+        TooManyRequestsException ex = assertThrows(TooManyRequestsException.class,
+                () -> authenticationService.forgotPin(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_COOLDOWN);
+        verify(otpService, never()).sendOtp(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void verifyOtp_whileOtpLocked_shouldBeRefusedWithoutCheckingCode() {
+        member.setStatus(ActiveStatus.INACTIVE);
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpCode("123456");
+        request.setOtpType(OtpType.REGISTER);
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+        doThrow(new TooManyRequestsException(ErrorConstant.OTP_LOCKED, 300))
+                .when(lockoutService).assertOtpNotLocked(member);
+
+        assertThrows(TooManyRequestsException.class, () -> authenticationService.verifyOtp(request));
+
+        verify(validationService, never()).verifyOtp(any(), any());
+    }
+
+    @Test
+    void forgotPin_whileOtpLocked_shouldBeRefused() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        ForgotPinRequest request = new ForgotPinRequest();
+        request.setEmail("budi@example.com");
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+        doThrow(new TooManyRequestsException(ErrorConstant.OTP_LOCKED, 300))
+                .when(lockoutService).assertOtpNotLocked(member);
+
+        assertThrows(TooManyRequestsException.class, () -> authenticationService.forgotPin(request));
+
+        verify(otpService, never()).sendOtp(anyString(), anyString(), anyString(), anyString());
+    }
+
+    // =========================================================================
+    // OTP type / account state guards
+    // =========================================================================
+    @Test
+    void verifyOtp_forgotPin_shouldMarkVerifiedKeepOtpAndNotTouchStatus() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpCode("123456");
+        request.setOtpType(OtpType.FORGOT_PIN);
+        MemberOtp otp = new MemberOtp();
+        otp.setExpiredAt(LocalDateTime.now().plusMinutes(1));
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+        when(validationService.verifyOtp(member, request)).thenReturn(otp);
+
+        BaseResponse<Void> result = authenticationService.verifyOtp(request);
+
+        assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.VERIFY_OTP_SUCCESS.getCode());
+        assertThat(otp.getVerifiedAt()).isNotNull();
+        assertThat(otp.getExpiredAt()).isAfter(LocalDateTime.now().plusMinutes(4));
+        assertThat(member.getStatus()).isEqualTo(ActiveStatus.ACTIVE);
+        verify(memberOtpRepository).save(otp);
+        verify(memberOtpRepository, never()).delete(any(MemberOtp.class));
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void verifyOtp_registerOtpForSuspendedMember_shouldRejectWithoutReactivating() {
+        member.setStatus(ActiveStatus.SUSPENDED);
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpCode("123456");
+        request.setOtpType(OtpType.REGISTER);
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.verifyOtp(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_NOT_FOUND);
+        assertThat(member.getStatus()).isEqualTo(ActiveStatus.SUSPENDED);
+        verify(validationService, never()).verifyOtp(any(), any());
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    void verifyOtp_forgotPinOtpForSuspendedMember_shouldReject() {
+        member.setStatus(ActiveStatus.SUSPENDED);
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpCode("123456");
+        request.setOtpType(OtpType.FORGOT_PIN);
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.verifyOtp(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.OTP_NOT_FOUND);
+        assertThat(member.getStatus()).isEqualTo(ActiveStatus.SUSPENDED);
+        verify(validationService, never()).verifyOtp(any(), any());
+    }
+
+    @Test
+    void forgotPin_memberNotActive_shouldRejectAndSendNothing() {
+        member.setStatus(ActiveStatus.SUSPENDED);
+        ForgotPinRequest request = new ForgotPinRequest();
+        request.setEmail("budi@example.com");
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.forgotPin(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MEMBER_NOT_ACTIVE);
+        verify(memberOtpRepository, never()).save(any());
+        verify(otpService, never()).sendOtp(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void resendOtp_suspendedMember_shouldAnswerGenericallyButSendNothing() {
+        member.setStatus(ActiveStatus.SUSPENDED);
+        ResendOtpRequest request = new ResendOtpRequest();
+        request.setEmail("budi@example.com");
+        request.setOtpType(OtpType.REGISTER);
+        when(validationService.getMemberByEmailIgnoreCase("budi@example.com")).thenReturn(member);
+
+        BaseResponse<Void> result = authenticationService.resendOtp(request);
+
+        assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.RESEND_OTP.getCode());
+        verify(memberOtpRepository, never()).save(any());
+        verify(otpService, never()).sendOtp(anyString(), anyString(), anyString(), anyString());
     }
 
     // =========================================================================
@@ -373,6 +697,27 @@ class AuthenticationServiceTest {
     // =========================================================================
     // helpers
     // =========================================================================
+    private ResetPinRequest resetPinRequest() {
+        ResetPinRequest r = new ResetPinRequest();
+        r.setEmail("budi@example.com");
+        r.setNewPin("654321");
+        return r;
+    }
+
+    private MemberOtp verifiedOtp(LocalDateTime expiredAt) {
+        MemberOtp otp = new MemberOtp();
+        otp.setOtpType(OtpType.FORGOT_PIN);
+        otp.setVerifiedAt(LocalDateTime.now().minusMinutes(1));
+        otp.setExpiredAt(expiredAt);
+        return otp;
+    }
+
+    private void assertPinNotChanged() {
+        assertThat(member.getPin()).isEqualTo("hashed-pin");
+        verify(memberRepository, never()).save(any(Member.class));
+        verify(memberTokenRepository, never()).deleteByUserId(anyString());
+    }
+
     private RegisterRequest buildRegisterRequest() {
         RegisterRequest r = new RegisterRequest();
         r.setFirstName("Budi");

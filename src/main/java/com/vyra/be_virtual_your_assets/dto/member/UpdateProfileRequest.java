@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.dto.member;
 
+import lombok.ToString;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -22,5 +23,14 @@ public class UpdateProfileRequest {
     @Pattern(regexp = "^62\\d+$", message = "Phone number must start with 62")
     @Size(min = 10, max = 15, message = "Phone number must contain 10 to 15 digits")
     private String phoneNumber;
+
+    /**
+     * Current PIN. Required whenever the e-mail address or phone number is being changed:
+     * those are where OTPs are delivered, so changing them with only an access token would
+     * let a stolen session take the account over.
+     */
+    @Pattern(regexp = "^\\d{6}$", message = "PIN must consist of exactly 6 digits")
+    @ToString.Exclude
+    private String pin;
 
 }

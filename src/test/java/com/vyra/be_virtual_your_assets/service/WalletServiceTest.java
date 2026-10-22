@@ -1,5 +1,8 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.dto.wallet.CreateWalletRequest;
+import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
+import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
@@ -36,6 +39,7 @@ class WalletServiceTest {
     @Mock private WalletStatementRepository walletStatementRepository;
     @Mock private WalletStatementHistoryRepository walletStatementHistoryRepository;
     @Mock private MemberActivityService memberActivityService;
+    @Mock private ValidationService validationService;
 
     @InjectMocks
     private WalletService walletService;
@@ -85,6 +89,95 @@ class WalletServiceTest {
     }
 
     // =========================================================================
+    // createWallet — one wallet per member / phone
+    // =========================================================================
+    @Test
+    void createWallet_walletAlreadyExistsForMember_shouldRejectAndNotSave() {
+        CreateWalletRequest request = new CreateWalletRequest();
+        request.setPhoneNumber("628123456789");
+        request.setMemberId("member-uuid-001");
+        when(memberWalletRepository.existsByMemberId("member-uuid-001")).thenReturn(true);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> walletService.createWallet(request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.CREATE_WALLET_FAILED);
+        verify(memberWalletRepository, never()).save(any());
+        verify(walletStatementRepository, never()).save(any());
+    }
+
+    @Test
+    void createWallet_phoneAlreadyHasWallet_shouldRejectAndNotSave() {
+        CreateWalletRequest request = new CreateWalletRequest();
+        request.setPhoneNumber("628123456789");
+        request.setMemberId("member-uuid-001");
+        when(memberWalletRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(memberWallet));
+
+        assertThrows(BusinessException.class, () -> walletService.createWallet(request));
+
+        verify(memberWalletRepository, never()).save(any());
+    }
+
+    // =========================================================================
+    // createOwnWallet / getOwnWallet — ownership
+    // =========================================================================
+    @Test
+    void createOwnWallet_forAnotherMember_shouldRejectAsUnknownAccount() {
+        Member caller = member("caller-id", "628111111111");
+        when(validationService.getMemberById("caller-id")).thenReturn(caller);
+        CreateWalletRequest request = new CreateWalletRequest();
+        request.setMemberId("victim-id");
+        request.setPhoneNumber("628222222222");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> walletService.createOwnWallet("caller-id", request));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MEMBER_NOT_FOUND);
+        verify(memberWalletRepository, never()).save(any());
+    }
+
+    @Test
+    void createOwnWallet_ownIdButForeignPhone_shouldReject() {
+        Member caller = member("caller-id", "628111111111");
+        when(validationService.getMemberById("caller-id")).thenReturn(caller);
+        CreateWalletRequest request = new CreateWalletRequest();
+        request.setMemberId("caller-id");
+        request.setPhoneNumber("628222222222");
+
+        assertThrows(BusinessException.class, () -> walletService.createOwnWallet("caller-id", request));
+
+        verify(memberWalletRepository, never()).save(any());
+    }
+
+    @Test
+    void getOwnWallet_otherMembersPhone_shouldRejectWithoutTouchingWallet() {
+        Member caller = member("caller-id", "628111111111");
+        when(validationService.getMemberById("caller-id")).thenReturn(caller);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> walletService.getOwnWallet("caller-id", "628222222222"));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MEMBER_NOT_FOUND);
+        verify(walletStatementRepository, never()).findByPhoneNumber(any());
+    }
+
+    @Test
+    void getOwnWallet_ownPhone_shouldReturnWallet() {
+        Member caller = member("member-uuid-001", "628123456789");
+        when(validationService.getMemberById("member-uuid-001")).thenReturn(caller);
+        when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(walletStatement));
+
+        BaseResponse<GetMemberWalletResponse> result = walletService.getOwnWallet("member-uuid-001", "628123456789");
+
+        assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.GET_MEMBER_WALLET_SUCCESS.getCode());
+        assertThat(result.getData().getBalance()).isEqualByComparingTo(BigDecimal.valueOf(1000000));
+    }
+
+    private static Member member(String id, String phone) {
+        Member m = new Member();
+        m.setId(id);
+        m.setPhoneNumber(phone);
+        return m;
+    }
+
+    // =========================================================================
     // getMemberWallet — success
     // =========================================================================
     @Test
@@ -124,7 +217,7 @@ class WalletServiceTest {
         request.setOldPhoneNumber("628123456789");
         request.setNewPhoneNumber("628999999999");
 
-        when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(walletStatement));
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628123456789")).thenReturn(Optional.of(walletStatement));
         when(memberWalletRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(memberWallet));
 
         walletService.updateMemberWallet(request);
@@ -145,7 +238,7 @@ class WalletServiceTest {
         WalletUpdateRequest request = new WalletUpdateRequest();
         request.setOldPhoneNumber("628000000000");
         request.setNewPhoneNumber("628111111111");
-        when(walletStatementRepository.findByPhoneNumber("628000000000")).thenReturn(Optional.empty());
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628000000000")).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> walletService.updateMemberWallet(request));
@@ -162,7 +255,7 @@ class WalletServiceTest {
         WalletUpdateRequest request = new WalletUpdateRequest();
         request.setOldPhoneNumber("628123456789");
         request.setNewPhoneNumber("628999999999");
-        when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(walletStatement));
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628123456789")).thenReturn(Optional.of(walletStatement));
         when(memberWalletRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -178,7 +271,7 @@ class WalletServiceTest {
     void createTransactionWallet_income_shouldAddToIncomeAndBalance() {
         TransactionWalletRequest request = buildTxWalletRequest("trx-001", "628123456789",
                 BigDecimal.valueOf(500000), TransactionType.INCOME);
-        when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(walletStatement));
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628123456789")).thenReturn(Optional.of(walletStatement));
         when(walletStatementHistoryRepository.save(any())).thenReturn(new WalletStatementHistory());
         when(walletStatementRepository.save(any())).thenReturn(walletStatement);
         doNothing().when(memberActivityService).createMemberActivity(anyString(), any());
@@ -201,6 +294,23 @@ class WalletServiceTest {
     }
 
     // =========================================================================
+    // createTransactionWallet — row lock
+    // =========================================================================
+    @Test
+    void createTransactionWallet_shouldReadTheWalletWithARowLockNeverWithAPlainRead() {
+        TransactionWalletRequest request = buildTxWalletRequest("trx-lock", "628123456789",
+                BigDecimal.valueOf(1000), TransactionType.INCOME);
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628123456789")).thenReturn(Optional.of(walletStatement));
+        when(walletStatementHistoryRepository.save(any())).thenReturn(new WalletStatementHistory());
+        when(walletStatementRepository.save(any())).thenReturn(walletStatement);
+
+        walletService.createTransactionWallet(request);
+
+        verify(walletStatementRepository).findByPhoneNumberForUpdate("628123456789");
+        verify(walletStatementRepository, never()).findByPhoneNumber(any());
+    }
+
+    // =========================================================================
     // createTransactionWallet — EXPENSE (negative amount)
     // =========================================================================
     @Test
@@ -209,7 +319,7 @@ class WalletServiceTest {
         BigDecimal negativeAmount = BigDecimal.valueOf(-200000);
         TransactionWalletRequest request = buildTxWalletRequest("trx-002", "628123456789",
                 negativeAmount, TransactionType.EXPENSE);
-        when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(walletStatement));
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628123456789")).thenReturn(Optional.of(walletStatement));
         when(walletStatementHistoryRepository.save(any())).thenReturn(new WalletStatementHistory());
         when(walletStatementRepository.save(any())).thenReturn(walletStatement);
         doNothing().when(memberActivityService).createMemberActivity(anyString(), any());
@@ -235,7 +345,7 @@ class WalletServiceTest {
     void createTransactionWallet_walletNotFound_shouldThrowMemberNotFound() {
         TransactionWalletRequest request = buildTxWalletRequest("trx-003", "628000000000",
                 BigDecimal.valueOf(100000), TransactionType.INCOME);
-        when(walletStatementRepository.findByPhoneNumber("628000000000")).thenReturn(Optional.empty());
+        when(walletStatementRepository.findByPhoneNumberForUpdate("628000000000")).thenReturn(Optional.empty());
         doNothing().when(memberActivityService).createMemberActivity(anyString(), any());
 
         BusinessException ex = assertThrows(BusinessException.class,

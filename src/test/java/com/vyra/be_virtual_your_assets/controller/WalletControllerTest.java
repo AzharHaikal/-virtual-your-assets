@@ -1,5 +1,9 @@
 package com.vyra.be_virtual_your_assets.controller;
 
+import java.util.List;
+import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.CreateWalletRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.CreateWalletResponse;
@@ -41,12 +45,12 @@ class WalletControllerTest {
         data.setBalance(BigDecimal.ZERO);
 
         BaseResponse<CreateWalletResponse> expected = new BaseResponse<>("VYRA-WLT-000", "Wallet created", data);
-        when(walletService.createWallet(request)).thenReturn(expected);
+        when(walletService.createOwnWallet("member-uuid-001", request)).thenReturn(expected);
 
-        BaseResponse<CreateWalletResponse> result = walletController.createWallet(request);
+        BaseResponse<CreateWalletResponse> result = walletController.createWallet(request, authFor("member-uuid-001"));
 
         assertThat(result).isSameAs(expected);
-        verify(walletService).createWallet(request);
+        verify(walletService).createOwnWallet("member-uuid-001", request);
     }
 
     // =========================================================================
@@ -63,11 +67,16 @@ class WalletControllerTest {
         data.setTotalExpense(BigDecimal.ZERO);
 
         BaseResponse<GetMemberWalletResponse> expected = new BaseResponse<>("VYRA-GWS-000", "Wallet found", data);
-        when(walletService.getMemberWallet(phoneNumber)).thenReturn(expected);
+        when(walletService.getOwnWallet("member-uuid-001", phoneNumber)).thenReturn(expected);
 
-        BaseResponse<GetMemberWalletResponse> result = walletController.getMemberWallet(phoneNumber);
+        BaseResponse<GetMemberWalletResponse> result =
+                walletController.getMemberWallet(phoneNumber, authFor("member-uuid-001"));
 
         assertThat(result).isSameAs(expected);
-        verify(walletService).getMemberWallet(phoneNumber);
+        verify(walletService).getOwnWallet("member-uuid-001", phoneNumber);
+    }
+
+    private static Authentication authFor(String memberId) {
+        return new UsernamePasswordAuthenticationToken(new CustomUserDetails(memberId, "access-token"), null, List.of());
     }
 }

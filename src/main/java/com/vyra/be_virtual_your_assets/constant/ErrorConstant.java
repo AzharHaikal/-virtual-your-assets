@@ -53,7 +53,13 @@ public enum ErrorConstant {
     OTP_NOT_FOUND("VYRA-OTP-002", "Invalid or expired OTP"),
     OTP_EXPIRED("VYRA-OTP-003", "The OTP has expired. Please request a new one"),
     OTP_INVALID("VYRA-OTP-004", "Invalid OTP. Please enter the OTP correctly. Remaining attempts - "),
-    MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "You've reached the maximum attempts. Your account has been suspended"),
+    MAX_ATTEMPTS_REACHED("VYRA-OTP-005", "You've reached the maximum attempts. Verification is temporarily locked. Please try again in "),
+
+    // Lock-out and rate limiting (HTTP 429). The remaining wait is appended to the message.
+    ACCOUNT_LOCKED("VYRA-LCK-001", "Too many failed attempts. Your account is temporarily locked. Please try again in"),
+    OTP_LOCKED("VYRA-LCK-002", "Too many invalid codes. Verification is temporarily locked. Please try again in"),
+    TOO_MANY_REQUESTS("VYRA-RTL-001", "Too many requests. Please try again in"),
+    OTP_COOLDOWN("VYRA-RTL-002", "A code was sent recently. Please wait before requesting another one. Try again in"),
 
     // Member
     GET_MEMBER_SUCCESS("VYRA-GMS-000", "Get member detail successful"),
@@ -62,6 +68,7 @@ public enum ErrorConstant {
 
     // Update member profile
     UPDATE_PROFILE_SUCCESS("VYRA-UPS-000", "Update member profile successful"),
+    UPDATE_PROFILE_PENDING("VYRA-UPS-001", "A verification code has been sent. Enter it to confirm the change of your e-mail address or phone number"),
     UPDATE_WALLET_SUCCESS("VYRA-UWS-000", "Update member wallet successful"),
     UPDATE_WALLET_FAILED("VYRA-UWS-000", "Update member wallet failed"),
 
@@ -89,6 +96,7 @@ public enum ErrorConstant {
     BAD_REQUEST("VYRA-ERR400", "Something went wrong with your request"),
     DATA_NOT_FOUND("VYRA-ERR404", "The requested data could not be found"),
     INTERNAL_SERVER_ERROR("VYRA-ERR500", "We are experiencing a system issue. Please try again later"),
+    SYSTEM_BUSY("VYRA-ERR503", "The system is busy right now. Please try again in a moment"),
 
     // =========================================================================
     // ADMIN AUTH

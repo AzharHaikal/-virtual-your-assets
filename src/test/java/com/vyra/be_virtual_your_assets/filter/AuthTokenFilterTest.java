@@ -1,6 +1,9 @@
 package com.vyra.be_virtual_your_assets.filter;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
+import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
+import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.security.filter.AuthTokenFilter;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
@@ -29,6 +32,7 @@ import static org.mockito.Mockito.when;
 class AuthTokenFilterTest {
 
     @Mock private MemberTokenRepository memberTokenRepository;
+    @Mock private MemberRepository memberRepository;
     @Mock private FilterChain filterChain;
 
     @InjectMocks
@@ -123,12 +127,55 @@ class AuthTokenFilterTest {
     }
 
     @Test
+    void validTokenOfSuspendedMember_shouldReturn401() throws Exception {
+        MemberToken token = new MemberToken();
+        token.setUserId("member-1");
+        token.setAccessToken("valid");
+        token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(10));
+        when(memberTokenRepository.findByAccessToken("valid")).thenReturn(Optional.of(token));
+        when(memberRepository.findById("member-1")).thenReturn(Optional.of(memberWith(ActiveStatus.SUSPENDED)));
+        MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer valid");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        authTokenFilter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void validTokenOfDeletedOrMissingMember_shouldReturn401() throws Exception {
+        MemberToken token = new MemberToken();
+        token.setUserId("ghost");
+        token.setAccessToken("valid");
+        token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(10));
+        when(memberTokenRepository.findByAccessToken("valid")).thenReturn(Optional.of(token));
+        when(memberRepository.findById("ghost")).thenReturn(Optional.empty());
+        MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer valid");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        authTokenFilter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    private static Member memberWith(ActiveStatus status) {
+        Member member = new Member();
+        member.setId("member-1");
+        member.setStatus(status);
+        return member;
+    }
+
+    @Test
     void validToken_shouldAuthenticateMemberAndContinueChain() throws Exception {
         MemberToken token = new MemberToken();
         token.setUserId("member-1");
         token.setAccessToken("valid");
         token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(10));
         when(memberTokenRepository.findByAccessToken("valid")).thenReturn(Optional.of(token));
+        when(memberRepository.findById("member-1")).thenReturn(Optional.of(memberWith(ActiveStatus.ACTIVE)));
         MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer valid");
         MockHttpServletResponse response = new MockHttpServletResponse();
 

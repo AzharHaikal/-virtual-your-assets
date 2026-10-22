@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
@@ -12,6 +13,7 @@ import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberOtp;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
@@ -40,6 +42,8 @@ public class AuthenticationService {
     private final ValidationService validationService;
     private final WalletService walletService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final LockoutService lockoutService;
+    private final SecurityPolicy securityPolicy;
 
     @NewSpan
     @Transactional
@@ -114,6 +118,21 @@ public class AuthenticationService {
         log.info("[START] authenticationService.resendOtp email: {} ", request.getEmail());
         Member member = validationService.getMemberByEmailIgnoreCase(request.getEmail());
 
+        lockoutService.assertOtpNotLocked(member);
+
+        if (!isOtpAllowed(member, request.getOtpType())) {
+            // Same generic answer as a normal resend, but nothing is generated or sent.
+            log.warn("Resend OTP ignored, member status {} not eligible for {}. phoneNumber: {}",
+                    member.getStatus(), request.getOtpType(), member.getPhoneNumber());
+            return new BaseResponse<>(
+                    ErrorConstant.RESEND_OTP.getCode(),
+                    ErrorConstant.RESEND_OTP.getMessage(),
+                    null
+            );
+        }
+
+        assertOtpCooldown(member, request.getOtpType());
+
         memberOtpRepository.deleteByPhoneNumberAndOtpType(member.getPhoneNumber(), request.getOtpType());
 
         String otp = generateOtp(request.getOtpType(), member.getPhoneNumber());
@@ -145,10 +164,30 @@ public class AuthenticationService {
         log.info("Attempt verify otp. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_VERIFY_OTP);
 
+        lockoutService.assertOtpNotLocked(member);
+
+        // An OTP type is only valid for the account state it was issued for. Without this a
+        // SUSPENDED member could request any OTP and verify it to reactivate itself.
+        if (!isOtpAllowed(member, request.getOtpType())) {
+            log.warn("Verify OTP rejected, member status {} not eligible for {}. phoneNumber: {}",
+                    member.getStatus(), request.getOtpType(), member.getPhoneNumber());
+            throw new BusinessException(ErrorConstant.OTP_NOT_FOUND);
+        }
+
         MemberOtp memberOtp = validationService.verifyOtp(member, request);
-        member.setStatus(ActiveStatus.ACTIVE);
-        memberRepository.save(member);
-        memberOtpRepository.delete(memberOtp);
+
+        if (OtpType.FORGOT_PIN == request.getOtpType()) {
+            // Keep the OTP as proof of verification: /auth/reset-pin consumes it. Account status is untouched.
+            memberOtp.setVerifiedAt(LocalDateTime.now());
+            memberOtp.setExpiredAt(OtpUtil.getResetWindowExpiredTime());
+            memberOtpRepository.save(memberOtp);
+        } else {
+            if (OtpType.REGISTER == request.getOtpType()) {
+                member.setStatus(ActiveStatus.ACTIVE);
+                memberRepository.save(member);
+            }
+            memberOtpRepository.delete(memberOtp);
+        }
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_VERIFY_OTP);
         log.info("[END] authenticationService.verifyOtp successfully phoneNumber: {}", member.getPhoneNumber());
@@ -175,11 +214,16 @@ public class AuthenticationService {
             throw new BusinessException(ErrorConstant.MEMBER_NOT_ACTIVE);
         }
 
+        // Locked members are refused without even looking at the PIN.
+        lockoutService.assertPinNotLocked(member);
+
         if (!passwordEncoder.matches(request.getPin(), member.getPin())) {
             log.info("Login failed invalid pin. phoneNumber: {} ", member.getPhoneNumber());
             createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_LOGIN);
+            lockoutService.onPinFailure(member); // throws 429 when this attempt reaches the limit
             throw new BusinessException(ErrorConstant.INVALID_PIN);
         }
+        lockoutService.onPinSuccess(member);
 
         String accessToken = TokenUtil.generateAccessToken();
         String refreshToken = TokenUtil.generateRefreshToken();
@@ -216,13 +260,20 @@ public class AuthenticationService {
     }
 
     @NewSpan
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public BaseResponse<RefreshTokenResponse> refreshToken(RefreshTokenRequest request) {
         MemberToken memberToken = memberTokenRepository.findByRefreshToken(request.getRefreshToken())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.INVALID_REFRESH_TOKEN));
 
         if (memberToken.getRefreshTokenExpiredAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorConstant.REFRESH_TOKEN_EXPIRED);
+        }
+
+        // Suspended / deleted members cannot renew a session; the dead token is removed.
+        Member tokenOwner = memberRepository.findById(memberToken.getUserId()).orElse(null);
+        if (tokenOwner == null || ActiveStatus.ACTIVE != tokenOwner.getStatus()) {
+            memberTokenRepository.delete(memberToken);
+            throw new BusinessException(ErrorConstant.MEMBER_NOT_ACTIVE);
         }
 
         String newAccessToken = TokenUtil.generateAccessToken();
@@ -247,10 +298,21 @@ public class AuthenticationService {
     }
 
     @NewSpan
+    @Transactional
     public BaseResponse<Void> forgotPin(ForgotPinRequest request) {
         Member member = validationService.getMemberByEmailIgnoreCase(request.getEmail());
         log.info("[START] authenticationService.forgotPin phoneNumber: {} ", member.getPhoneNumber());
 
+        if (ActiveStatus.ACTIVE != member.getStatus()) {
+            log.info("Forgot PIN rejected, member not active. phoneNumber: {} ", member.getPhoneNumber());
+            throw new BusinessException(ErrorConstant.MEMBER_NOT_ACTIVE);
+        }
+
+        lockoutService.assertOtpNotLocked(member);
+        assertOtpCooldown(member, OtpType.FORGOT_PIN);
+
+        // A new request invalidates any earlier (possibly already verified) reset OTP.
+        memberOtpRepository.deleteByPhoneNumberAndOtpType(member.getPhoneNumber(), OtpType.FORGOT_PIN);
         String otp = generateOtp(OtpType.FORGOT_PIN, member.getPhoneNumber());
         String fullName = member.getFirstName().trim() + " " + member.getLastName().trim();
 
@@ -272,6 +334,7 @@ public class AuthenticationService {
     }
 
     @NewSpan
+    @Transactional(noRollbackFor = BusinessException.class)
     public BaseResponse<Void> resetPin(ResetPinRequest request) {
         Member member = validationService.getMemberByEmailOrPhoneNumber(request.getEmail(), request.getPhoneNumber());
         log.info("[START] authenticationService.resetPin phoneNumber: {}", member.getPhoneNumber());
@@ -279,9 +342,16 @@ public class AuthenticationService {
         log.info("Attempt reset pin. phoneNumber: {}", member.getPhoneNumber());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_RESET_PIN);
 
+        MemberOtp verifiedOtp = requireVerifiedResetOtp(member);
+
         member.setPin(passwordEncoder.encode(request.getNewPin()));
         member.setUpdatedAt(LocalDateTime.now());
         memberRepository.save(member);
+
+        // The proof of verification is single-use, and every existing session of the
+        // member is ended so a previously stolen token does not survive the PIN reset.
+        memberOtpRepository.delete(verifiedOtp);
+        memberTokenRepository.deleteByUserId(member.getId());
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_RESET_PIN);
         log.info("[END] authenticationService.resetPin successfully phoneNumber: {}", member.getPhoneNumber());
@@ -308,6 +378,60 @@ public class AuthenticationService {
                 ErrorConstant.LOGOUT_SUCCESS.getMessage(),
                 null
         );
+    }
+
+    /**
+     * Which account states may request / verify which OTP type:
+     * REGISTER only while INACTIVE (not yet verified); FORGOT_PIN and LOGIN only while ACTIVE.
+     * SUSPENDED / DELETED members can never obtain a working OTP.
+     */
+    /** One OTP e-mail per type per cool-down period: stops e-mail flooding of a member. */
+    private void assertOtpCooldown(Member member, OtpType otpType) {
+        memberOtpRepository
+                .findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), otpType)
+                .map(MemberOtp::getCreatedAt)
+                .ifPresent(createdAt -> {
+                    LocalDateTime next = createdAt.plusSeconds(securityPolicy.getOtpResendCooldownSeconds());
+                    LocalDateTime now = LocalDateTime.now();
+                    if (next.isAfter(now)) {
+                        long wait = java.time.Duration.between(now, next).getSeconds() + 1;
+                        throw new TooManyRequestsException(ErrorConstant.OTP_COOLDOWN, wait);
+                    }
+                });
+    }
+
+    private boolean isOtpAllowed(Member member, OtpType otpType) {
+        if (otpType == null) return false;
+        return switch (otpType) {
+            case REGISTER -> ActiveStatus.INACTIVE == member.getStatus();
+            case FORGOT_PIN, LOGIN -> ActiveStatus.ACTIVE == member.getStatus();
+            // Only reachable through the authenticated profile flow, never the public OTP endpoints.
+            case CHANGE_CONTACT -> false;
+        };
+    }
+
+    /** Returns the member's latest FORGOT_PIN OTP, which must be verified and still inside the reset window. */
+    private MemberOtp requireVerifiedResetOtp(Member member) {
+        if (ActiveStatus.ACTIVE != member.getStatus()) {
+            createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_RESET_PIN);
+            throw new BusinessException(ErrorConstant.MEMBER_NOT_ACTIVE);
+        }
+
+        MemberOtp otp = memberOtpRepository
+                .findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), OtpType.FORGOT_PIN)
+                .filter(o -> o.getVerifiedAt() != null)
+                .orElse(null);
+        if (otp == null) {
+            log.warn("Reset pin rejected, no verified OTP. phoneNumber: {}", member.getPhoneNumber());
+            createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_RESET_PIN);
+            throw new BusinessException(ErrorConstant.OTP_NOT_FOUND);
+        }
+        if (otp.getExpiredAt().isBefore(LocalDateTime.now())) {
+            log.warn("Reset pin rejected, verified OTP expired. phoneNumber: {}", member.getPhoneNumber());
+            createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_RESET_PIN);
+            throw new BusinessException(ErrorConstant.OTP_EXPIRED);
+        }
+        return otp;
     }
 
     private String generateOtp(OtpType otpType, String phoneNumber) {

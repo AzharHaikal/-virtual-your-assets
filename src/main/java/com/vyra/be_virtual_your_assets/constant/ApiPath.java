@@ -24,6 +24,8 @@ public class ApiPath {
     public static final String V1_MEMBER = "/api/v1/member";
     public static final String GET_MEMBER = "/get-member";
     public static final String UPDATE_PROFILE = "/update-profile";
+    public static final String UPDATE_PROFILE_VERIFY = "/update-profile/verify";
+    public static final String UPDATE_PROFILE_RESEND_OTP = "/update-profile/resend-otp";
     public static final String CHANGE_PIN = "/change-pin";
     public static final String GET_MEMBER_ACTIVITY = "/activity";
 
