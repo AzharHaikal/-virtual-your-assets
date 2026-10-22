@@ -34,6 +34,8 @@ public enum ErrorConstant {
     INVALID_PIN_MISS_MATCH("VYRA-INV-002", "Wrong PIN. Please input with correct PIN"),
     INVALID_TIMEZONE("VYRA-INV-003", "Invalid time zone. Use a region id such as Asia/Jakarta"),
     INVALID_DATE_TIME("VYRA-INV-004", "Invalid date. Use ISO-8601, e.g. 2026-10-22T08:30:00+07:00"),
+    INVALID_DATE_RANGE("VYRA-INV-005", "The start date must be on or before the end date"),
+    INVALID_SORT("VYRA-INV-006", "Sort must be date or amount, optionally followed by ,asc or ,desc"),
 
     // Not Found (generic to prevent enumeration)
     PHONE_NUMBER_NOT_FOUND("VYRA-DNF-001", "Invalid account. Please check your account details"),
@@ -89,6 +91,8 @@ public enum ErrorConstant {
     UPDATE_TRANSACTION_SUCCESS("VYRA-UTS-000", "Transaction updated successfully"),
     DELETE_TRANSACTION_SUCCESS("VYRA-DTS-000", "Transaction deleted successfully"),
     TRANSACTION_NOT_FOUND("VYRA-TRX-404", "Transaction could not be found"),
+    TRANSACTION_LIST_SUCCESS("VYRA-TRX-LST-000", "Transactions retrieved successfully"),
+    FINANCE_SUMMARY_SUCCESS("VYRA-FIN-SUM-000", "Finance summary retrieved successfully"),
     TRANSACTION_NOT_EDITABLE("VYRA-TRX-001", "Only successful transactions can be changed"),
 
     // Finance categories

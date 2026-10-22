@@ -604,6 +604,7 @@ Record a new income or expense transaction for the authenticated member.
 | `amount` | decimal | ✅ | Must be greater than 0 |
 | `transactionDate` | string | ❌ | ISO-8601 with offset (`2026-06-10T09:00:00+07:00`). Without offset it is read in the member's time zone; empty = now. Invalid → `400 VYRA-INV-004` |
 | `transactionDesc` | string | ❌ | Transaction description |
+| `paymentMethod` | string | ❌ | `CASH`, `TRANSFER`, `E_WALLET`, `CARD`, `OTHER` |
 
 **Request Example**
 
@@ -777,6 +778,50 @@ Soft-deletes one of the member's own transactions (`status = DELETED`, `deletedA
 **Response `200 OK`** — same shape as 4.5 with `responseStatus: "VYRA-DTS-000"` and `transaction.status: "DELETED"`.
 
 **Errors:** `404 VYRA-TRX-404` (not found or another member's).
+
+---
+
+### 4.8 List Transactions (search, filter, sort)
+
+`GET /api/v1/transactions`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `type` | `TransactionType` | — | `INCOME` / `EXPENSE` |
+| `categoryId` | string | — | One category |
+| `from`, `to` | date (`yyyy-MM-dd`) | — | Member's local dates, inclusive |
+| `q` | string | — | Searches description and reference number (case-insensitive) |
+| `sort` | string | `date,desc` | `date` or `amount` (absolute value), `,asc` / `,desc` |
+| `page`, `size` | int | `0`, `20` | `size` max 100 |
+
+Response `VYRA-TRX-LST-000`, `data` = `{ content: [history item…], pageNumber, pageSize, totalElements, totalPages, last }`. Items as in 4.4 plus `categoryId/Name/Icon/Color` and `paymentMethod`. Deleted transactions are never listed. Errors: `400 VYRA-INV-005` (from after to), `400 VYRA-INV-006` (sort).
+
+---
+
+### 4.9 Finance Summary
+
+`GET /api/v1/finance/summary?from=2026-10-01&to=2026-10-31`
+
+`from` / `to` optional (default: the current month in the member's time zone). Only `SUCCESS` transactions count; all amounts are positive.
+
+```json
+{
+  "responseStatus": "VYRA-FIN-SUM-000",
+  "data": {
+    "from": "2026-10-01", "to": "2026-10-31",
+    "totalIncome": 5000000.00, "totalExpense": 400000.00, "net": 4600000.00,
+    "previousFrom": "2026-09-01", "previousTo": "2026-09-30",
+    "previousIncome": 4800000.00, "previousExpense": 380000.00,
+    "expenseByCategory": [
+      { "categoryId": "default-FOOD_AND_BEVERAGE", "code": "FOOD_AND_BEVERAGE", "name": "Food & Beverage",
+        "icon": "restaurant", "color": "#EF4444", "amount": 300000.00, "percentage": 75.0 }
+    ],
+    "incomeByCategory": [ ... ]
+  }
+}
+```
+
+The previous period is the previous calendar month when the range is a whole month, otherwise the same number of days just before `from`. Categories are sorted biggest first.
 
 ---
 

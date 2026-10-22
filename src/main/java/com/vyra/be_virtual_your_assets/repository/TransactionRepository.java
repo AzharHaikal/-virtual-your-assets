@@ -7,6 +7,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,7 +17,23 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-public interface TransactionRepository extends JpaRepository<Transaction, String> {
+public interface TransactionRepository extends JpaRepository<Transaction, String>, JpaSpecificationExecutor<Transaction> {
+
+    /** Member's SUCCESS totals per category in [from, to] (local dates). Rows: [categoryId, type, signed sum]. */
+    @Query(value = """
+        SELECT t.category_id, t.transaction_type, COALESCE(SUM(t.amount), 0)
+        FROM transaction_finance.transaction t
+        WHERE t.member_id = :memberId
+          AND t.deleted_at IS NULL
+          AND t.status = 'SUCCESS'
+          AND t.local_date >= :from
+          AND t.local_date <= :to
+        GROUP BY t.category_id, t.transaction_type
+        """, nativeQuery = true)
+    List<Object[]> sumByCategory(@Param("memberId") String memberId,
+                                 @Param("from") LocalDate from,
+                                 @Param("to") LocalDate to);
+
     @Query("""
     SELECT t
     FROM Transaction t

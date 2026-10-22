@@ -1,20 +1,29 @@
 package com.vyra.be_virtual_your_assets.controller;
 
 import com.vyra.be_virtual_your_assets.constant.ApiPath;
+import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
+import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
+import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionMutationResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.UpdateTransactionRequest;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import com.vyra.be_virtual_your_assets.service.FinanceService;
 import com.vyra.be_virtual_your_assets.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 import static com.vyra.be_virtual_your_assets.constant.ApiPath.TRANSACTION_ID;
 
@@ -28,6 +37,27 @@ import static com.vyra.be_virtual_your_assets.constant.ApiPath.TRANSACTION_ID;
 public class MemberTransactionController {
 
     private final TransactionService transactionService;
+    private final FinanceService financeService;
+
+    /**
+     * Member's transactions with optional filters: type, categoryId, from / to (local dates, inclusive),
+     * q (description or reference), sort = date|amount[,asc|desc] (default date,desc).
+     */
+    @GetMapping
+    public BaseResponse<PageResponse<TransactionHistoryResponse>> listTransactions(
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication
+    ) {
+        CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        return financeService.listTransactions(user.getMemberId(), type, categoryId, from, to, q, sort, page, size);
+    }
 
     @PatchMapping(TRANSACTION_ID)
     public BaseResponse<TransactionMutationResponse> updateTransaction(

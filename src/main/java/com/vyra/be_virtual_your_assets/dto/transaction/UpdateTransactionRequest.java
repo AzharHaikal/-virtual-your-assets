@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.dto.transaction;
 
+import com.vyra.be_virtual_your_assets.constant.transaction.PaymentMethod;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionCategory;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import jakarta.validation.constraints.Positive;
@@ -15,6 +16,9 @@ public class UpdateTransactionRequest {
 
     /** Legacy built-in category; ignored when {@link #categoryId} is set. */
     private TransactionCategory category;
+
+    /** Optional. */
+    private PaymentMethod paymentMethod;
 
     /** finance_category id (built-in or the member's own). */
     private String categoryId;

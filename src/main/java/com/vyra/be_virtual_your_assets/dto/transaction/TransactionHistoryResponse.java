@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.dto.transaction;
 
+import com.vyra.be_virtual_your_assets.constant.transaction.PaymentMethod;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import lombok.Data;
@@ -22,6 +23,7 @@ public class TransactionHistoryResponse {
     private TransactionStatus status;
     private BigDecimal amount;
     private String transactionDesc;
+    private PaymentMethod paymentMethod;
     private LocalDateTime transactionDate;
     /** The member's local date of the transaction (grouping by day in the app). */
     private LocalDate localDate;

@@ -1,9 +1,12 @@
 package com.vyra.be_virtual_your_assets.controller;
 
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
+import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
+import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionMutationResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.UpdateTransactionRequest;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import com.vyra.be_virtual_your_assets.service.FinanceService;
 import com.vyra.be_virtual_your_assets.service.TransactionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +22,7 @@ import static org.mockito.Mockito.when;
 class MemberTransactionControllerTest {
 
     @Mock private TransactionService transactionService;
+    @Mock private FinanceService financeService;
 
     @InjectMocks
     private MemberTransactionController controller;
@@ -33,6 +37,17 @@ class MemberTransactionControllerTest {
         when(transactionService.updateOwnTransaction("member-1", "trx-1", request)).thenReturn(expected);
 
         assertThat(controller.updateTransaction("trx-1", request, authentication)).isSameAs(expected);
+    }
+
+    @Test
+    void list_shouldPassTheFiltersForTheAuthenticatedMember() {
+        BaseResponse<PageResponse<TransactionHistoryResponse>> expected =
+                new BaseResponse<>("VYRA-TRX-LST-000", "ok", null);
+        when(financeService.listTransactions("member-1", null, "c-1", null, null, "kopi", "amount,desc", 0, 20))
+                .thenReturn(expected);
+
+        assertThat(controller.listTransactions(null, "c-1", null, null, "kopi", "amount,desc", 0, 20, authentication))
+                .isSameAs(expected);
     }
 
     @Test

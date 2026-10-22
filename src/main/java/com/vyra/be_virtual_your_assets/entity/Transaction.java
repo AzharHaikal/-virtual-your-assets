@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.entity;
 
+import com.vyra.be_virtual_your_assets.constant.transaction.PaymentMethod;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import jakarta.persistence.*;
@@ -68,6 +69,11 @@ public class Transaction extends BaseEntity {
 
     @Column(nullable = false, unique = true, length = 50)
     private String referenceNumber;
+
+    /** Optional. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private PaymentMethod paymentMethod;
 
     /** UTC instant of the transaction. */
     private LocalDateTime transactionDate;

@@ -175,6 +175,7 @@ public class TransactionService {
                 .userEmail(member.getEmail())
                 .transactionCategory(category.legacyCode())
                 .categoryId(category.getId())
+                .paymentMethod(request.getPaymentMethod())
                 .transactionType(request.getType())
                 .amount(request.getAmount())
                 .transactionDesc(request.getTransactionDesc())
@@ -256,6 +257,9 @@ public class TransactionService {
         }
         if (request.getTransactionDesc() != null) {
             transaction.setTransactionDesc(request.getTransactionDesc().trim());
+        }
+        if (request.getPaymentMethod() != null) {
+            transaction.setPaymentMethod(request.getPaymentMethod());
         }
         transaction.setTransactionType(newType);
         transaction.setAmount(newAmount);
@@ -373,25 +377,9 @@ public class TransactionService {
     }
 
     private TransactionHistoryResponse mapToHistoryResponse(Transaction transaction, Map<String, FinanceCategory> categories) {
-        TransactionHistoryResponse response = new TransactionHistoryResponse();
-        response.setTransactionId(transaction.getId());
-        response.setReferenceNumber(transaction.getReferenceNumber());
-        response.setCategory(transaction.getTransactionCategory());
-        FinanceCategory category = categories.get(transaction.getCategoryId());
-        if (category != null) {
-            response.setCategoryId(category.getId());
-            response.setCategoryName(category.getName());
-            response.setCategoryIcon(category.getIcon());
-            response.setCategoryColor(category.getColor());
-        }
-        response.setType(transaction.getTransactionType());
-        response.setStatus(transaction.getStatus());
-        response.setAmount(transaction.getAmount());
-        response.setTransactionDesc(transaction.getTransactionDesc());
-        response.setTransactionDate(transaction.getTransactionDate());
-        response.setLocalDate(transaction.getLocalDate());
-        return response;
+        return TransactionMapper.toHistoryResponse(transaction, categories);
     }
+
 
     private List<ChartItemResponse> buildChartWithEmptyBucket(String period, List<Object[]> results, LocalDate today) {
         return switch (period) {

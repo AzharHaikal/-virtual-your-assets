@@ -54,6 +54,8 @@ public class ApiPath {
     // =========================================================================
     // FINANCE CATEGORIES: /api/v1/finance/categories
     // =========================================================================
+    public static final String V1_FINANCE = "/api/v1/finance";
+    public static final String FINANCE_SUMMARY = "/summary";
     public static final String V1_FINANCE_CATEGORIES = "/api/v1/finance/categories";
     public static final String CATEGORY_ID = "/{categoryId}";
 
