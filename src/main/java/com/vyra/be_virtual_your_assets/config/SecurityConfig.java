@@ -53,6 +53,8 @@ public class SecurityConfig {
                                 .permitAll()
                                 .requestMatchers(SecurityConstant.ADMIN_WHITE_LIST_URL)
                                 .permitAll()
+                                .requestMatchers(SecurityConstant.API_DOCS_URL)
+                                .permitAll()
                                 .anyRequest()
                                 .authenticated()
                 )

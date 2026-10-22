@@ -327,7 +327,11 @@ Semua response menggunakan format:
 | `GET` | `/get-top-history` | ✅ | Riwayat transaksi terbaru (tanpa pagination) |
 | `GET` | `/get-history` | ✅ | Riwayat transaksi dengan pagination & filter |
 
-> Dokumentasi lengkap request/response ada di `API_Specification.md`
+> Dokumentasi lengkap request/response ada di [`docs/api-spec.md`](docs/api-spec.md).
+> OpenAPI/Swagger UI tersedia di `/swagger-ui.html` (spec: `/v3/api-docs`) bila `VYRA_API_DOCS_ENABLED=true` — aktifkan hanya di lokal/staging. Saat nonaktif path tersebut mengembalikan 404.
+
+### 💾 Backup & Restore
+Backup harian (`scripts/db-backup.sh`, retensi ≥ 7 hari) dan uji restore bulanan (`scripts/db-restore-check.sh`). Prosedur lengkap: [`docs/backup-restore.md`](docs/backup-restore.md).
 
 ---
 

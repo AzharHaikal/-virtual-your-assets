@@ -19,4 +19,12 @@ public class SecurityConstant {
     };
 
     public static final String ADMIN_PATH_PREFIX = "/api/v1/admin/**";
+
+    /** OpenAPI spec and Swagger UI; only served when springdoc is enabled (404 otherwise). */
+    public static final String[] API_DOCS_URL = {
+            "/v3/api-docs",
+            "/v3/api-docs/**",
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+    };
 }

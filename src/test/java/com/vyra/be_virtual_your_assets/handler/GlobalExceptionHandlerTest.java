@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -36,6 +37,19 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED.getCode());
         assertThat(response.getBody().getResponseMessage()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED.getMessage());
         assertThat(response.getBody().getData()).isNull();
+    }
+
+    // =========================================================================
+    // handleNoResource
+    // =========================================================================
+    @Test
+    void handleNoResource_shouldReturn404InsteadOf500() {
+        NoResourceFoundException ex = new NoResourceFoundException(org.springframework.http.HttpMethod.GET, "swagger-ui.html");
+
+        ResponseEntity<BaseResponse<Void>> response = handler.handleNoResource(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.DATA_NOT_FOUND.getCode());
     }
 
     // =========================================================================

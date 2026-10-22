@@ -79,6 +79,13 @@ management:
     sampling:
       probability: 1.0
 
+# OpenAPI spec (/v3/api-docs) and Swagger UI (/swagger-ui.html): off unless enabled (never in production).
+springdoc:
+  api-docs:
+    enabled: ${VYRA_API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${VYRA_API_DOCS_ENABLED:false}
+
 crypto:
   secret-key: ${CRYPTO_SECRET_KEY}
 
