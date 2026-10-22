@@ -13,6 +13,7 @@ import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.entity.WalletStatement;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
@@ -74,6 +75,7 @@ class AdminMemberServiceTest {
     @Test
     void getMemberList_shouldReturnPagedMembersWithBalance() {
         doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(true);
         Page<Member> page = new PageImpl<>(List.of(member), PageRequest.of(0, 10), 1);
         when(memberRepository.searchMembers(eq("budi"), eq(ActiveStatus.ACTIVE), any(PageRequest.class))).thenReturn(page);
 
@@ -92,6 +94,7 @@ class AdminMemberServiceTest {
     @Test
     void getMemberList_memberWithoutWalletStatement_shouldDefaultBalanceToZero() {
         doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(true);
         Page<Member> page = new PageImpl<>(List.of(member), PageRequest.of(0, 10), 1);
         when(memberRepository.searchMembers(any(), any(), any(PageRequest.class))).thenReturn(page);
         when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.empty());
@@ -102,12 +105,27 @@ class AdminMemberServiceTest {
         assertThat(result.getData().getContent().get(0).getBalance()).isEqualTo(BigDecimal.ZERO);
     }
 
+    @Test
+    void getMemberList_withoutTransactionAccess_shouldHideBalance() {
+        doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(false);
+        Page<Member> page = new PageImpl<>(List.of(member), PageRequest.of(0, 10), 1);
+        when(memberRepository.searchMembers(any(), any(), any(PageRequest.class))).thenReturn(page);
+
+        BaseResponse<PageResponse<AdminMemberListItemResponse>> result =
+                adminMemberService.getMemberList(null, null, 0, 10);
+
+        assertThat(result.getData().getContent().get(0).getBalance()).isNull();
+        verifyNoInteractions(walletStatementRepository);
+    }
+
     // =========================================================================
     // getMemberDetail
     // =========================================================================
     @Test
     void getMemberDetail_withWalletStatement_shouldReturnFullFinancialSummary() {
         doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(true);
         when(memberRepository.findById("member-id-001")).thenReturn(Optional.of(member));
 
         WalletStatement ws = new WalletStatement();
@@ -136,6 +154,7 @@ class AdminMemberServiceTest {
     @Test
     void getMemberDetail_withoutWalletStatement_shouldDefaultFinancialFieldsToZero() {
         doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(true);
         when(memberRepository.findById("member-id-001")).thenReturn(Optional.of(member));
         when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.empty());
         when(transactionRepository.findTransactionHistory("member-id-001")).thenReturn(List.of());
@@ -149,6 +168,24 @@ class AdminMemberServiceTest {
         assertThat(result.getData().getTotalIncome()).isEqualTo(BigDecimal.ZERO);
         assertThat(result.getData().getTotalExpense()).isEqualTo(BigDecimal.ZERO);
         assertThat(result.getData().getLastActivityAt()).isNull();
+    }
+
+    @Test
+    void getMemberDetail_withoutTransactionAccess_shouldHideFinancialFields() {
+        doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(false);
+        when(memberRepository.findById("member-id-001")).thenReturn(Optional.of(member));
+        when(walletStatementRepository.findByPhoneNumber("628123456789")).thenReturn(Optional.of(new WalletStatement()));
+        when(transactionRepository.findTransactionHistory("member-id-001")).thenReturn(List.of());
+        Page<Transaction> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 1), 3);
+        when(transactionRepository.findByMemberIdForAdmin(eq("member-id-001"), any(PageRequest.class))).thenReturn(emptyPage);
+
+        AdminMemberDetailResponse data = adminMemberService.getMemberDetail("member-id-001").getData();
+
+        assertThat(data.getBalance()).isNull();
+        assertThat(data.getTotalIncome()).isNull();
+        assertThat(data.getTotalExpense()).isNull();
+        assertThat(data.getTotalTransactions()).isEqualTo(3L);
     }
 
     @Test
@@ -167,7 +204,9 @@ class AdminMemberServiceTest {
     // =========================================================================
     @Test
     void getMemberTransactions_shouldReturnPagedTransactionResponses() {
-        doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        doNothing().when(adminAuthorizationService).requireMemberTransactionAccess();
+        when(adminAuthorizationService.getCurrentAdmin())
+                .thenReturn(new CustomAdminDetails("super-admin-id", "token", AdminRole.SUPER_ADMIN));
         when(memberRepository.findById("member-id-001")).thenReturn(Optional.of(member));
 
         Transaction transaction = buildTransaction(LocalDateTime.now());
@@ -180,11 +219,24 @@ class AdminMemberServiceTest {
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.ADMIN_MEMBER_TRANSACTIONS_SUCCESS.getCode());
         assertThat(result.getData().getContent()).hasSize(1);
         assertThat(result.getData().getContent().get(0).getCategory()).isEqualTo("SALARY");
+        verify(adminActivityService).createAdminActivity("super-admin-id", null,
+                AdminActivityEvent.VIEW_MEMBER_TRANSACTIONS, "member member-id-001", null, null);
+    }
+
+    @Test
+    void getMemberTransactions_withoutTransactionAccess_shouldThrowForbiddenAndNotQuery() {
+        doThrow(new ForbiddenException(ErrorConstant.ADMIN_UNAUTHORIZED))
+                .when(adminAuthorizationService).requireMemberTransactionAccess();
+
+        assertThrows(ForbiddenException.class,
+                () -> adminMemberService.getMemberTransactions("member-id-001", 0, 10));
+
+        verifyNoInteractions(memberRepository, transactionRepository, adminActivityService);
     }
 
     @Test
     void getMemberTransactions_memberNotFound_shouldThrowBusinessException() {
-        doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.MEMBER_VIEW);
+        doNothing().when(adminAuthorizationService).requireMemberTransactionAccess();
         when(memberRepository.findById("unknown")).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class,

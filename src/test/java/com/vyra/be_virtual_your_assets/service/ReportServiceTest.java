@@ -1,7 +1,9 @@
 package com.vyra.be_virtual_your_assets.service;
 
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
+import com.vyra.be_virtual_your_assets.constant.AdminActivityEvent;
 import com.vyra.be_virtual_your_assets.constant.AdminPermission;
+import com.vyra.be_virtual_your_assets.constant.AdminRole;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
@@ -13,9 +15,11 @@ import com.vyra.be_virtual_your_assets.dto.report.TransactionReportItemResponse;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.entity.WalletStatement;
+import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import com.vyra.be_virtual_your_assets.repository.WalletStatementRepository;
+import com.vyra.be_virtual_your_assets.security.model.CustomAdminDetails;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,10 +37,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +55,7 @@ class ReportServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private WalletStatementRepository walletStatementRepository;
     @Mock private AdminAuthorizationService adminAuthorizationService;
+    @Mock private AdminActivityService adminActivityService;
 
     @InjectMocks
     private ReportService reportService;
@@ -53,6 +63,10 @@ class ReportServiceTest {
     @BeforeEach
     void setUp() {
         doNothing().when(adminAuthorizationService).requirePermission(AdminPermission.REPORT_VIEW);
+        // Default: a Super Admin with member transaction access switched on.
+        lenient().when(adminAuthorizationService.getCurrentAdmin())
+                .thenReturn(new CustomAdminDetails("super-admin-id", "token", AdminRole.SUPER_ADMIN));
+        lenient().when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(true);
     }
 
     // =========================================================================
@@ -190,6 +204,29 @@ class ReportServiceTest {
     }
 
     @Test
+    void getTransactionReport_withoutTransactionAccess_shouldThrowForbiddenAndNotQuery() {
+        doThrow(new ForbiddenException(ErrorConstant.ADMIN_UNAUTHORIZED))
+                .when(adminAuthorizationService).requireMemberTransactionAccess();
+
+        assertThrows(ForbiddenException.class, () -> reportService.getTransactionReport(
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 1), null, null, 0, 10));
+
+        verifyNoInteractions(transactionRepository, adminActivityService);
+    }
+
+    @Test
+    void getTransactionReport_auditsOnlyTheFirstPage() {
+        when(transactionRepository.findPlatformTransactions(any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        reportService.getTransactionReport(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 2), null, null, 0, 10);
+        reportService.getTransactionReport(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 2), null, null, 1, 10);
+
+        verify(adminActivityService, times(1)).createAdminActivity("super-admin-id", null,
+                AdminActivityEvent.VIEW_MEMBER_TRANSACTIONS, "transaction report 2026-06-01 to 2026-06-02", null, null);
+    }
+
+    @Test
     void getTransactionReport_oversizedPage_shouldBeClamped() {
         when(transactionRepository.findPlatformTransactions(any(), any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
@@ -251,6 +288,27 @@ class ReportServiceTest {
 
         assertThat(result.getData().getContent().get(0).getBalance()).isEqualTo(BigDecimal.ZERO);
         assertThat(result.getData().getContent().get(0).getTotalTransactions()).isZero();
+    }
+
+    @Test
+    void getMemberReport_withoutTransactionAccess_shouldHideBalance() {
+        when(adminAuthorizationService.canViewMemberTransactions()).thenReturn(false);
+        Member member = new Member();
+        member.setId("member-id-003");
+        member.setFirstName("Andi");
+        member.setLastName("Pratama");
+        member.setPhoneNumber("628777777777");
+
+        when(memberRepository.searchMembers(eq(""), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(member), PageRequest.of(0, 10), 1));
+        when(transactionRepository.countByMemberIds(any()))
+                .thenReturn(List.<Object[]>of(new Object[]{"member-id-003", 4L}));
+
+        MemberReportItemResponse item = reportService.getMemberReport(0, 10).getData().getContent().get(0);
+
+        assertThat(item.getBalance()).isNull();
+        assertThat(item.getTotalTransactions()).isEqualTo(4L);
+        verifyNoInteractions(walletStatementRepository);
     }
 
     @Test

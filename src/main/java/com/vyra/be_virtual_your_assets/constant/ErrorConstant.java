@@ -110,6 +110,15 @@ public enum ErrorConstant {
     ADMIN_INVALID_REFRESH_TOKEN("VYRA-ADM-TKN-001", "Invalid refresh token"),
     ADMIN_REFRESH_TOKEN_EXPIRED("VYRA-ADM-TKN-002", "Your session has expired. Please log in again"),
     ADMIN_UNAUTHORIZED("VYRA-ADM-AUT-001", "You don't have permission to perform this action"),
+    MEMBER_TRANSACTION_ACCESS_DISABLED("VYRA-ADM-AUT-002", "Access to member transaction details is turned off in Settings"),
+
+    // =========================================================================
+    // ADMIN SYSTEM SETTINGS
+    // =========================================================================
+    SYSTEM_CONFIG_LIST_SUCCESS("VYRA-CFG-LST-000", "Settings retrieved successfully"),
+    SYSTEM_CONFIG_UPDATE_SUCCESS("VYRA-CFG-UPD-000", "Setting updated successfully"),
+    SYSTEM_CONFIG_NOT_FOUND("VYRA-CFG-DNF-001", "Setting could not be found"),
+    SYSTEM_CONFIG_INVALID_VALUE("VYRA-CFG-VAL-001", "Invalid value for this setting"),
 
     // =========================================================================
     // ADMIN MANAGEMENT (CRUD admin users / RBAC)

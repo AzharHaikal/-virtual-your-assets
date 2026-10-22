@@ -99,6 +99,13 @@ public class ApiPath {
     public static final String REPORT_EXPORT_CSV = "/export";
 
     // =========================================================================
+    // ADMIN SETTINGS CONTROLLER
+    // =========================================================================
+    public static final String V1_ADMIN_SETTINGS = "/api/v1/admin/settings";
+    public static final String SETTINGS_LIST = "";
+    public static final String SETTINGS_UPDATE = "/{configKey}";
+
+    // =========================================================================
     // ADMIN AUDIT CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUDIT = "/api/v1/admin/audit";

@@ -4,6 +4,7 @@ import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.AdminActivityEvent;
 import com.vyra.be_virtual_your_assets.constant.AdminRole;
+import com.vyra.be_virtual_your_assets.constant.RolePermissionMapper;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.admin.AdminLoginRequest;
@@ -40,6 +41,7 @@ class AdminAuthenticationServiceTest {
     @Mock private AdminTokenRepository adminTokenRepository;
     @Mock private AdminActivityService adminActivityService;
     @Mock private BCryptPasswordEncoder passwordEncoder;
+    @Mock private AdminAuthorizationService adminAuthorizationService;
     @Spy private SecurityPolicy securityPolicy = new SecurityPolicy();
 
     @InjectMocks
@@ -69,6 +71,8 @@ class AdminAuthenticationServiceTest {
         when(passwordEncoder.matches("Secret123!", "hashed-password")).thenReturn(true);
         when(adminTokenRepository.save(any(AdminToken.class))).thenReturn(new AdminToken());
         doNothing().when(adminActivityService).createAdminActivity(anyString(), anyString(), any(), any(), any());
+        when(adminAuthorizationService.effectivePermissions(AdminRole.SUPER_ADMIN))
+                .thenReturn(RolePermissionMapper.getPermissions(AdminRole.SUPER_ADMIN));
 
         BaseResponse<AdminLoginResponse> result = adminAuthenticationService.login(request);
 

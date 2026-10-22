@@ -150,6 +150,8 @@ class AdminServiceTest {
     @Test
     void getProfile_found_shouldReturnProfileResponse() {
         when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+        when(adminAuthorizationService.effectivePermissions(admin.getRole()))
+                .thenReturn(RolePermissionMapper.getPermissions(admin.getRole()));
 
         BaseResponse<AdminProfileResponse> result = adminService.getProfile("admin-id-001");
 

@@ -175,6 +175,16 @@ class DashboardServiceTest {
         assertThat(item.getType()).isEqualTo(TransactionType.INCOME);
     }
 
+    @Test
+    void getRecentTransactions_withoutTransactionAccess_shouldThrowForbiddenAndNotQuery() {
+        doThrow(new ForbiddenException(ErrorConstant.MEMBER_TRANSACTION_ACCESS_DISABLED))
+                .when(adminAuthorizationService).requireMemberTransactionAccess();
+
+        assertThrows(ForbiddenException.class, () -> dashboardService.getRecentTransactions());
+
+        verify(transactionRepository, never()).findRecentTransactions();
+    }
+
     // =========================================================================
     // getLatestMembers
     // =========================================================================

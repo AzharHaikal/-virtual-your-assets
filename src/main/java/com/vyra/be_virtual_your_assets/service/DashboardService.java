@@ -115,6 +115,8 @@ public class DashboardService {
 
     public BaseResponse<List<RecentTransactionResponse>> getRecentTransactions() {
         adminAuthorizationService.requirePermission(AdminPermission.DASHBOARD_VIEW);
+        // Lists individual member transactions, not aggregates.
+        adminAuthorizationService.requireMemberTransactionAccess();
 
         List<RecentTransactionResponse> items = transactionRepository.findRecentTransactions()
                 .stream()

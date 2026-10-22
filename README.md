@@ -239,6 +239,18 @@ Aplikasi menggunakan **3 schema PostgreSQL** yang terpisah:
 - Timeout database: `DB_LOCK_TIMEOUT_MS` (default 5000) dan `DB_STATEMENT_TIMEOUT_MS` (default 30000) dipasang di setiap koneksi; request yang menunggu baris terkunci terlalu lama dijawab `503 VYRA-ERR503` (bukan menggantung).
 - Ubah e-mail / nomor telepon: PIN **dan** OTP. OTP dikirim ke e-mail baru (atau e-mail saat ini bila hanya telepon yang berubah); perubahan baru berlaku setelah `POST /member/update-profile/verify`, dan sesi lain dihentikan.
 
+### Akses Data Keuangan Member (Admin Portal)
+Data keuangan **per member** (daftar transaksi member, saldo, total income/expense member, laporan transaksi per baris, recent transactions) hanya bisa dilihat oleh **SUPER_ADMIN**, dan hanya selama setting `privacy.member_transaction_detail.enabled` bernilai `true` (default).
+
+| Role | Detail transaksi & saldo member | Data agregat (dashboard summary, chart, distribusi kategori, laporan income/expense per hari) |
+|---|---|---|
+| SUPER_ADMIN | ✅ bila setting aktif · `403 VYRA-ADM-AUT-002` bila nonaktif | ✅ |
+| ADMINISTRATOR / OPERATOR / VIEWER | ❌ `403 VYRA-ADM-AUT-001` · saldo di daftar/detail member & member report bernilai `null` | ✅ |
+
+- Permission: `MEMBER_TRANSACTION_VIEW` (hanya SUPER_ADMIN). Saat setting nonaktif, permission ini tidak dikirim di `/admin/me` & login, sehingga portal menyembunyikan menunya.
+- Setting dikelola lewat `GET /api/v1/admin/settings` (`SETTINGS_VIEW`) dan `PUT /api/v1/admin/settings/{configKey}` body `{"value":"true|false"}` (`SETTINGS_MANAGE`, hanya SUPER_ADMIN).
+- Audit: `VIEW_MEMBER_TRANSACTIONS` (member yang dilihat / periode laporan) dan `UPDATE_SYSTEM_CONFIG`.
+
 ### Public Endpoints (Whitelist)
 Endpoint berikut tidak memerlukan autentikasi:
 ```
