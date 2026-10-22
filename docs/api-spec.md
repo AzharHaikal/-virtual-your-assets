@@ -592,6 +592,8 @@ Retrieve income and expense chart data for the authenticated member, grouped by 
 
 Record a new income or expense transaction for the authenticated member.
 
+**Header (recommended):** `Idempotency-Key: <unique id per form submission>` (max 100 chars). Sending the same request again with the same key (e.g. a retry after a timeout) returns the first response and creates **no** duplicate. The same key with a different body → `409 VYRA-IDM-002`; the same key while the first request is still running → `409 VYRA-IDM-003`. Keys expire after 24 hours. Without the header the request is processed normally.
+
 **Request Body**
 
 | Field | Type | Required | Validation |

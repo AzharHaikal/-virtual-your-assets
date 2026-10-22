@@ -7,6 +7,7 @@ import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionRequest;
 import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryResponse;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import com.vyra.be_virtual_your_assets.service.IdempotencyService;
 import com.vyra.be_virtual_your_assets.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,8 +20,11 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +36,9 @@ class TransactionControllerTest {
 
     @Mock
     private Authentication authentication;
+
+    @Mock
+    private IdempotencyService idempotencyService;
 
     @InjectMocks
     private TransactionController transactionController;
@@ -74,8 +81,12 @@ class TransactionControllerTest {
         BaseResponse<CreateTransactionResponse> expected = new BaseResponse<>("VYRA-CTS-000", "Created", data);
         when(authentication.getPrincipal()).thenReturn(userDetails);
         when(transactionService.createTransaction(MEMBER_ID, request)).thenReturn(expected);
+        // The idempotency guard runs the action (no stored response for this key).
+        when(idempotencyService.execute(eq(MEMBER_ID), eq("key-1"), eq(request), eq(CreateTransactionResponse.class), any()))
+                .thenAnswer(inv -> ((Supplier<?>) inv.getArgument(4)).get());
 
-        BaseResponse<CreateTransactionResponse> result = transactionController.createTransaction(request, authentication);
+        BaseResponse<CreateTransactionResponse> result =
+                transactionController.createTransaction(request, "key-1", authentication);
 
         assertThat(result).isSameAs(expected);
         verify(authentication).getPrincipal();

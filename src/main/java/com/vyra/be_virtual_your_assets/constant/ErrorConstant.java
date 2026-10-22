@@ -91,6 +91,11 @@ public enum ErrorConstant {
     TRANSACTION_NOT_FOUND("VYRA-TRX-404", "Transaction could not be found"),
     TRANSACTION_NOT_EDITABLE("VYRA-TRX-001", "Only successful transactions can be changed"),
 
+    // Idempotency-Key
+    IDEMPOTENCY_KEY_INVALID("VYRA-IDM-001", "Invalid Idempotency-Key (max 100 characters)"),
+    IDEMPOTENCY_KEY_REUSED("VYRA-IDM-002", "This Idempotency-Key was already used for a different request"),
+    IDEMPOTENCY_KEY_IN_PROGRESS("VYRA-IDM-003", "The same request is still being processed. Please wait a moment"),
+
     // Transaction History
     GET_TOP_TRANSACTION_HISTORY_SUCCESS("VYRA-GTT-000","Top transaction history retrieved successfully"),
     GET_TRANSACTION_HISTORY_SUCCESS("VYRA-GTH-000","Transaction history retrieved successfully"),
