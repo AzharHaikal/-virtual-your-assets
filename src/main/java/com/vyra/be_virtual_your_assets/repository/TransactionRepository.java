@@ -46,6 +46,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     WHERE t.member_id = :memberId
         AND t.transaction_date >= :startDate
         AND t.transaction_date <= :endDate
+        AND t.deleted_at IS NULL
     """, nativeQuery = true)
     BigDecimal getPreviousMonthIncome(
             @Param("memberId") String memberId,
