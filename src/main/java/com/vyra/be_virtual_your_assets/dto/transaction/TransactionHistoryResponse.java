@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -17,5 +18,7 @@ public class TransactionHistoryResponse {
     private BigDecimal amount;
     private String transactionDesc;
     private LocalDateTime transactionDate;
+    /** The member's local date of the transaction (grouping by day in the app). */
+    private LocalDate localDate;
 
 }

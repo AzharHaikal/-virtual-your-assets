@@ -3,6 +3,7 @@ package com.vyra.be_virtual_your_assets.service;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
+import com.vyra.be_virtual_your_assets.constant.WalletEntryType;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.*;
@@ -18,6 +19,7 @@ import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -184,6 +186,7 @@ public class WalletService {
             wallet.setTotalExpense(wallet.getTotalExpense().add(amount));
             wallet.setBalance(wallet.getBalance().add(amount));
         }
+        history.setEntryType(WalletEntryType.CREATE);
         history.setCreatedBy(request.getPhoneNumber());
         history.setCreatedAt(LocalDateTime.now());
 
@@ -204,6 +207,57 @@ public class WalletService {
                 ErrorConstant.CREATE_TRANSACTION_WALLET_SUCCESS.getMessage(),
                 response
         );
+    }
+
+    /**
+     * Applies the difference between a transaction's old and new booking (edit) or removes it (delete).
+     * The ledger stays append-only: one history row with the deltas and {@link WalletEntryType#UPDATE} /
+     * {@link WalletEntryType#DELETE}. Runs in the caller's transaction (the caller holds the transaction row lock).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public TransactionWalletResponse adjustTransactionWallet(AdjustTransactionWalletRequest request) {
+        WalletStatement wallet = walletStatementRepository.findByPhoneNumberForUpdate(request.getPhoneNumber())
+                .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
+
+        BigDecimal incomeDelta = part(TransactionType.INCOME, request.getNewType(), request.getNewAmount())
+                .subtract(part(TransactionType.INCOME, request.getOldType(), request.getOldAmount()));
+        BigDecimal expenseDelta = part(TransactionType.EXPENSE, request.getNewType(), request.getNewAmount())
+                .subtract(part(TransactionType.EXPENSE, request.getOldType(), request.getOldAmount()));
+        BigDecimal previousBalance = wallet.getBalance();
+
+        wallet.setTotalIncome(wallet.getTotalIncome().add(incomeDelta));
+        wallet.setTotalExpense(wallet.getTotalExpense().add(expenseDelta));
+        wallet.setBalance(previousBalance.add(incomeDelta).add(expenseDelta));
+        wallet.setModifiedBy(request.getPhoneNumber());
+        wallet.setUpdatedAt(LocalDateTime.now());
+
+        WalletStatementHistory history = new WalletStatementHistory();
+        history.setWalletStatementId(wallet.getId());
+        history.setMemberWalletId(wallet.getMemberWalletId());
+        history.setTransactionId(request.getTransactionId());
+        history.setPreviousBalance(previousBalance);
+        history.setIncome(incomeDelta);
+        history.setExpense(expenseDelta);
+        history.setCurrentBalance(wallet.getBalance());
+        history.setEntryType(request.getEntryType());
+        history.setCreatedBy(request.getPhoneNumber());
+        history.setCreatedAt(LocalDateTime.now());
+
+        walletStatementHistoryRepository.save(history);
+        walletStatementRepository.save(wallet);
+
+        TransactionWalletResponse response = new TransactionWalletResponse();
+        response.setPhoneNumber(request.getPhoneNumber());
+        response.setPreviousBalance(previousBalance);
+        response.setTotalIncome(wallet.getTotalIncome());
+        response.setTotalExpense(wallet.getTotalExpense());
+        response.setBalance(wallet.getBalance());
+        return response;
+    }
+
+    /** The signed amount when the booking is of {@code bucket}'s type, zero otherwise. */
+    private static BigDecimal part(TransactionType bucket, TransactionType type, BigDecimal signedAmount) {
+        return bucket == type && signedAmount != null ? signedAmount : BigDecimal.ZERO;
     }
 
     private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {

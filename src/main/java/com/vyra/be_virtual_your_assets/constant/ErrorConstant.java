@@ -86,6 +86,10 @@ public enum ErrorConstant {
     CREATE_TRANSACTION_WALLET_FAILED("VYRA-TWS-001", "Get member detail successful"),
 
     CREATE_TRANSACTION_SUCCESS("VYRA-CTS-000", "Create transaction successful"),
+    UPDATE_TRANSACTION_SUCCESS("VYRA-UTS-000", "Transaction updated successfully"),
+    DELETE_TRANSACTION_SUCCESS("VYRA-DTS-000", "Transaction deleted successfully"),
+    TRANSACTION_NOT_FOUND("VYRA-TRX-404", "Transaction could not be found"),
+    TRANSACTION_NOT_EDITABLE("VYRA-TRX-001", "Only successful transactions can be changed"),
 
     // Transaction History
     GET_TOP_TRANSACTION_HISTORY_SUCCESS("VYRA-GTT-000","Top transaction history retrieved successfully"),

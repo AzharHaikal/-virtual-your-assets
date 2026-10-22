@@ -4,6 +4,7 @@ import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
@@ -88,6 +89,17 @@ public class GlobalExceptionHandler {
                 new BaseResponse<>(
                         ErrorConstant.INTERNAL_SERVER_ERROR.getCode(),
                         ErrorConstant.INTERNAL_SERVER_ERROR.getMessage(),
+                        null
+                )
+        );
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<BaseResponse<Void>> handleNotFound(NotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                new BaseResponse<>(
+                        ex.getErrorConstant().getCode(),
+                        ex.getErrorConstant().getMessage(),
                         null
                 )
         );

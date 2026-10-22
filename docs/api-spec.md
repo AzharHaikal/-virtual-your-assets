@@ -699,7 +699,8 @@ Retrieve paginated transaction history for the authenticated member with date ra
         "status": "SUCCESS",
         "amount": 5000000.00,
         "transactionDesc": "Monthly salary",
-        "transactionDate": "2026-06-10T02:00:00Z"
+        "transactionDate": "2026-06-10T02:00:00Z",
+        "localDate": "2026-06-10"
       }
     ],
     "totalElements": 25,
@@ -709,6 +710,69 @@ Retrieve paginated transaction history for the authenticated member with date ra
   }
 }
 ```
+
+---
+
+### 4.5 Update Transaction
+
+`PATCH /api/v1/transactions/{transactionId}`
+
+Edits one of the member's own transactions. Every field is optional (`null` keeps the current value). The wallet is corrected by the difference and the change is added to the wallet history as an `UPDATE` entry (the original entry is never rewritten). Only `SUCCESS` transactions can be edited.
+
+**Request Body**
+
+| Field | Type | Required | Validation |
+|-------|------|----------|------------|
+| `type` | `TransactionType` | ❌ | `INCOME` or `EXPENSE` |
+| `category` | `TransactionCategory` | ❌ | See [Enums](#5-enums) |
+| `amount` | decimal | ❌ | Greater than 0; the sign follows `type` |
+| `transactionDate` | string | ❌ | Same rules as on create; the local date is recomputed |
+| `transactionDesc` | string | ❌ | Max 255 chars |
+
+**Request Example**
+
+```json
+{ "amount": 75000, "transactionDesc": "Makan siang kantor" }
+```
+
+**Response `200 OK`**
+
+```json
+{
+  "responseStatus": "VYRA-UTS-000",
+  "responseMessage": "Transaction updated successfully",
+  "data": {
+    "transaction": {
+      "transactionId": "uuid-string",
+      "referenceNumber": "VYRA20261022...",
+      "type": "EXPENSE",
+      "category": "FOOD_AND_BEVERAGE",
+      "status": "SUCCESS",
+      "amount": -75000.00,
+      "transactionDesc": "Makan siang kantor",
+      "transactionDate": "2026-10-22T05:00:00Z",
+      "localDate": "2026-10-22"
+    },
+    "balance": 725000.00,
+    "totalIncome": 1000000.00,
+    "totalExpense": -275000.00
+  }
+}
+```
+
+**Errors:** `404 VYRA-TRX-404` (not found, deleted, or another member's), `400 VYRA-TRX-001` (not a `SUCCESS` transaction), `400` validation errors.
+
+---
+
+### 4.6 Delete Transaction
+
+`DELETE /api/v1/transactions/{transactionId}`
+
+Soft-deletes one of the member's own transactions (`status = DELETED`, `deletedAt` set) and removes it from the wallet with a `DELETE` history entry. Deleted transactions disappear from history, charts and summaries. **Idempotent:** deleting an already deleted transaction returns `200` and changes nothing.
+
+**Response `200 OK`** — same shape as 4.5 with `responseStatus: "VYRA-DTS-000"` and `transaction.status: "DELETED"`.
+
+**Errors:** `404 VYRA-TRX-404` (not found or another member's).
 
 ---
 

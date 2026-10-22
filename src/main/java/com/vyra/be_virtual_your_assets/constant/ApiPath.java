@@ -46,6 +46,12 @@ public class ApiPath {
     public static final String GET_TRANSACTION_HISTORY = "/get-history";
 
     // =========================================================================
+    // TRANSACTIONS (REST, V2): /api/v1/transactions
+    // =========================================================================
+    public static final String V1_TRANSACTIONS = "/api/v1/transactions";
+    public static final String TRANSACTION_ID = "/{transactionId}";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

@@ -3,15 +3,18 @@ package com.vyra.be_virtual_your_assets.repository;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
     @Query("""
@@ -183,6 +186,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     List<Object[]> getChartMonthlyAll(@Param("memberId") String memberId);
 
     List<Transaction> findAllByUserPhoneNumber(String oldPhoneNumber);
+
+    /**
+     * The member's own transaction (deleted ones included) with a row lock held until the surrounding
+     * transaction ends, so two edits/deletes of the same transaction never both correct the wallet.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Transaction t WHERE t.id = :id AND t.memberId = :memberId")
+    Optional<Transaction> findOwnedForUpdate(@Param("id") String id, @Param("memberId") String memberId);
 
     // =========================================================================
     // ADMIN PORTAL QUERIES (platform-wide, not scoped to a single member)

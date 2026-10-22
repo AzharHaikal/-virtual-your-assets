@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
+import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,15 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED.getCode());
         assertThat(response.getBody().getResponseMessage()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED.getMessage());
         assertThat(response.getBody().getData()).isNull();
+    }
+
+    @Test
+    void handleNotFound_shouldReturn404WithTheResourceCode() {
+        ResponseEntity<BaseResponse<Void>> response =
+                handler.handleNotFound(new NotFoundException(ErrorConstant.TRANSACTION_NOT_FOUND));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.TRANSACTION_NOT_FOUND.getCode());
     }
 
     // =========================================================================
