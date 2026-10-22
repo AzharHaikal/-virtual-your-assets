@@ -13,7 +13,11 @@ import java.math.BigDecimal;
 public class UpdateTransactionRequest {
     private TransactionType type;
 
+    /** Legacy built-in category; ignored when {@link #categoryId} is set. */
     private TransactionCategory category;
+
+    /** finance_category id (built-in or the member's own). */
+    private String categoryId;
 
     /** Always positive; the sign follows the type (expense is stored negative). */
     @Positive(message = "Amount must be greater than zero")

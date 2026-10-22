@@ -52,6 +52,12 @@ public class ApiPath {
     public static final String TRANSACTION_ID = "/{transactionId}";
 
     // =========================================================================
+    // FINANCE CATEGORIES: /api/v1/finance/categories
+    // =========================================================================
+    public static final String V1_FINANCE_CATEGORIES = "/api/v1/finance/categories";
+    public static final String CATEGORY_ID = "/{categoryId}";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

@@ -13,7 +13,12 @@ public class TransactionHistoryResponse {
     private String transactionId;
     private String referenceNumber;
     private TransactionType type;
+    /** Legacy code (built-in code, or OTHERS_* for a custom category). */
     private String category;
+    private String categoryId;
+    private String categoryName;
+    private String categoryIcon;
+    private String categoryColor;
     private TransactionStatus status;
     private BigDecimal amount;
     private String transactionDesc;

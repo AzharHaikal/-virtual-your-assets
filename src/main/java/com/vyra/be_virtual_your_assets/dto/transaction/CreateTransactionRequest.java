@@ -10,7 +10,13 @@ import java.math.BigDecimal;
 
 @Data
 public class CreateTransactionRequest {
+    /** Legacy built-in category; ignored when {@link #categoryId} is set. */
     private TransactionCategory category;
+
+    /** finance_category id (built-in or the member's own); takes precedence over {@link #category}. */
+    private String categoryId;
+
+    @NotNull(message = "Type is required")
     private TransactionType type;
     @NotNull(message = "Amount is required")
     @Positive(message = "Amount must be greater than zero")

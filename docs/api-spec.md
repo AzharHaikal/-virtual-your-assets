@@ -598,8 +598,9 @@ Record a new income or expense transaction for the authenticated member.
 
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
-| `category` | `TransactionCategory` | ❌ | See [Enums](#5-enums) |
-| `type` | `TransactionType` | ❌ | `INCOME` or `EXPENSE` |
+| `categoryId` | string | ❌ | Category id from [4.7](#47-finance-categories) (built-in or own); must match `type`. Preferred over `category` |
+| `category` | `TransactionCategory` | ❌ | Legacy built-in category (older apps). Neither given → "Other" of the type |
+| `type` | `TransactionType` | ✅ | `INCOME` or `EXPENSE` |
 | `amount` | decimal | ✅ | Must be greater than 0 |
 | `transactionDate` | string | ❌ | ISO-8601 with offset (`2026-06-10T09:00:00+07:00`). Without offset it is read in the member's time zone; empty = now. Invalid → `400 VYRA-INV-004` |
 | `transactionDesc` | string | ❌ | Transaction description |
@@ -726,7 +727,8 @@ Edits one of the member's own transactions. Every field is optional (`null` keep
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
 | `type` | `TransactionType` | ❌ | `INCOME` or `EXPENSE` |
-| `category` | `TransactionCategory` | ❌ | See [Enums](#5-enums) |
+| `categoryId` | string | ❌ | Category id (built-in or own), must match the (new) type |
+| `category` | `TransactionCategory` | ❌ | Legacy built-in category |
 | `amount` | decimal | ❌ | Greater than 0; the sign follows `type` |
 | `transactionDate` | string | ❌ | Same rules as on create; the local date is recomputed |
 | `transactionDesc` | string | ❌ | Max 255 chars |
@@ -775,6 +777,32 @@ Soft-deletes one of the member's own transactions (`status = DELETED`, `deletedA
 **Response `200 OK`** — same shape as 4.5 with `responseStatus: "VYRA-DTS-000"` and `transaction.status: "DELETED"`.
 
 **Errors:** `404 VYRA-TRX-404` (not found or another member's).
+
+---
+
+### 4.7 Finance Categories
+
+Built-in categories (shared, `custom: false`, id `default-<CODE>`) plus the member's own (`custom: true`). Errors for another member's category look like a missing one.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/finance/categories?type=INCOME\|EXPENSE` | Built-in first, then own; `type` optional |
+| `POST` | `/api/v1/finance/categories` | Create own category → `201` |
+| `PATCH` | `/api/v1/finance/categories/{categoryId}` | Rename / change icon or color (own only; the type cannot change) |
+| `DELETE` | `/api/v1/finance/categories/{categoryId}` | Soft delete (own only); transactions keep showing its name |
+
+**Create body:** `name` (≤ 50, unique per type), `type`, `icon` (key such as `local_cafe`, pattern `^[a-z][a-z0-9_]{0,39}$`), `color` (`#RRGGBB`). Max 50 own categories.
+
+**Category object**
+
+```json
+{ "id": "default-FOOD_AND_BEVERAGE", "code": "FOOD_AND_BEVERAGE", "name": "Food & Beverage",
+  "type": "EXPENSE", "icon": "restaurant", "color": "#EF4444", "custom": false }
+```
+
+Transactions in history responses now also carry `categoryId`, `categoryName`, `categoryIcon` and `categoryColor`; `category` keeps the legacy code (`OTHERS_*` for a custom category).
+
+**Errors:** `404 VYRA-CAT-404`, `409 VYRA-CAT-002` (name exists), `400 VYRA-CAT-003` (limit), on transactions `400 VYRA-CAT-001` (type mismatch) / `400 VYRA-CAT-404` (unknown or deleted category).
 
 ---
 

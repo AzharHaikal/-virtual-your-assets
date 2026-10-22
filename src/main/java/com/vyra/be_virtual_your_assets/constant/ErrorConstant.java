@@ -91,6 +91,16 @@ public enum ErrorConstant {
     TRANSACTION_NOT_FOUND("VYRA-TRX-404", "Transaction could not be found"),
     TRANSACTION_NOT_EDITABLE("VYRA-TRX-001", "Only successful transactions can be changed"),
 
+    // Finance categories
+    CATEGORY_LIST_SUCCESS("VYRA-CAT-LST-000", "Categories retrieved successfully"),
+    CATEGORY_CREATE_SUCCESS("VYRA-CAT-CRT-000", "Category created successfully"),
+    CATEGORY_UPDATE_SUCCESS("VYRA-CAT-UPD-000", "Category updated successfully"),
+    CATEGORY_DELETE_SUCCESS("VYRA-CAT-DEL-000", "Category deleted successfully"),
+    CATEGORY_NOT_FOUND("VYRA-CAT-404", "Category could not be found"),
+    CATEGORY_TYPE_MISMATCH("VYRA-CAT-001", "The category does not match the transaction type"),
+    CATEGORY_NAME_EXISTS("VYRA-CAT-002", "You already have a category with this name"),
+    CATEGORY_LIMIT_REACHED("VYRA-CAT-003", "You can create up to 50 categories"),
+
     // Idempotency-Key
     IDEMPOTENCY_KEY_INVALID("VYRA-IDM-001", "Invalid Idempotency-Key (max 100 characters)"),
     IDEMPOTENCY_KEY_REUSED("VYRA-IDM-002", "This Idempotency-Key was already used for a different request"),

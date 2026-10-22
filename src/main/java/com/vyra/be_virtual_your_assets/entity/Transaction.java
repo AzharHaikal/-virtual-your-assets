@@ -46,7 +46,11 @@ public class Transaction extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String userEmail;
 
+    /** Legacy code (built-in category code, or OTHERS_* for a custom one); see {@link #categoryId}. */
     private String transactionCategory;
+
+    /** finance_category.id (built-in "default-&lt;CODE&gt;" or the member's own category). */
+    private String categoryId;
 
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "varchar(20)")

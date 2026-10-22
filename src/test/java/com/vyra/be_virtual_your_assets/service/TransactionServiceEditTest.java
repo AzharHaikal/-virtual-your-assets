@@ -12,6 +12,7 @@ import com.vyra.be_virtual_your_assets.dto.transaction.UpdateTransactionRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.AdjustTransactionWalletRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
+import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,6 +54,7 @@ class TransactionServiceEditTest {
     @Mock private MemberActivityService memberActivityService;
     @Mock private ValidationService validationService;
     @Mock private WalletService walletService;
+    @Mock private CategoryService categoryService;
     @Spy private TimeService timeService =
             new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
 
@@ -63,6 +66,9 @@ class TransactionServiceEditTest {
 
     @BeforeEach
     void setUp() {
+        // Any requested category resolves to the built-in "Other" of the transaction type.
+        lenient().when(categoryService.resolveForTransaction(any(), any(), any(), any()))
+                .thenAnswer(inv -> builtInOther(inv.getArgument(1)));
         member = new Member();
         member.setId(MEMBER_ID);
         member.setPhoneNumber("628123456789");
@@ -239,5 +245,14 @@ class TransactionServiceEditTest {
         GetMemberWalletResponse response = new GetMemberWalletResponse();
         response.setBalance(new BigDecimal(balance));
         return new BaseResponse<>(ErrorConstant.GET_MEMBER_WALLET_SUCCESS.getCode(), "ok", response);
+    }
+
+    private static FinanceCategory builtInOther(TransactionType type) {
+        FinanceCategory category = new FinanceCategory();
+        category.setId(FinanceCategory.otherId(type));
+        category.setCode(type == TransactionType.INCOME ? "OTHERS_INCOME" : "OTHERS_EXPENSE");
+        category.setType(type);
+        category.setName("Other");
+        return category;
     }
 }

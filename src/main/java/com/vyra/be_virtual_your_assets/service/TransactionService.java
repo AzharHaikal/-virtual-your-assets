@@ -18,6 +18,7 @@ import com.vyra.be_virtual_your_assets.dto.wallet.AdjustTransactionWalletRequest
 import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
+import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
@@ -41,6 +42,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -54,6 +56,7 @@ public class TransactionService {
     private final ValidationService validationService;
     private final WalletService walletService;
     private final TimeService timeService;
+    private final CategoryService categoryService;
 
     @NewSpan
     public BaseResponse<GetChartResponse> getChart(String memberId, String period) {
@@ -87,9 +90,11 @@ public class TransactionService {
         log.info("[START] transactionService.getTopTransactionHistory phoneNumber: {} ", member.getPhoneNumber());
 
         List<Transaction> transactions = transactionRepository.findTransactionHistory(memberId);
-        List<TransactionHistoryResponse> responses = transactions.stream().map(this::mapToHistoryResponse).toList();
-
-        log.info("Response : {}", responses);
+        Map<String, FinanceCategory> categories = categoryService.byIds(
+                transactions.stream().map(Transaction::getCategoryId).toList());
+        List<TransactionHistoryResponse> responses = transactions.stream()
+                .map(t -> mapToHistoryResponse(t, categories))
+                .toList();
         log.info("[END] transactionService.getTopTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
         return new BaseResponse<>(
                 ErrorConstant.GET_TOP_TRANSACTION_HISTORY_SUCCESS.getCode(),
@@ -146,7 +151,9 @@ public class TransactionService {
         LocalDate end = LocalDate.parse(endDate);
 
         Page<Transaction> transactions = transactionRepository.findTransactionHistory(memberId, start, end, type, pageable);
-        Page<TransactionHistoryResponse> responses = transactions.map(this::mapToHistoryResponse);
+        Map<String, FinanceCategory> categories = categoryService.byIds(
+                transactions.getContent().stream().map(Transaction::getCategoryId).toList());
+        Page<TransactionHistoryResponse> responses = transactions.map(t -> mapToHistoryResponse(t, categories));
 
         log.info("[END] transactionService.getTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
 
@@ -160,11 +167,14 @@ public class TransactionService {
     private Transaction createTransaction(CreateTransactionRequest request, Member member, String ref) {
         ZoneId zone = timeService.zoneOf(member);
         LocalDateTime occurredAt = timeService.parseClientDateTime(request.getTransactionDate(), zone);
+        FinanceCategory category = categoryService.resolveForTransaction(
+                member.getId(), request.getType(), request.getCategoryId(), request.getCategory());
         return Transaction.builder()
                 .memberId(member.getId())
                 .userPhoneNumber(member.getPhoneNumber())
                 .userEmail(member.getEmail())
-                .transactionCategory(request.getCategory().name())
+                .transactionCategory(category.legacyCode())
+                .categoryId(category.getId())
                 .transactionType(request.getType())
                 .amount(request.getAmount())
                 .transactionDesc(request.getTransactionDesc())
@@ -238,8 +248,11 @@ public class TransactionService {
             transaction.setTransactionDate(occurredAt);
             transaction.setLocalDate(timeService.toLocalDate(occurredAt, zone));
         }
-        if (request.getCategory() != null) {
-            transaction.setTransactionCategory(request.getCategory().name());
+        if (request.getCategoryId() != null || request.getCategory() != null || newType != oldType) {
+            FinanceCategory category = categoryService.resolveForTransaction(
+                    memberId, newType, request.getCategoryId(), request.getCategory());
+            transaction.setCategoryId(category.getId());
+            transaction.setTransactionCategory(category.legacyCode());
         }
         if (request.getTransactionDesc() != null) {
             transaction.setTransactionDesc(request.getTransactionDesc().trim());
@@ -317,7 +330,8 @@ public class TransactionService {
     private TransactionMutationResponse toMutationResponse(Transaction transaction, BigDecimal balance,
                                                            BigDecimal totalIncome, BigDecimal totalExpense) {
         TransactionMutationResponse response = new TransactionMutationResponse();
-        response.setTransaction(mapToHistoryResponse(transaction));
+        response.setTransaction(mapToHistoryResponse(transaction,
+                categoryService.byIds(Collections.singletonList(transaction.getCategoryId()))));
         response.setBalance(balance);
         response.setTotalIncome(totalIncome);
         response.setTotalExpense(totalExpense);
@@ -358,11 +372,18 @@ public class TransactionService {
         memberActivityService.createMemberActivity(phoneNumber, activityEvent);
     }
 
-    private TransactionHistoryResponse mapToHistoryResponse(Transaction transaction) {
+    private TransactionHistoryResponse mapToHistoryResponse(Transaction transaction, Map<String, FinanceCategory> categories) {
         TransactionHistoryResponse response = new TransactionHistoryResponse();
         response.setTransactionId(transaction.getId());
         response.setReferenceNumber(transaction.getReferenceNumber());
         response.setCategory(transaction.getTransactionCategory());
+        FinanceCategory category = categories.get(transaction.getCategoryId());
+        if (category != null) {
+            response.setCategoryId(category.getId());
+            response.setCategoryName(category.getName());
+            response.setCategoryIcon(category.getIcon());
+            response.setCategoryColor(category.getColor());
+        }
         response.setType(transaction.getTransactionType());
         response.setStatus(transaction.getStatus());
         response.setAmount(transaction.getAmount());
