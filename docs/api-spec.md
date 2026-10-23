@@ -30,6 +30,7 @@ Authentication uses **Bearer Token** in the `Authorization` header (except endpo
 3. [Wallet](#3-wallet)
 4. [Transaction](#4-transaction)
 4a. [Mood](#4a-mood)
+4b. [Habit](#4b-habit)
 5. [Enums](#5-enums)
 6. [Error Codes](#6-error-codes)
 
@@ -888,6 +889,49 @@ Built-in tag codes: `GOOD_SLEEP`, `FRIENDS`, `FAMILY`, `WORK`, `EXERCISE`, `GOOD
 
 ---
 
+## 4b. Habit
+
+Habits of the member with a weekly schedule. Days are the member's **local days**. A day the habit is not scheduled on never counts as missed. Private to the member: there is no admin endpoint.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/habits?category=HEALTH&archived=false` | Habits in the order they were added; `category` optional, `archived=true` lists only archived ones |
+| `GET` | `/api/v1/habits/today` | Today's checklist: active habits scheduled today |
+| `POST` | `/api/v1/habits` | Create (max 50) → `201` |
+| `PATCH` | `/api/v1/habits/{habitId}` | Change the fields that are sent |
+| `DELETE` | `/api/v1/habits/{habitId}` | Soft delete |
+| `POST` | `/api/v1/habits/{habitId}/archive` · `/unarchive` | Leaves / returns to the checklist, history is kept (idempotent) |
+| `PUT` | `/api/v1/habits/{habitId}/completions/{localDate}` | Set the progress of that day (idempotent) |
+| `DELETE` | `/api/v1/habits/{habitId}/completions/{localDate}` | Remove the progress of that day (idempotent) |
+
+**Create body**
+
+```json
+{ "name": "Minum air", "category": "HEALTH", "icon": "local_drink", "color": "#3B82F6",
+  "targetCount": 8, "scheduleType": "SPECIFIC_DAYS", "scheduleDays": ["MONDAY", "WEDNESDAY", "FRIDAY"] }
+```
+
+`category`: `PRODUCTIVITY` · `HEALTH` · `PERSONAL` · `OTHER`. `targetCount` 1–100 (default 1 = done / not done). `scheduleType` `DAILY` or `SPECIFIC_DAYS` (then `scheduleDays` is required). `icon` / `color` follow the category rules (4.7). The habit starts on the member's current day.
+
+**Completion body** (optional): `{ "count": 3 }` (1–1000). Without it the day is set to `targetCount` (done). A day is done when `count ≥ targetCount`. Only today and the 6 days before can be marked, and only days the habit is scheduled on (from its start day). Parallel requests for the same day leave one row.
+
+**Habit object**
+
+```json
+{ "id": "f67c…", "name": "Minum air", "category": "HEALTH", "icon": "local_drink", "color": "#3B82F6",
+  "targetCount": 8, "scheduleType": "DAILY", "scheduleDays": ["MONDAY", "…", "SUNDAY"],
+  "startDate": "2026-10-23", "archived": false,
+  "scheduledToday": true, "todayCount": 3, "doneToday": false,
+  "weekDone": 4, "weekScheduled": 7,
+  "week": [ { "localDate": "2026-10-19", "scheduled": true, "count": 8, "done": true }, "… Monday to Sunday" ] }
+```
+
+`weekDone / weekScheduled` is the weekly progress of the current week (Monday–Sunday), e.g. "4/7 days".
+
+**Errors:** `404 VYRA-HBT-404`, `400 VYRA-HBT-001` (future day), `VYRA-HBT-002` (older than 7 days), `VYRA-HBT-003` (not scheduled that day), `VYRA-HBT-004` (archived), `VYRA-HBT-005` (no days for `SPECIFIC_DAYS`), `VYRA-HBT-006` (limit).
+
+---
+
 ## 5. Enums
 
 ### OtpType
@@ -995,6 +1039,6 @@ Built-in tag codes: `GOOD_SLEEP`, `FRIENDS`, `FAMILY`, `WORK`, `EXERCISE`, `GOOD
 | `VYRA-UPS-001` | A verification code has been sent. Enter it to confirm the change… | Contact change staged (HTTP 200) |
 | `VYRA-ERR503` | The system is busy right now. Please try again in a moment | HTTP 503 – database lock / statement timeout |
 | `VYRA-RTL-002` | A code was sent recently. Please wait before requesting another one. Try again in N seconds. | HTTP 429 – OTP e-mail cool-down |
-| `VYRA-ERR400` | Something went wrong with your request | Bad request / validation error |
+| `VYRA-ERR400` | Something went wrong with your request | Bad request / validation error; also an unknown value in the path or query (`Invalid value for category`) or an unreadable body (`Invalid request body`) |
 | `VYRA-ERR404` | The requested data could not be found | Data not found |
 | `VYRA-ERR500` | We are experiencing a system issue. Please try again later | Internal server error |

@@ -69,6 +69,16 @@ public class ApiPath {
     public static final String MOOD_TAG_ID = "/{tagId}";
 
     // =========================================================================
+    // HABIT: /api/v1/habits
+    // =========================================================================
+    public static final String V1_HABITS = "/api/v1/habits";
+    public static final String HABIT_TODAY = "/today";
+    public static final String HABIT_ID = "/{habitId}";
+    public static final String HABIT_ARCHIVE = "/{habitId}/archive";
+    public static final String HABIT_UNARCHIVE = "/{habitId}/unarchive";
+    public static final String HABIT_COMPLETION = "/{habitId}/completions/{localDate}";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";
