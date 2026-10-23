@@ -60,6 +60,15 @@ public class ApiPath {
     public static final String CATEGORY_ID = "/{categoryId}";
 
     // =========================================================================
+    // MOOD: /api/v1/mood-entries, /api/v1/mood-tags
+    // =========================================================================
+    public static final String V1_MOOD_ENTRIES = "/api/v1/mood-entries";
+    public static final String MOOD_TODAY = "/today";
+    public static final String MOOD_DATE = "/{localDate}";
+    public static final String V1_MOOD_TAGS = "/api/v1/mood-tags";
+    public static final String MOOD_TAG_ID = "/{tagId}";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

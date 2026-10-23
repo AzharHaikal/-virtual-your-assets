@@ -29,6 +29,7 @@ Authentication uses **Bearer Token** in the `Authorization` header (except endpo
 2. [Member](#2-member)
 3. [Wallet](#3-wallet)
 4. [Transaction](#4-transaction)
+4a. [Mood](#4a-mood)
 5. [Enums](#5-enums)
 6. [Error Codes](#6-error-codes)
 
@@ -848,6 +849,42 @@ Built-in categories (shared, `custom: false`, id `default-<CODE>`) plus the memb
 Transactions in history responses now also carry `categoryId`, `categoryName`, `categoryIcon` and `categoryColor`; `category` keeps the legacy code (`OTHERS_*` for a custom category).
 
 **Errors:** `404 VYRA-CAT-404`, `409 VYRA-CAT-002` (name exists), `400 VYRA-CAT-003` (limit), on transactions `400 VYRA-CAT-001` (type mismatch) / `400 VYRA-CAT-404` (unknown or deleted category).
+
+---
+
+## 4a. Mood
+
+One check-in per member and **local day** (the member's time zone). Only the member can read it — there is no admin endpoint. The journal (`note`) is encrypted at rest and never logged.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/mood-entries?from=yyyy-MM-dd&to=yyyy-MM-dd` | Entries of the range, newest first (default: the last 30 days up to today) |
+| `GET` | `/api/v1/mood-entries/today` | Today's entry; `data: null` when there is none yet |
+| `PUT` | `/api/v1/mood-entries/{localDate}` | Create or replace the entry of that day |
+| `DELETE` | `/api/v1/mood-entries/{localDate}` | Soft delete of that day's entry |
+| `GET` | `/api/v1/mood-tags` | Built-in tags first, then own |
+| `POST` | `/api/v1/mood-tags` | Create own tag (`name` ≤ 40, unique per member, max 30) → `201` |
+| `DELETE` | `/api/v1/mood-tags/{tagId}` | Soft delete of an own tag; past entries keep showing it |
+
+**PUT body**
+
+```json
+{ "moodScore": 4, "note": "Hari ini produktif", "tagIds": ["mood-tag-GOOD_SLEEP", "mood-tag-WORK"] }
+```
+
+`moodScore` 1 (very bad) … 5 (very good), required. `note` ≤ 2000 characters, optional. `tagIds` at most 10. Saving the same day twice updates that day's entry (also under concurrent requests). A day after today in the member's zone is rejected.
+
+**Entry object**
+
+```json
+{ "id": "c3c8…", "localDate": "2026-10-23", "moodScore": 4, "note": "Hari ini produktif",
+  "tags": [ { "id": "mood-tag-WORK", "code": "WORK", "name": "Work", "custom": false } ],
+  "checkedInAt": "2026-10-23T02:41:50Z" }
+```
+
+Built-in tag codes: `GOOD_SLEEP`, `FRIENDS`, `FAMILY`, `WORK`, `EXERCISE`, `GOOD_FOOD`, `HOBBY`, `ACHIEVEMENT`, `STRESS`, `TIRED`, `SICK`, `MONEY` (id `mood-tag-<CODE>`). Clients translate built-in names by `code`.
+
+**Errors:** `400 VYRA-MOD-001` (future day), `404 VYRA-MOD-404` (no entry that day), `400 VYRA-MTG-404` / `404 VYRA-MTG-404` (unknown tag on save / delete), `409 VYRA-MTG-002` (name exists), `400 VYRA-MTG-003` (limit).
 
 ---
 

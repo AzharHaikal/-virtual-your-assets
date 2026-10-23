@@ -105,6 +105,20 @@ public enum ErrorConstant {
     CATEGORY_NAME_EXISTS("VYRA-CAT-002", "You already have a category with this name"),
     CATEGORY_LIMIT_REACHED("VYRA-CAT-003", "You can create up to 50 categories"),
 
+    // Mood
+    MOOD_SAVE_SUCCESS("VYRA-MOD-SAV-000", "Mood saved"),
+    MOOD_LIST_SUCCESS("VYRA-MOD-LST-000", "Mood entries retrieved successfully"),
+    MOOD_GET_SUCCESS("VYRA-MOD-GET-000", "Mood entry retrieved successfully"),
+    MOOD_DELETE_SUCCESS("VYRA-MOD-DEL-000", "Mood entry deleted"),
+    MOOD_NOT_FOUND("VYRA-MOD-404", "No mood entry for this day"),
+    MOOD_DATE_IN_FUTURE("VYRA-MOD-001", "You cannot check in for a future day"),
+    MOOD_TAG_LIST_SUCCESS("VYRA-MTG-LST-000", "Mood tags retrieved successfully"),
+    MOOD_TAG_CREATE_SUCCESS("VYRA-MTG-CRT-000", "Mood tag created"),
+    MOOD_TAG_DELETE_SUCCESS("VYRA-MTG-DEL-000", "Mood tag deleted"),
+    MOOD_TAG_NOT_FOUND("VYRA-MTG-404", "Mood tag could not be found"),
+    MOOD_TAG_NAME_EXISTS("VYRA-MTG-002", "A tag with this name already exists"),
+    MOOD_TAG_LIMIT_REACHED("VYRA-MTG-003", "You can create up to 30 tags"),
+
     // Idempotency-Key
     IDEMPOTENCY_KEY_INVALID("VYRA-IDM-001", "Invalid Idempotency-Key (max 100 characters)"),
     IDEMPOTENCY_KEY_REUSED("VYRA-IDM-002", "This Idempotency-Key was already used for a different request"),
