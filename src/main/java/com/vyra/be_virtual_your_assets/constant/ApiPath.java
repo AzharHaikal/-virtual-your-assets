@@ -79,6 +79,15 @@ public class ApiPath {
     public static final String HABIT_COMPLETION = "/{habitId}/completions/{localDate}";
 
     // =========================================================================
+    // GOAL: /api/v1/goals
+    // =========================================================================
+    public static final String V1_GOALS = "/api/v1/goals";
+    public static final String GOAL_ID = "/{goalId}";
+    public static final String GOAL_MILESTONES = "/{goalId}/milestones";
+    public static final String GOAL_MILESTONE_ID = "/{goalId}/milestones/{milestoneId}";
+    public static final String GOAL_PROGRESS = "/{goalId}/progress";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

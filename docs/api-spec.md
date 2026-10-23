@@ -31,6 +31,7 @@ Authentication uses **Bearer Token** in the `Authorization` header (except endpo
 4. [Transaction](#4-transaction)
 4a. [Mood](#4a-mood)
 4b. [Habit](#4b-habit)
+4c. [Goals](#4c-goals)
 5. [Enums](#5-enums)
 6. [Error Codes](#6-error-codes)
 
@@ -929,6 +930,57 @@ Habits of the member with a weekly schedule. Days are the member's **local days*
 `weekDone / weekScheduled` is the weekly progress of the current week (Monday–Sunday), e.g. "4/7 days".
 
 **Errors:** `404 VYRA-HBT-404`, `400 VYRA-HBT-001` (future day), `VYRA-HBT-002` (older than 7 days), `VYRA-HBT-003` (not scheduled that day), `VYRA-HBT-004` (archived), `VYRA-HBT-005` (no days for `SPECIFIC_DAYS`), `VYRA-HBT-006` (limit).
+
+---
+
+## 4c. Goals
+
+Goals measured by their **milestones** (done ÷ total) or by a **value** towards a target (current ÷ target, max 100%). Progress is always computed by the server. The status only changes when the member changes it: a passed due date or reaching 100% never changes it (the app suggests marking the goal done). Private to the member: there is no admin endpoint.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/goals?status=ACTIVE&status=PAUSED` | Goals, nearest due date first (none last); without `status` all of them. No `progressLogs` in the list |
+| `GET` | `/api/v1/goals/{goalId}` | One goal with milestones and the latest 20 progress entries |
+| `POST` | `/api/v1/goals` | Create (max 50) → `201` |
+| `PATCH` | `/api/v1/goals/{goalId}` | Change the fields that are sent, including `status` |
+| `DELETE` | `/api/v1/goals/{goalId}` | Soft delete |
+| `POST` | `/api/v1/goals/{goalId}/progress` | Add a value change and/or a note |
+| `POST` | `/api/v1/goals/{goalId}/milestones` | Add a milestone at the end (max 50 per goal) → `201` |
+| `PATCH` | `/api/v1/goals/{goalId}/milestones/{milestoneId}` | Rename and/or tick: `{ "title": "…", "completed": true }` |
+| `DELETE` | `/api/v1/goals/{goalId}/milestones/{milestoneId}` | Delete a milestone |
+
+Every write except `DELETE /goals/{goalId}` returns the whole goal (detail form), so the app can show the new progress at once.
+
+**Create body**
+
+```json
+{ "title": "Dana darurat", "description": "3x pengeluaran bulanan", "category": "FINANCE",
+  "icon": "savings", "color": "#22C55E", "progressType": "VALUE",
+  "targetValue": 10000000, "unit": "IDR", "dueDate": "2026-12-31",
+  "milestones": ["Buka rekening terpisah", "Auto-debit tiap gajian"] }
+```
+
+`category`: `FINANCE` · `HEALTH` · `CAREER` · `EDUCATION` · `PERSONAL` · `OTHER`. `progressType`: `MILESTONE` or `VALUE`; `targetValue` (> 0, 2 decimals) is required for `VALUE` and not allowed for `MILESTONE`. `dueDate` (optional, the member's day) cannot be before today. `milestones` is optional (max 50, 120 characters each). `icon` / `color` follow the category rules (4.7). The progress type cannot be changed later.
+
+**Update body** — every field optional: `title`, `description` (`""` removes it), `category`, `icon`, `color`, `targetValue` (VALUE goals only), `unit` (`""` removes it), `dueDate`, `clearDueDate: true`, `status` (`ACTIVE` · `COMPLETED` · `PAUSED` · `CANCELLED`). `COMPLETED` sets `completedAt`, any other status clears it. A due date that has already passed may be sent back unchanged; setting a new one in the past is rejected.
+
+**Progress body**: `{ "delta": 500000, "note": "Gaji Oktober" }` — at least one of them. `delta` (VALUE goals only) is added to `currentValue`; a negative delta corrects it, but the value never goes below 0. A note alone is allowed on any goal. Parallel requests on the same goal add up (the goal row is locked).
+
+**Goal object**
+
+```json
+{ "id": "9b1c…", "title": "Dana darurat", "description": "3x pengeluaran bulanan", "category": "FINANCE",
+  "icon": "savings", "color": "#22C55E", "progressType": "VALUE",
+  "targetValue": 10000000.00, "currentValue": 3500000.00, "unit": "IDR",
+  "dueDate": "2026-12-31", "status": "ACTIVE", "completedAt": null, "createdAt": "2026-10-23T03:10:00",
+  "progressPercent": 35, "milestoneDone": 1, "milestoneTotal": 2, "overdue": false,
+  "milestones": [ { "id": "…", "title": "Buka rekening terpisah", "position": 1, "completed": true, "completedAt": "2026-10-23T03:12:00" } ],
+  "progressLogs": [ { "id": "…", "delta": 500000.00, "valueAfter": 3500000.00, "note": "Gaji Oktober", "createdAt": "2026-10-23T03:15:00" } ] }
+```
+
+`progressPercent` 0–100 is rounded down, so 100 only shows when the goal is really reached. `overdue` = `ACTIVE` and the due date has passed (informational). Timestamps are UTC.
+
+**Errors:** `404 VYRA-GOL-404` (goal), `404 VYRA-GML-404` (milestone), `400 VYRA-GOL-001` (target required), `VYRA-GOL-002` (value on a MILESTONE goal), `VYRA-GOL-003` (due date in the past), `VYRA-GOL-004` (value below 0), `VYRA-GOL-005` (no value and no note), `VYRA-GOL-006` (goal limit), `VYRA-GML-001` (milestone limit).
 
 ---
 
