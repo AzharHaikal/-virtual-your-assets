@@ -143,6 +143,8 @@ public enum ErrorConstant {
     ACCOUNT_CURRENCY_UNSUPPORTED("VYRA-ACC-001", "This currency is not supported"),
     ACCOUNT_PHOTO_INVALID("VYRA-ACC-002", "Use a JPEG, PNG or WebP image"),
     ACCOUNT_PHOTO_TOO_LARGE("VYRA-ACC-003", "The photo must be 1 MB or smaller"),
+    ACCOUNT_DELETE_OTP_SENT("VYRA-ACC-DEL-001", "A verification code has been sent to your e-mail. Enter it to delete your account"),
+    ACCOUNT_DELETE_SUCCESS("VYRA-ACC-DEL-000", "Your account has been deleted"),
     GOAL_LIST_SUCCESS("VYRA-GOL-LST-000", "Goals retrieved successfully"),
     GOAL_DETAIL_SUCCESS("VYRA-GOL-DTL-000", "Goal retrieved successfully"),
     GOAL_CREATE_SUCCESS("VYRA-GOL-CRT-000", "Goal created"),

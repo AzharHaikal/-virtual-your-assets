@@ -3,9 +3,13 @@ package com.vyra.be_virtual_your_assets.controller;
 import com.vyra.be_virtual_your_assets.constant.ApiPath;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.account.AccountResponse;
+import com.vyra.be_virtual_your_assets.dto.account.DeleteAccountOtpResponse;
+import com.vyra.be_virtual_your_assets.dto.account.DeleteAccountRequest;
 import com.vyra.be_virtual_your_assets.dto.account.UpdatePreferencesRequest;
+import com.vyra.be_virtual_your_assets.dto.member.VerifyContactChangeRequest;
 import com.vyra.be_virtual_your_assets.entity.MemberPhoto;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import com.vyra.be_virtual_your_assets.service.AccountDeletionService;
 import com.vyra.be_virtual_your_assets.service.AccountService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -17,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +37,7 @@ import java.io.InputStream;
 public class AccountController {
 
     private final AccountService accountService;
+    private final AccountDeletionService accountDeletionService;
 
     @GetMapping
     public BaseResponse<AccountResponse> getAccount(Authentication authentication) {
@@ -72,6 +78,29 @@ public class AccountController {
     @DeleteMapping(ApiPath.USERS_ME_PHOTO)
     public BaseResponse<AccountResponse> deletePhoto(Authentication authentication) {
         return accountService.deletePhoto(memberId(authentication));
+    }
+
+    /** Delete the own account, step 1: PIN; an OTP is e-mailed. */
+    @PostMapping(ApiPath.USERS_ME_DELETE_REQUEST)
+    public BaseResponse<DeleteAccountOtpResponse> requestDeletion(
+            @Valid @RequestBody DeleteAccountRequest request,
+            Authentication authentication
+    ) {
+        return accountDeletionService.request(memberId(authentication), request.getPin());
+    }
+
+    @PostMapping(ApiPath.USERS_ME_DELETE_RESEND)
+    public BaseResponse<DeleteAccountOtpResponse> resendDeletionOtp(Authentication authentication) {
+        return accountDeletionService.resend(memberId(authentication));
+    }
+
+    /** Step 2: the OTP; the account becomes DELETED and every session ends. */
+    @PostMapping(ApiPath.USERS_ME_DELETE)
+    public BaseResponse<Void> confirmDeletion(
+            @Valid @RequestBody VerifyContactChangeRequest request,
+            Authentication authentication
+    ) {
+        return accountDeletionService.confirm(memberId(authentication), request.getOtpCode());
     }
 
     private static String memberId(Authentication authentication) {

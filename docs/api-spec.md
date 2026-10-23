@@ -501,6 +501,18 @@ REST endpoints for the signed-in member's own account. The `/member/*` endpoints
 
 **Errors:** `400 VYRA-INV-003` (time zone), `VYRA-ACC-001` (currency), `VYRA-ACC-002` (not a JPEG/PNG/WebP image), `VYRA-ACC-003` (larger than 1 MB), `404 VYRA-ACC-404` (no photo).
 
+### 2.5 Delete own account
+
+Two steps, like a contact change. Soft delete only: the member and all their data stay in the database with status `DELETED` and `deleted_at`; login and every token are refused afterwards, recovery goes through support.
+
+| Method | Endpoint | Body | Result |
+|---|---|---|---|
+| `POST` | `/api/v1/users/me/delete/request` | `{ "pin": "123456" }` | `VYRA-ACC-DEL-001`, `data.email` = where the OTP went |
+| `POST` | `/api/v1/users/me/delete/resend` | — | New OTP for a pending request (`VYRA-OTP-002` without one) |
+| `POST` | `/api/v1/users/me/delete` | `{ "otpCode": "654321" }` | `VYRA-ACC-DEL-000`; the account is DELETED and all sessions end |
+
+A wrong PIN counts towards the PIN lock-out (`VYRA-INV-002`, then `429`); OTP rules are the same as for other OTPs (expiry, 4 attempts, resend cool-down `429 VYRA-RTL-002`). The OTP type `DELETE_ACCOUNT` is never accepted by the public `/auth` OTP endpoints.
+
 ---
 
 ## 3. Wallet

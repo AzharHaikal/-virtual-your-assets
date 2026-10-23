@@ -59,6 +59,11 @@ public enum MemberActivityEvent {
     REQUEST_CHANGE_CONTACT("Member requested to change e-mail address or phone number"),
     SUCCESS_UPDATE_TIMEZONE("Member changed the time zone"),
 
+    // DELETE ACCOUNT (self-service)
+    REQUEST_DELETE_ACCOUNT("Member requested to delete the account"),
+    FAILED_DELETE_ACCOUNT("Member failed to confirm deleting the account"),
+    SUCCESS_DELETE_ACCOUNT("Member deleted the account"),
+
     // TRANSACTION
     ATTEMPT_CREATE_TRANSACTION("Member attempted to create a transaction"),
     SUCCESS_CREATE_TRANSACTION("Member successfully created the transaction"),

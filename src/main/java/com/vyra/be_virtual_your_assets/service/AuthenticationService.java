@@ -410,8 +410,8 @@ public class AuthenticationService {
         return switch (otpType) {
             case REGISTER -> ActiveStatus.INACTIVE == member.getStatus();
             case FORGOT_PIN, LOGIN -> ActiveStatus.ACTIVE == member.getStatus();
-            // Only reachable through the authenticated profile flow, never the public OTP endpoints.
-            case CHANGE_CONTACT -> false;
+            // Only reachable through the authenticated profile / account flows, never the public OTP endpoints.
+            case CHANGE_CONTACT, DELETE_ACCOUNT -> false;
         };
     }
 

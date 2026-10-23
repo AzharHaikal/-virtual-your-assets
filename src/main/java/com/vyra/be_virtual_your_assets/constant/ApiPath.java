@@ -89,6 +89,9 @@ public class ApiPath {
     public static final String V1_USERS_ME = "/api/v1/users/me";
     public static final String USERS_ME_PREFERENCES = "/preferences";
     public static final String USERS_ME_PHOTO = "/photo";
+    public static final String USERS_ME_DELETE = "/delete";
+    public static final String USERS_ME_DELETE_REQUEST = "/delete/request";
+    public static final String USERS_ME_DELETE_RESEND = "/delete/resend";
 
     // =========================================================================
     // GOAL: /api/v1/goals
