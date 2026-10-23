@@ -377,6 +377,16 @@ class TransactionServiceTest {
     }
 
     @Test
+    void createTransaction_withoutDescription_shouldStoreEmptyText() {
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.EXPENSE, BigDecimal.valueOf(10000));
+        request.setTransactionDesc(null);
+
+        Transaction saved = createAndCaptureFirstSave(request);
+
+        assertThat(saved.getTransactionDesc()).isEmpty();
+    }
+
+    @Test
     void createTransaction_invalidDate_shouldThrowBadRequestBeforeSaving() {
         CreateTransactionRequest request = buildCreateRequest(TransactionType.INCOME, BigDecimal.valueOf(10000));
         request.setTransactionDate("kemarin");

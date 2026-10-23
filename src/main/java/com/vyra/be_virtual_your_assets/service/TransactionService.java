@@ -29,6 +29,7 @@ import com.vyra.be_virtual_your_assets.util.TransactionUtil;
 import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -178,7 +179,8 @@ public class TransactionService {
                 .paymentMethod(request.getPaymentMethod())
                 .transactionType(request.getType())
                 .amount(request.getAmount())
-                .transactionDesc(request.getTransactionDesc())
+                // Optional in the request but NOT NULL in the table.
+                .transactionDesc(StringUtils.trimToEmpty(request.getTransactionDesc()))
                 .referenceNumber(ref)
                 .transactionDate(occurredAt)
                 .localDate(timeService.toLocalDate(occurredAt, zone))
