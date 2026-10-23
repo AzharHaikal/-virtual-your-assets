@@ -79,6 +79,11 @@ public class ApiPath {
     public static final String HABIT_COMPLETION = "/{habitId}/completions/{localDate}";
 
     // =========================================================================
+    // HOME: /api/v1/dashboard/summary (member; the portal's is under /admin)
+    // =========================================================================
+    public static final String V1_HOME_SUMMARY = "/api/v1/dashboard/summary";
+
+    // =========================================================================
     // GOAL: /api/v1/goals
     // =========================================================================
     public static final String V1_GOALS = "/api/v1/goals";

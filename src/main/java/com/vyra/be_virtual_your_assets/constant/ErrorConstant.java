@@ -134,6 +134,7 @@ public enum ErrorConstant {
     HABIT_ARCHIVED("VYRA-HBT-004", "This habit is archived"),
     HABIT_SCHEDULE_DAYS_REQUIRED("VYRA-HBT-005", "Choose at least one day"),
     HABIT_LIMIT_REACHED("VYRA-HBT-006", "You can have up to 50 habits"),
+    HOME_SUMMARY_SUCCESS("VYRA-HOM-000", "Home summary retrieved successfully"),
     GOAL_LIST_SUCCESS("VYRA-GOL-LST-000", "Goals retrieved successfully"),
     GOAL_DETAIL_SUCCESS("VYRA-GOL-DTL-000", "Goal retrieved successfully"),
     GOAL_CREATE_SUCCESS("VYRA-GOL-CRT-000", "Goal created"),

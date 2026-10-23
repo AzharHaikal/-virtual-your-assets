@@ -32,6 +32,7 @@ Authentication uses **Bearer Token** in the `Authorization` header (except endpo
 4a. [Mood](#4a-mood)
 4b. [Habit](#4b-habit)
 4c. [Goals](#4c-goals)
+4d. [Home summary](#4d-home-summary)
 5. [Enums](#5-enums)
 6. [Error Codes](#6-error-codes)
 
@@ -981,6 +982,33 @@ Every write except `DELETE /goals/{goalId}` returns the whole goal (detail form)
 `progressPercent` 0–100 is rounded down, so 100 only shows when the goal is really reached. `overdue` = `ACTIVE` and the due date has passed (informational). Timestamps are UTC.
 
 **Errors:** `404 VYRA-GOL-404` (goal), `404 VYRA-GML-404` (milestone), `400 VYRA-GOL-001` (target required), `VYRA-GOL-002` (value on a MILESTONE goal), `VYRA-GOL-003` (due date in the past), `VYRA-GOL-004` (value below 0), `VYRA-GOL-005` (no value and no note), `VYRA-GOL-006` (goal limit), `VYRA-GML-001` (milestone limit).
+
+---
+
+## 4d. Home summary
+
+`GET /api/v1/dashboard/summary` — everything the app's home screen shows in one call (member token). The numbers come from the same services as each module's own screen. A module without data is empty or `null`, never a fake 0, so the app can show an invitation instead.
+
+```json
+{ "firstName": "Azhar", "today": "2026-10-23",
+  "finance": { "balance": 1500000.00, "from": "2026-10-01", "to": "2026-10-31",
+               "totalIncome": 5000000.00, "totalExpense": 1200000.00, "net": 3800000.00, "previousExpense": 900000.00,
+               "hasTransactions": true, "topExpenseCategories": [ { "categoryId": "…", "name": "Makan", "icon": "restaurant", "color": "#F97316", "amount": 600000.00, "percentage": 50.00 } ] },
+  "mood": { "today": { "id": "…", "localDate": "2026-10-23", "moodScore": 4, "note": null, "tags": [], "checkedInAt": "…" },
+            "weekAverage": 3.5, "weekEntries": 2 },
+  "habits": { "doneToday": 1, "totalToday": 3, "hasHabits": true, "today": [ "habit objects (4b)" ] },
+  "goals": { "activeCount": 4, "top": [ "up to 3 active goal objects (4c), nearest due date first" ] },
+  "recentActivity": [
+    { "type": "HABIT", "refId": "…", "title": "Minum air", "icon": "local_drink", "color": "#3B82F6", "occurredAt": "…", "count": 3, "targetCount": 8 },
+    { "type": "MOOD", "refId": "…", "occurredAt": "…", "moodScore": 4 },
+    { "type": "GOAL", "refId": "…", "title": "Dana darurat", "icon": "savings", "color": "#22C55E", "occurredAt": "…", "amount": 100000.00, "unit": "IDR", "hasNote": false },
+    { "type": "TRANSACTION", "refId": "…", "title": "Makan", "icon": "restaurant", "color": "#F97316", "occurredAt": "…", "transactionType": "EXPENSE", "amount": 50000.00 } ] }
+```
+
+- `finance`: this calendar month in the member's zone; `balance` is `null` without a wallet; `hasTransactions=false` means no transaction this month. `topExpenseCategories` = the biggest 3.
+- `mood.today` is `null` until the member checks in; `weekAverage` (last 7 days, 1 decimal) is `null` without entries.
+- `habits`: today's checklist (active habits scheduled today). `hasHabits=false` = no active habit at all.
+- `recentActivity`: newest first, max 8, from the latest 3 transactions, mood check-ins and habit progress of the last 7 days and the latest 5 goal progress entries. Each item only has the fields of its type. Journal text and goal notes are never included. Times are UTC.
 
 ---
 
