@@ -1,6 +1,9 @@
 package com.vyra.be_virtual_your_assets.entity;
 
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
+import com.vyra.be_virtual_your_assets.constant.AppCurrency;
+import com.vyra.be_virtual_your_assets.constant.AppLanguage;
+import com.vyra.be_virtual_your_assets.constant.AppTheme;
 import com.vyra.be_virtual_your_assets.service.TimeService;
 import jakarta.persistence.*;
 import lombok.*;
@@ -54,10 +57,32 @@ public class Member extends BaseEntity {
     @Column(nullable = false, length = 64)
     private String timezone;
 
+    /** Preferences shared by all the member's devices (Phase 1.10). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 8)
+    private AppTheme theme;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 2)
+    private AppLanguage language;
+
+    /** ISO 4217 code used to format amounts; no exchange rates. */
+    @Column(nullable = false, length = 3)
+    private String currency;
+
     @PrePersist
-    void defaultTimezone() {
+    void defaultPreferences() {
         if (timezone == null) {
             timezone = TimeService.FALLBACK_ZONE_ID;
+        }
+        if (theme == null) {
+            theme = AppTheme.LIGHT;
+        }
+        if (language == null) {
+            language = AppLanguage.EN;
+        }
+        if (currency == null) {
+            currency = AppCurrency.DEFAULT;
         }
     }
 }

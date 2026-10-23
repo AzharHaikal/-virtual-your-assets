@@ -474,6 +474,35 @@ Change the authenticated member's PIN. On success every other session of the mem
 
 ---
 
+### 2.4 Account & preferences (`/api/v1/users/me`)
+
+REST endpoints for the signed-in member's own account. The `/member/*` endpoints above stay for older apps.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/users/me` | Profile and preferences |
+| `PATCH` | `/api/v1/users/me/preferences` | Change the preferences that are sent |
+| `PUT` | `/api/v1/users/me/photo` | Replace the profile photo (raw image bytes as the body) |
+| `GET` | `/api/v1/users/me/photo` | The photo bytes with their `Content-Type` (`404 VYRA-ACC-404` without a photo) |
+| `DELETE` | `/api/v1/users/me/photo` | Remove the photo (idempotent) |
+
+**Account object**
+
+```json
+{ "id": "…", "firstName": "Azhar", "lastName": "Haikal", "fullName": "Azhar Haikal",
+  "email": "…", "phoneNumber": "628…", "timezone": "Asia/Jakarta",
+  "theme": "DARK", "language": "ID", "currency": "IDR",
+  "photoUpdatedAt": "2026-10-24T02:00:00", "createdAt": "…" }
+```
+
+**Preferences body** — every field optional: `theme` (`LIGHT` · `DARK`), `language` (`ID` · `EN`), `timezone` (IANA region id such as `Asia/Jakarta`; only data written afterwards uses it), `currency` (`IDR` · `USD` · `EUR` · `SGD` · `MYR` · `JPY` · `AUD`; display only, no exchange rates). New members start with `LIGHT`, `EN`, `IDR`.
+
+**Photo**: the app compresses it first; the body may be at most 1 MB. Only JPEG, PNG and WebP are stored; the type is read from the image bytes, not from the request header. `photoUpdatedAt` changes with every new photo (`null` without one), so the app can cache by it.
+
+**Errors:** `400 VYRA-INV-003` (time zone), `VYRA-ACC-001` (currency), `VYRA-ACC-002` (not a JPEG/PNG/WebP image), `VYRA-ACC-003` (larger than 1 MB), `404 VYRA-ACC-404` (no photo).
+
+---
+
 ## 3. Wallet
 
 Base path: `/api/v1/wallet`

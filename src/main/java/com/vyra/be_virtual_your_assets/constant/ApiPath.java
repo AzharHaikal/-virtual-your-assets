@@ -84,6 +84,13 @@ public class ApiPath {
     public static final String V1_HOME_SUMMARY = "/api/v1/dashboard/summary";
 
     // =========================================================================
+    // ACCOUNT: /api/v1/users/me (the old /member endpoints stay for older apps)
+    // =========================================================================
+    public static final String V1_USERS_ME = "/api/v1/users/me";
+    public static final String USERS_ME_PREFERENCES = "/preferences";
+    public static final String USERS_ME_PHOTO = "/photo";
+
+    // =========================================================================
     // GOAL: /api/v1/goals
     // =========================================================================
     public static final String V1_GOALS = "/api/v1/goals";
