@@ -8,6 +8,7 @@ import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionRequest;
 import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryResponse;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
+import com.vyra.be_virtual_your_assets.service.IdempotencyService;
 import com.vyra.be_virtual_your_assets.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,10 @@ import static com.vyra.be_virtual_your_assets.constant.ApiPath.*;
 @RequiredArgsConstructor
 @RequestMapping(ApiPath.V1_TRANSACTION)
 public class TransactionController {
+    public static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+
     private final TransactionService transactionService;
+    private final IdempotencyService idempotencyService;
 
     @GetMapping(GET_CHART)
     public BaseResponse<GetChartResponse> getChart(@RequestParam String period, Authentication authentication) {
@@ -31,13 +35,16 @@ public class TransactionController {
         return transactionService.getChart(user.getMemberId(), period);
     }
 
+    /** With an Idempotency-Key header a retry of the same request returns the first response instead of a duplicate. */
     @PostMapping(CREATE_TRANSACTION)
     public BaseResponse<CreateTransactionResponse> createTransaction(
             @RequestBody @Valid CreateTransactionRequest request,
+            @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             Authentication authentication
     ) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
-        return transactionService.createTransaction(user.getMemberId(), request);
+        return idempotencyService.execute(user.getMemberId(), idempotencyKey, request, CreateTransactionResponse.class,
+                () -> transactionService.createTransaction(user.getMemberId(), request));
     }
 
     @GetMapping(GET_TOP_TRANSACTION_HISTORY)

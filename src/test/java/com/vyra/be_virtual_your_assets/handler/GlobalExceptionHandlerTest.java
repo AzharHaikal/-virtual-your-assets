@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
+import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -13,6 +14,8 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -37,6 +40,38 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED.getCode());
         assertThat(response.getBody().getResponseMessage()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED.getMessage());
         assertThat(response.getBody().getData()).isNull();
+    }
+
+    @Test
+    void handleNotFound_shouldReturn404WithTheResourceCode() {
+        ResponseEntity<BaseResponse<Void>> response =
+                handler.handleNotFound(new NotFoundException(ErrorConstant.TRANSACTION_NOT_FOUND));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.TRANSACTION_NOT_FOUND.getCode());
+    }
+
+    @Test
+    void handleTypeMismatch_shouldReturn400NamingTheParameter() {
+        MethodArgumentTypeMismatchException ex =
+                new MethodArgumentTypeMismatchException("NOPE", null, "category", null, null);
+
+        ResponseEntity<BaseResponse<Void>> response = handler.handleTypeMismatch(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().getResponseStatus()).isEqualTo(ErrorConstant.BAD_REQUEST.getCode());
+        assertThat(response.getBody().getResponseMessage()).isEqualTo("Invalid value for category");
+    }
+
+    @Test
+    void handleUnreadableBody_shouldReturn400WithoutEchoingTheBody() {
+        HttpMessageNotReadableException ex = new HttpMessageNotReadableException(
+                "JSON parse error: Cannot deserialize value \"secret\"", mock(org.springframework.http.HttpInputMessage.class));
+
+        ResponseEntity<BaseResponse<Void>> response = handler.handleUnreadableBody(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().getResponseMessage()).isEqualTo("Invalid request body");
     }
 
     // =========================================================================

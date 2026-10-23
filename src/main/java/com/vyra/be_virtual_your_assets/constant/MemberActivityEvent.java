@@ -59,10 +59,18 @@ public enum MemberActivityEvent {
     REQUEST_CHANGE_CONTACT("Member requested to change e-mail address or phone number"),
     SUCCESS_UPDATE_TIMEZONE("Member changed the time zone"),
 
+    // DELETE ACCOUNT (self-service)
+    REQUEST_DELETE_ACCOUNT("Member requested to delete the account"),
+    FAILED_DELETE_ACCOUNT("Member failed to confirm deleting the account"),
+    SUCCESS_DELETE_ACCOUNT("Member deleted the account"),
+
     // TRANSACTION
     ATTEMPT_CREATE_TRANSACTION("Member attempted to create a transaction"),
     SUCCESS_CREATE_TRANSACTION("Member successfully created the transaction"),
     FAILED_CREATE_TRANSACTION("Member failed to create a transaction"),
+    ATTEMPT_UPDATE_TRANSACTION("Member attempted to update a transaction"),
+    SUCCESS_UPDATE_TRANSACTION("Member successfully updated the transaction"),
+    SUCCESS_DELETE_TRANSACTION("Member deleted a transaction"),
 
     // TRANSACTION WALLET / STATEMENT (Sistem internal ledger)
     ATTEMPT_INSERT_WALLET_STATEMENT("Attempted to update the wallet statement"),

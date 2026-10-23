@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.entity;
 
+import com.vyra.be_virtual_your_assets.constant.transaction.PaymentMethod;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import jakarta.persistence.*;
@@ -46,7 +47,11 @@ public class Transaction extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String userEmail;
 
+    /** Legacy code (built-in category code, or OTHERS_* for a custom one); see {@link #categoryId}. */
     private String transactionCategory;
+
+    /** finance_category.id (built-in "default-&lt;CODE&gt;" or the member's own category). */
+    private String categoryId;
 
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "varchar(20)")
@@ -64,6 +69,11 @@ public class Transaction extends BaseEntity {
 
     @Column(nullable = false, unique = true, length = 50)
     private String referenceNumber;
+
+    /** Optional. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private PaymentMethod paymentMethod;
 
     /** UTC instant of the transaction. */
     private LocalDateTime transactionDate;

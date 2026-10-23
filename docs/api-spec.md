@@ -29,6 +29,10 @@ Authentication uses **Bearer Token** in the `Authorization` header (except endpo
 2. [Member](#2-member)
 3. [Wallet](#3-wallet)
 4. [Transaction](#4-transaction)
+4a. [Mood](#4a-mood)
+4b. [Habit](#4b-habit)
+4c. [Goals](#4c-goals)
+4d. [Home summary](#4d-home-summary)
 5. [Enums](#5-enums)
 6. [Error Codes](#6-error-codes)
 
@@ -470,6 +474,47 @@ Change the authenticated member's PIN. On success every other session of the mem
 
 ---
 
+### 2.4 Account & preferences (`/api/v1/users/me`)
+
+REST endpoints for the signed-in member's own account. The `/member/*` endpoints above stay for older apps.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/users/me` | Profile and preferences |
+| `PATCH` | `/api/v1/users/me/preferences` | Change the preferences that are sent |
+| `PUT` | `/api/v1/users/me/photo` | Replace the profile photo (raw image bytes as the body) |
+| `GET` | `/api/v1/users/me/photo` | The photo bytes with their `Content-Type` (`404 VYRA-ACC-404` without a photo) |
+| `DELETE` | `/api/v1/users/me/photo` | Remove the photo (idempotent) |
+
+**Account object**
+
+```json
+{ "id": "…", "firstName": "Azhar", "lastName": "Haikal", "fullName": "Azhar Haikal",
+  "email": "…", "phoneNumber": "628…", "timezone": "Asia/Jakarta",
+  "theme": "DARK", "language": "ID", "currency": "IDR",
+  "photoUpdatedAt": "2026-10-24T02:00:00", "createdAt": "…" }
+```
+
+**Preferences body** — every field optional: `theme` (`LIGHT` · `DARK`), `language` (`ID` · `EN`), `timezone` (IANA region id such as `Asia/Jakarta`; only data written afterwards uses it), `currency` (`IDR` · `USD` · `EUR` · `SGD` · `MYR` · `JPY` · `AUD`; display only, no exchange rates). New members start with `LIGHT`, `EN`, `IDR`.
+
+**Photo**: the app compresses it first; the body may be at most 1 MB. Only JPEG, PNG and WebP are stored; the type is read from the image bytes, not from the request header. `photoUpdatedAt` changes with every new photo (`null` without one), so the app can cache by it.
+
+**Errors:** `400 VYRA-INV-003` (time zone), `VYRA-ACC-001` (currency), `VYRA-ACC-002` (not a JPEG/PNG/WebP image), `VYRA-ACC-003` (larger than 1 MB), `404 VYRA-ACC-404` (no photo).
+
+### 2.5 Delete own account
+
+Two steps, like a contact change. Soft delete only: the member and all their data stay in the database with status `DELETED` and `deleted_at`; login and every token are refused afterwards, recovery goes through support.
+
+| Method | Endpoint | Body | Result |
+|---|---|---|---|
+| `POST` | `/api/v1/users/me/delete/request` | `{ "pin": "123456" }` | `VYRA-ACC-DEL-001`, `data.email` = where the OTP went |
+| `POST` | `/api/v1/users/me/delete/resend` | — | New OTP for a pending request (`VYRA-OTP-002` without one) |
+| `POST` | `/api/v1/users/me/delete` | `{ "otpCode": "654321" }` | `VYRA-ACC-DEL-000`; the account is DELETED and all sessions end |
+
+A wrong PIN counts towards the PIN lock-out (`VYRA-INV-002`, then `429`); OTP rules are the same as for other OTPs (expiry, 4 attempts, resend cool-down `429 VYRA-RTL-002`). The OTP type `DELETE_ACCOUNT` is never accepted by the public `/auth` OTP endpoints.
+
+---
+
 ## 3. Wallet
 
 Base path: `/api/v1/wallet`
@@ -592,15 +637,19 @@ Retrieve income and expense chart data for the authenticated member, grouped by 
 
 Record a new income or expense transaction for the authenticated member.
 
+**Header (recommended):** `Idempotency-Key: <unique id per form submission>` (max 100 chars). Sending the same request again with the same key (e.g. a retry after a timeout) returns the first response and creates **no** duplicate. The same key with a different body → `409 VYRA-IDM-002`; the same key while the first request is still running → `409 VYRA-IDM-003`. Keys expire after 24 hours. Without the header the request is processed normally.
+
 **Request Body**
 
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
-| `category` | `TransactionCategory` | ❌ | See [Enums](#5-enums) |
-| `type` | `TransactionType` | ❌ | `INCOME` or `EXPENSE` |
+| `categoryId` | string | ❌ | Category id from [4.7](#47-finance-categories) (built-in or own); must match `type`. Preferred over `category` |
+| `category` | `TransactionCategory` | ❌ | Legacy built-in category (older apps). Neither given → "Other" of the type |
+| `type` | `TransactionType` | ✅ | `INCOME` or `EXPENSE` |
 | `amount` | decimal | ✅ | Must be greater than 0 |
 | `transactionDate` | string | ❌ | ISO-8601 with offset (`2026-06-10T09:00:00+07:00`). Without offset it is read in the member's time zone; empty = now. Invalid → `400 VYRA-INV-004` |
 | `transactionDesc` | string | ❌ | Transaction description |
+| `paymentMethod` | string | ❌ | `CASH`, `TRANSFER`, `E_WALLET`, `CARD`, `OTHER` |
 
 **Request Example**
 
@@ -699,7 +748,8 @@ Retrieve paginated transaction history for the authenticated member with date ra
         "status": "SUCCESS",
         "amount": 5000000.00,
         "transactionDesc": "Monthly salary",
-        "transactionDate": "2026-06-10T02:00:00Z"
+        "transactionDate": "2026-06-10T02:00:00Z",
+        "localDate": "2026-06-10"
       }
     ],
     "totalElements": 25,
@@ -709,6 +759,297 @@ Retrieve paginated transaction history for the authenticated member with date ra
   }
 }
 ```
+
+---
+
+### 4.5 Update Transaction
+
+`PATCH /api/v1/transactions/{transactionId}`
+
+Edits one of the member's own transactions. Every field is optional (`null` keeps the current value). The wallet is corrected by the difference and the change is added to the wallet history as an `UPDATE` entry (the original entry is never rewritten). Only `SUCCESS` transactions can be edited.
+
+**Request Body**
+
+| Field | Type | Required | Validation |
+|-------|------|----------|------------|
+| `type` | `TransactionType` | ❌ | `INCOME` or `EXPENSE` |
+| `categoryId` | string | ❌ | Category id (built-in or own), must match the (new) type |
+| `category` | `TransactionCategory` | ❌ | Legacy built-in category |
+| `amount` | decimal | ❌ | Greater than 0; the sign follows `type` |
+| `transactionDate` | string | ❌ | Same rules as on create; the local date is recomputed |
+| `transactionDesc` | string | ❌ | Max 255 chars |
+
+**Request Example**
+
+```json
+{ "amount": 75000, "transactionDesc": "Makan siang kantor" }
+```
+
+**Response `200 OK`**
+
+```json
+{
+  "responseStatus": "VYRA-UTS-000",
+  "responseMessage": "Transaction updated successfully",
+  "data": {
+    "transaction": {
+      "transactionId": "uuid-string",
+      "referenceNumber": "VYRA20261022...",
+      "type": "EXPENSE",
+      "category": "FOOD_AND_BEVERAGE",
+      "status": "SUCCESS",
+      "amount": -75000.00,
+      "transactionDesc": "Makan siang kantor",
+      "transactionDate": "2026-10-22T05:00:00Z",
+      "localDate": "2026-10-22"
+    },
+    "balance": 725000.00,
+    "totalIncome": 1000000.00,
+    "totalExpense": -275000.00
+  }
+}
+```
+
+**Errors:** `404 VYRA-TRX-404` (not found, deleted, or another member's), `400 VYRA-TRX-001` (not a `SUCCESS` transaction), `400` validation errors.
+
+---
+
+### 4.6 Delete Transaction
+
+`DELETE /api/v1/transactions/{transactionId}`
+
+Soft-deletes one of the member's own transactions (`status = DELETED`, `deletedAt` set) and removes it from the wallet with a `DELETE` history entry. Deleted transactions disappear from history, charts and summaries. **Idempotent:** deleting an already deleted transaction returns `200` and changes nothing.
+
+**Response `200 OK`** — same shape as 4.5 with `responseStatus: "VYRA-DTS-000"` and `transaction.status: "DELETED"`.
+
+**Errors:** `404 VYRA-TRX-404` (not found or another member's).
+
+---
+
+### 4.8 List Transactions (search, filter, sort)
+
+`GET /api/v1/transactions`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `type` | `TransactionType` | — | `INCOME` / `EXPENSE` |
+| `categoryId` | string | — | One category |
+| `from`, `to` | date (`yyyy-MM-dd`) | — | Member's local dates, inclusive |
+| `q` | string | — | Searches description and reference number (case-insensitive) |
+| `sort` | string | `date,desc` | `date` or `amount` (absolute value), `,asc` / `,desc` |
+| `page`, `size` | int | `0`, `20` | `size` max 100 |
+
+Response `VYRA-TRX-LST-000`, `data` = `{ content: [history item…], pageNumber, pageSize, totalElements, totalPages, last }`. Items as in 4.4 plus `categoryId/Name/Icon/Color` and `paymentMethod`. Deleted transactions are never listed. Errors: `400 VYRA-INV-005` (from after to), `400 VYRA-INV-006` (sort).
+
+---
+
+### 4.9 Finance Summary
+
+`GET /api/v1/finance/summary?from=2026-10-01&to=2026-10-31`
+
+`from` / `to` optional (default: the current month in the member's time zone). Only `SUCCESS` transactions count; all amounts are positive.
+
+```json
+{
+  "responseStatus": "VYRA-FIN-SUM-000",
+  "data": {
+    "from": "2026-10-01", "to": "2026-10-31",
+    "totalIncome": 5000000.00, "totalExpense": 400000.00, "net": 4600000.00,
+    "previousFrom": "2026-09-01", "previousTo": "2026-09-30",
+    "previousIncome": 4800000.00, "previousExpense": 380000.00,
+    "expenseByCategory": [
+      { "categoryId": "default-FOOD_AND_BEVERAGE", "code": "FOOD_AND_BEVERAGE", "name": "Food & Beverage",
+        "icon": "restaurant", "color": "#EF4444", "amount": 300000.00, "percentage": 75.0 }
+    ],
+    "incomeByCategory": [ ... ]
+  }
+}
+```
+
+The previous period is the previous calendar month when the range is a whole month, otherwise the same number of days just before `from`. Categories are sorted biggest first.
+
+---
+
+### 4.7 Finance Categories
+
+Built-in categories (shared, `custom: false`, id `default-<CODE>`) plus the member's own (`custom: true`). Errors for another member's category look like a missing one.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/finance/categories?type=INCOME\|EXPENSE` | Built-in first, then own; `type` optional |
+| `POST` | `/api/v1/finance/categories` | Create own category → `201` |
+| `PATCH` | `/api/v1/finance/categories/{categoryId}` | Rename / change icon or color (own only; the type cannot change) |
+| `DELETE` | `/api/v1/finance/categories/{categoryId}` | Soft delete (own only); transactions keep showing its name |
+
+**Create body:** `name` (≤ 50, unique per type), `type`, `icon` (key such as `local_cafe`, pattern `^[a-z][a-z0-9_]{0,39}$`), `color` (`#RRGGBB`). Max 50 own categories.
+
+**Category object**
+
+```json
+{ "id": "default-FOOD_AND_BEVERAGE", "code": "FOOD_AND_BEVERAGE", "name": "Food & Beverage",
+  "type": "EXPENSE", "icon": "restaurant", "color": "#EF4444", "custom": false }
+```
+
+Transactions in history responses now also carry `categoryId`, `categoryName`, `categoryIcon` and `categoryColor`; `category` keeps the legacy code (`OTHERS_*` for a custom category).
+
+**Errors:** `404 VYRA-CAT-404`, `409 VYRA-CAT-002` (name exists), `400 VYRA-CAT-003` (limit), on transactions `400 VYRA-CAT-001` (type mismatch) / `400 VYRA-CAT-404` (unknown or deleted category).
+
+---
+
+## 4a. Mood
+
+One check-in per member and **local day** (the member's time zone). Only the member can read it — there is no admin endpoint. The journal (`note`) is encrypted at rest and never logged.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/mood-entries?from=yyyy-MM-dd&to=yyyy-MM-dd` | Entries of the range, newest first (default: the last 30 days up to today) |
+| `GET` | `/api/v1/mood-entries/today` | Today's entry; `data: null` when there is none yet |
+| `PUT` | `/api/v1/mood-entries/{localDate}` | Create or replace the entry of that day |
+| `DELETE` | `/api/v1/mood-entries/{localDate}` | Soft delete of that day's entry |
+| `GET` | `/api/v1/mood-tags` | Built-in tags first, then own |
+| `POST` | `/api/v1/mood-tags` | Create own tag (`name` ≤ 40, unique per member, max 30) → `201` |
+| `DELETE` | `/api/v1/mood-tags/{tagId}` | Soft delete of an own tag; past entries keep showing it |
+
+**PUT body**
+
+```json
+{ "moodScore": 4, "note": "Hari ini produktif", "tagIds": ["mood-tag-GOOD_SLEEP", "mood-tag-WORK"] }
+```
+
+`moodScore` 1 (very bad) … 5 (very good), required. `note` ≤ 2000 characters, optional. `tagIds` at most 10. Saving the same day twice updates that day's entry (also under concurrent requests). A day after today in the member's zone is rejected.
+
+**Entry object**
+
+```json
+{ "id": "c3c8…", "localDate": "2026-10-23", "moodScore": 4, "note": "Hari ini produktif",
+  "tags": [ { "id": "mood-tag-WORK", "code": "WORK", "name": "Work", "custom": false } ],
+  "checkedInAt": "2026-10-23T02:41:50Z" }
+```
+
+Built-in tag codes: `GOOD_SLEEP`, `FRIENDS`, `FAMILY`, `WORK`, `EXERCISE`, `GOOD_FOOD`, `HOBBY`, `ACHIEVEMENT`, `STRESS`, `TIRED`, `SICK`, `MONEY` (id `mood-tag-<CODE>`). Clients translate built-in names by `code`.
+
+**Errors:** `400 VYRA-MOD-001` (future day), `404 VYRA-MOD-404` (no entry that day), `400 VYRA-MTG-404` / `404 VYRA-MTG-404` (unknown tag on save / delete), `409 VYRA-MTG-002` (name exists), `400 VYRA-MTG-003` (limit).
+
+---
+
+## 4b. Habit
+
+Habits of the member with a weekly schedule. Days are the member's **local days**. A day the habit is not scheduled on never counts as missed. Private to the member: there is no admin endpoint.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/habits?category=HEALTH&archived=false` | Habits in the order they were added; `category` optional, `archived=true` lists only archived ones |
+| `GET` | `/api/v1/habits/today` | Today's checklist: active habits scheduled today |
+| `POST` | `/api/v1/habits` | Create (max 50) → `201` |
+| `PATCH` | `/api/v1/habits/{habitId}` | Change the fields that are sent |
+| `DELETE` | `/api/v1/habits/{habitId}` | Soft delete |
+| `POST` | `/api/v1/habits/{habitId}/archive` · `/unarchive` | Leaves / returns to the checklist, history is kept (idempotent) |
+| `PUT` | `/api/v1/habits/{habitId}/completions/{localDate}` | Set the progress of that day (idempotent) |
+| `DELETE` | `/api/v1/habits/{habitId}/completions/{localDate}` | Remove the progress of that day (idempotent) |
+
+**Create body**
+
+```json
+{ "name": "Minum air", "category": "HEALTH", "icon": "local_drink", "color": "#3B82F6",
+  "targetCount": 8, "scheduleType": "SPECIFIC_DAYS", "scheduleDays": ["MONDAY", "WEDNESDAY", "FRIDAY"] }
+```
+
+`category`: `PRODUCTIVITY` · `HEALTH` · `PERSONAL` · `OTHER`. `targetCount` 1–100 (default 1 = done / not done). `scheduleType` `DAILY` or `SPECIFIC_DAYS` (then `scheduleDays` is required). `icon` / `color` follow the category rules (4.7). The habit starts on the member's current day.
+
+**Completion body** (optional): `{ "count": 3 }` (1–1000). Without it the day is set to `targetCount` (done). A day is done when `count ≥ targetCount`. Only today and the 6 days before can be marked, and only days the habit is scheduled on (from its start day). Parallel requests for the same day leave one row.
+
+**Habit object**
+
+```json
+{ "id": "f67c…", "name": "Minum air", "category": "HEALTH", "icon": "local_drink", "color": "#3B82F6",
+  "targetCount": 8, "scheduleType": "DAILY", "scheduleDays": ["MONDAY", "…", "SUNDAY"],
+  "startDate": "2026-10-23", "archived": false,
+  "scheduledToday": true, "todayCount": 3, "doneToday": false,
+  "weekDone": 4, "weekScheduled": 7,
+  "week": [ { "localDate": "2026-10-19", "scheduled": true, "count": 8, "done": true }, "… Monday to Sunday" ] }
+```
+
+`weekDone / weekScheduled` is the weekly progress of the current week (Monday–Sunday), e.g. "4/7 days".
+
+**Errors:** `404 VYRA-HBT-404`, `400 VYRA-HBT-001` (future day), `VYRA-HBT-002` (older than 7 days), `VYRA-HBT-003` (not scheduled that day), `VYRA-HBT-004` (archived), `VYRA-HBT-005` (no days for `SPECIFIC_DAYS`), `VYRA-HBT-006` (limit).
+
+---
+
+## 4c. Goals
+
+Goals measured by their **milestones** (done ÷ total) or by a **value** towards a target (current ÷ target, max 100%). Progress is always computed by the server. The status only changes when the member changes it: a passed due date or reaching 100% never changes it (the app suggests marking the goal done). Private to the member: there is no admin endpoint.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/goals?status=ACTIVE&status=PAUSED` | Goals, nearest due date first (none last); without `status` all of them. No `progressLogs` in the list |
+| `GET` | `/api/v1/goals/{goalId}` | One goal with milestones and the latest 20 progress entries |
+| `POST` | `/api/v1/goals` | Create (max 50) → `201` |
+| `PATCH` | `/api/v1/goals/{goalId}` | Change the fields that are sent, including `status` |
+| `DELETE` | `/api/v1/goals/{goalId}` | Soft delete |
+| `POST` | `/api/v1/goals/{goalId}/progress` | Add a value change and/or a note |
+| `POST` | `/api/v1/goals/{goalId}/milestones` | Add a milestone at the end (max 50 per goal) → `201` |
+| `PATCH` | `/api/v1/goals/{goalId}/milestones/{milestoneId}` | Rename and/or tick: `{ "title": "…", "completed": true }` |
+| `DELETE` | `/api/v1/goals/{goalId}/milestones/{milestoneId}` | Delete a milestone |
+
+Every write except `DELETE /goals/{goalId}` returns the whole goal (detail form), so the app can show the new progress at once.
+
+**Create body**
+
+```json
+{ "title": "Dana darurat", "description": "3x pengeluaran bulanan", "category": "FINANCE",
+  "icon": "savings", "color": "#22C55E", "progressType": "VALUE",
+  "targetValue": 10000000, "unit": "IDR", "dueDate": "2026-12-31",
+  "milestones": ["Buka rekening terpisah", "Auto-debit tiap gajian"] }
+```
+
+`category`: `FINANCE` · `HEALTH` · `CAREER` · `EDUCATION` · `PERSONAL` · `OTHER`. `progressType`: `MILESTONE` or `VALUE`; `targetValue` (> 0, 2 decimals) is required for `VALUE` and not allowed for `MILESTONE`. `dueDate` (optional, the member's day) cannot be before today. `milestones` is optional (max 50, 120 characters each). `icon` / `color` follow the category rules (4.7). The progress type cannot be changed later.
+
+**Update body** — every field optional: `title`, `description` (`""` removes it), `category`, `icon`, `color`, `targetValue` (VALUE goals only), `unit` (`""` removes it), `dueDate`, `clearDueDate: true`, `status` (`ACTIVE` · `COMPLETED` · `PAUSED` · `CANCELLED`). `COMPLETED` sets `completedAt`, any other status clears it. A due date that has already passed may be sent back unchanged; setting a new one in the past is rejected.
+
+**Progress body**: `{ "delta": 500000, "note": "Gaji Oktober" }` — at least one of them. `delta` (VALUE goals only) is added to `currentValue`; a negative delta corrects it, but the value never goes below 0. A note alone is allowed on any goal. Parallel requests on the same goal add up (the goal row is locked).
+
+**Goal object**
+
+```json
+{ "id": "9b1c…", "title": "Dana darurat", "description": "3x pengeluaran bulanan", "category": "FINANCE",
+  "icon": "savings", "color": "#22C55E", "progressType": "VALUE",
+  "targetValue": 10000000.00, "currentValue": 3500000.00, "unit": "IDR",
+  "dueDate": "2026-12-31", "status": "ACTIVE", "completedAt": null, "createdAt": "2026-10-23T03:10:00",
+  "progressPercent": 35, "milestoneDone": 1, "milestoneTotal": 2, "overdue": false,
+  "milestones": [ { "id": "…", "title": "Buka rekening terpisah", "position": 1, "completed": true, "completedAt": "2026-10-23T03:12:00" } ],
+  "progressLogs": [ { "id": "…", "delta": 500000.00, "valueAfter": 3500000.00, "note": "Gaji Oktober", "createdAt": "2026-10-23T03:15:00" } ] }
+```
+
+`progressPercent` 0–100 is rounded down, so 100 only shows when the goal is really reached. `overdue` = `ACTIVE` and the due date has passed (informational). Timestamps are UTC.
+
+**Errors:** `404 VYRA-GOL-404` (goal), `404 VYRA-GML-404` (milestone), `400 VYRA-GOL-001` (target required), `VYRA-GOL-002` (value on a MILESTONE goal), `VYRA-GOL-003` (due date in the past), `VYRA-GOL-004` (value below 0), `VYRA-GOL-005` (no value and no note), `VYRA-GOL-006` (goal limit), `VYRA-GML-001` (milestone limit).
+
+---
+
+## 4d. Home summary
+
+`GET /api/v1/dashboard/summary` — everything the app's home screen shows in one call (member token). The numbers come from the same services as each module's own screen. A module without data is empty or `null`, never a fake 0, so the app can show an invitation instead.
+
+```json
+{ "firstName": "Azhar", "today": "2026-10-23",
+  "finance": { "balance": 1500000.00, "from": "2026-10-01", "to": "2026-10-31",
+               "totalIncome": 5000000.00, "totalExpense": 1200000.00, "net": 3800000.00, "previousExpense": 900000.00,
+               "hasTransactions": true, "topExpenseCategories": [ { "categoryId": "…", "name": "Makan", "icon": "restaurant", "color": "#F97316", "amount": 600000.00, "percentage": 50.00 } ] },
+  "mood": { "today": { "id": "…", "localDate": "2026-10-23", "moodScore": 4, "note": null, "tags": [], "checkedInAt": "…" },
+            "weekAverage": 3.5, "weekEntries": 2 },
+  "habits": { "doneToday": 1, "totalToday": 3, "hasHabits": true, "today": [ "habit objects (4b)" ] },
+  "goals": { "activeCount": 4, "top": [ "up to 3 active goal objects (4c), nearest due date first" ] },
+  "recentActivity": [
+    { "type": "HABIT", "refId": "…", "title": "Minum air", "icon": "local_drink", "color": "#3B82F6", "occurredAt": "…", "count": 3, "targetCount": 8 },
+    { "type": "MOOD", "refId": "…", "occurredAt": "…", "moodScore": 4 },
+    { "type": "GOAL", "refId": "…", "title": "Dana darurat", "icon": "savings", "color": "#22C55E", "occurredAt": "…", "amount": 100000.00, "unit": "IDR", "hasNote": false },
+    { "type": "TRANSACTION", "refId": "…", "title": "Makan", "icon": "restaurant", "color": "#F97316", "occurredAt": "…", "transactionType": "EXPENSE", "amount": 50000.00 } ] }
+```
+
+- `finance`: this calendar month in the member's zone; `balance` is `null` without a wallet; `hasTransactions=false` means no transaction this month. `topExpenseCategories` = the biggest 3.
+- `mood.today` is `null` until the member checks in; `weekAverage` (last 7 days, 1 decimal) is `null` without entries.
+- `habits`: today's checklist (active habits scheduled today). `hasHabits=false` = no active habit at all.
+- `recentActivity`: newest first, max 8, from the latest 3 transactions, mood check-ins and habit progress of the last 7 days and the latest 5 goal progress entries. Each item only has the fields of its type. Journal text and goal notes are never included. Times are UTC.
 
 ---
 
@@ -819,6 +1160,6 @@ Retrieve paginated transaction history for the authenticated member with date ra
 | `VYRA-UPS-001` | A verification code has been sent. Enter it to confirm the change… | Contact change staged (HTTP 200) |
 | `VYRA-ERR503` | The system is busy right now. Please try again in a moment | HTTP 503 – database lock / statement timeout |
 | `VYRA-RTL-002` | A code was sent recently. Please wait before requesting another one. Try again in N seconds. | HTTP 429 – OTP e-mail cool-down |
-| `VYRA-ERR400` | Something went wrong with your request | Bad request / validation error |
+| `VYRA-ERR400` | Something went wrong with your request | Bad request / validation error; also an unknown value in the path or query (`Invalid value for category`) or an unreadable body (`Invalid request body`) |
 | `VYRA-ERR404` | The requested data could not be found | Data not found |
 | `VYRA-ERR500` | We are experiencing a system issue. Please try again later | Internal server error |

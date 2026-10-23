@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.entity;
 
+import com.vyra.be_virtual_your_assets.constant.WalletEntryType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -39,5 +40,17 @@ public class WalletStatementHistory extends BaseEntity {
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal currentBalance;
+
+    /** CREATE for the transaction itself, UPDATE / DELETE for a later correction of it. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private WalletEntryType entryType;
+
+    @PrePersist
+    void defaultEntryType() {
+        if (entryType == null) {
+            entryType = WalletEntryType.CREATE;
+        }
+    }
 
 }

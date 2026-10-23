@@ -46,6 +46,63 @@ public class ApiPath {
     public static final String GET_TRANSACTION_HISTORY = "/get-history";
 
     // =========================================================================
+    // TRANSACTIONS (REST, V2): /api/v1/transactions
+    // =========================================================================
+    public static final String V1_TRANSACTIONS = "/api/v1/transactions";
+    public static final String TRANSACTION_ID = "/{transactionId}";
+
+    // =========================================================================
+    // FINANCE CATEGORIES: /api/v1/finance/categories
+    // =========================================================================
+    public static final String V1_FINANCE = "/api/v1/finance";
+    public static final String FINANCE_SUMMARY = "/summary";
+    public static final String V1_FINANCE_CATEGORIES = "/api/v1/finance/categories";
+    public static final String CATEGORY_ID = "/{categoryId}";
+
+    // =========================================================================
+    // MOOD: /api/v1/mood-entries, /api/v1/mood-tags
+    // =========================================================================
+    public static final String V1_MOOD_ENTRIES = "/api/v1/mood-entries";
+    public static final String MOOD_TODAY = "/today";
+    public static final String MOOD_DATE = "/{localDate}";
+    public static final String V1_MOOD_TAGS = "/api/v1/mood-tags";
+    public static final String MOOD_TAG_ID = "/{tagId}";
+
+    // =========================================================================
+    // HABIT: /api/v1/habits
+    // =========================================================================
+    public static final String V1_HABITS = "/api/v1/habits";
+    public static final String HABIT_TODAY = "/today";
+    public static final String HABIT_ID = "/{habitId}";
+    public static final String HABIT_ARCHIVE = "/{habitId}/archive";
+    public static final String HABIT_UNARCHIVE = "/{habitId}/unarchive";
+    public static final String HABIT_COMPLETION = "/{habitId}/completions/{localDate}";
+
+    // =========================================================================
+    // HOME: /api/v1/dashboard/summary (member; the portal's is under /admin)
+    // =========================================================================
+    public static final String V1_HOME_SUMMARY = "/api/v1/dashboard/summary";
+
+    // =========================================================================
+    // ACCOUNT: /api/v1/users/me (the old /member endpoints stay for older apps)
+    // =========================================================================
+    public static final String V1_USERS_ME = "/api/v1/users/me";
+    public static final String USERS_ME_PREFERENCES = "/preferences";
+    public static final String USERS_ME_PHOTO = "/photo";
+    public static final String USERS_ME_DELETE = "/delete";
+    public static final String USERS_ME_DELETE_REQUEST = "/delete/request";
+    public static final String USERS_ME_DELETE_RESEND = "/delete/resend";
+
+    // =========================================================================
+    // GOAL: /api/v1/goals
+    // =========================================================================
+    public static final String V1_GOALS = "/api/v1/goals";
+    public static final String GOAL_ID = "/{goalId}";
+    public static final String GOAL_MILESTONES = "/{goalId}/milestones";
+    public static final String GOAL_MILESTONE_ID = "/{goalId}/milestones/{milestoneId}";
+    public static final String GOAL_PROGRESS = "/{goalId}/progress";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

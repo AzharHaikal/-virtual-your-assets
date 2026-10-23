@@ -2,6 +2,7 @@ package com.vyra.be_virtual_your_assets.service;
 
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
+import com.vyra.be_virtual_your_assets.constant.WalletEntryType;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus;
 import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
@@ -10,17 +11,25 @@ import com.vyra.be_virtual_your_assets.dto.chart.GetChartResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionRequest;
 import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryResponse;
+import com.vyra.be_virtual_your_assets.dto.transaction.TransactionMutationResponse;
+import com.vyra.be_virtual_your_assets.dto.transaction.UpdateTransactionRequest;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionUpdateRequest;
+import com.vyra.be_virtual_your_assets.dto.wallet.AdjustTransactionWalletRequest;
+import com.vyra.be_virtual_your_assets.dto.wallet.GetMemberWalletResponse;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
+import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
+import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
+import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import com.vyra.be_virtual_your_assets.util.TransactionUtil;
 import io.micrometer.tracing.annotation.NewSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.InternalException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +43,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +57,7 @@ public class TransactionService {
     private final ValidationService validationService;
     private final WalletService walletService;
     private final TimeService timeService;
+    private final CategoryService categoryService;
 
     @NewSpan
     public BaseResponse<GetChartResponse> getChart(String memberId, String period) {
@@ -80,9 +91,11 @@ public class TransactionService {
         log.info("[START] transactionService.getTopTransactionHistory phoneNumber: {} ", member.getPhoneNumber());
 
         List<Transaction> transactions = transactionRepository.findTransactionHistory(memberId);
-        List<TransactionHistoryResponse> responses = transactions.stream().map(this::mapToHistoryResponse).toList();
-
-        log.info("Response : {}", responses);
+        Map<String, FinanceCategory> categories = categoryService.byIds(
+                transactions.stream().map(Transaction::getCategoryId).toList());
+        List<TransactionHistoryResponse> responses = transactions.stream()
+                .map(t -> mapToHistoryResponse(t, categories))
+                .toList();
         log.info("[END] transactionService.getTopTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
         return new BaseResponse<>(
                 ErrorConstant.GET_TOP_TRANSACTION_HISTORY_SUCCESS.getCode(),
@@ -139,7 +152,9 @@ public class TransactionService {
         LocalDate end = LocalDate.parse(endDate);
 
         Page<Transaction> transactions = transactionRepository.findTransactionHistory(memberId, start, end, type, pageable);
-        Page<TransactionHistoryResponse> responses = transactions.map(this::mapToHistoryResponse);
+        Map<String, FinanceCategory> categories = categoryService.byIds(
+                transactions.getContent().stream().map(Transaction::getCategoryId).toList());
+        Page<TransactionHistoryResponse> responses = transactions.map(t -> mapToHistoryResponse(t, categories));
 
         log.info("[END] transactionService.getTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
 
@@ -153,14 +168,19 @@ public class TransactionService {
     private Transaction createTransaction(CreateTransactionRequest request, Member member, String ref) {
         ZoneId zone = timeService.zoneOf(member);
         LocalDateTime occurredAt = timeService.parseClientDateTime(request.getTransactionDate(), zone);
+        FinanceCategory category = categoryService.resolveForTransaction(
+                member.getId(), request.getType(), request.getCategoryId(), request.getCategory());
         return Transaction.builder()
                 .memberId(member.getId())
                 .userPhoneNumber(member.getPhoneNumber())
                 .userEmail(member.getEmail())
-                .transactionCategory(request.getCategory().name())
+                .transactionCategory(category.legacyCode())
+                .categoryId(category.getId())
+                .paymentMethod(request.getPaymentMethod())
                 .transactionType(request.getType())
                 .amount(request.getAmount())
-                .transactionDesc(request.getTransactionDesc())
+                // Optional in the request but NOT NULL in the table.
+                .transactionDesc(StringUtils.trimToEmpty(request.getTransactionDesc()))
                 .referenceNumber(ref)
                 .transactionDate(occurredAt)
                 .localDate(timeService.toLocalDate(occurredAt, zone))
@@ -200,6 +220,130 @@ public class TransactionService {
         return response.getData();
     }
 
+    /**
+     * Edits the member's own transaction and corrects the wallet by the difference (PATCH: null keeps a value).
+     * Only SUCCESS transactions can be edited; this is bookkeeping, not real money, so any field may change.
+     */
+    @NewSpan
+    @Transactional(rollbackFor = Exception.class)
+    public BaseResponse<TransactionMutationResponse> updateOwnTransaction(String memberId, String transactionId,
+                                                                          UpdateTransactionRequest request) {
+        Member member = validationService.getMemberById(memberId);
+        log.info("[START] transactionService.updateOwnTransaction phoneNumber: {} ", member.getPhoneNumber());
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_UPDATE_TRANSACTION);
+
+        Transaction transaction = transactionRepository.findOwnedForUpdate(transactionId, memberId)
+                .filter(t -> t.getDeletedAt() == null && t.getStatus() != TransactionStatus.DELETED)
+                .orElseThrow(() -> new NotFoundException(ErrorConstant.TRANSACTION_NOT_FOUND));
+        if (transaction.getStatus() != TransactionStatus.SUCCESS) {
+            throw new BadRequestException(ErrorConstant.TRANSACTION_NOT_EDITABLE);
+        }
+
+        ZoneId zone = timeService.zoneOf(member);
+        TransactionType oldType = transaction.getTransactionType();
+        BigDecimal oldAmount = transaction.getAmount();
+        TransactionType newType = request.getType() != null ? request.getType() : oldType;
+        BigDecimal absolute = request.getAmount() != null ? request.getAmount() : oldAmount.abs();
+        BigDecimal newAmount = newType == TransactionType.EXPENSE ? absolute.negate() : absolute;
+
+        if (request.getTransactionDate() != null) {
+            LocalDateTime occurredAt = timeService.parseClientDateTime(request.getTransactionDate(), zone);
+            transaction.setTransactionDate(occurredAt);
+            transaction.setLocalDate(timeService.toLocalDate(occurredAt, zone));
+        }
+        if (request.getCategoryId() != null || request.getCategory() != null || newType != oldType) {
+            FinanceCategory category = categoryService.resolveForTransaction(
+                    memberId, newType, request.getCategoryId(), request.getCategory());
+            transaction.setCategoryId(category.getId());
+            transaction.setTransactionCategory(category.legacyCode());
+        }
+        if (request.getTransactionDesc() != null) {
+            transaction.setTransactionDesc(request.getTransactionDesc().trim());
+        }
+        if (request.getPaymentMethod() != null) {
+            transaction.setPaymentMethod(request.getPaymentMethod());
+        }
+        transaction.setTransactionType(newType);
+        transaction.setAmount(newAmount);
+        transaction.setModifiedBy(member.getPhoneNumber());
+        transaction.setUpdatedAt(timeService.nowUtc());
+
+        TransactionWalletResponse wallet = walletService.adjustTransactionWallet(AdjustTransactionWalletRequest.builder()
+                .phoneNumber(member.getPhoneNumber())
+                .transactionId(transaction.getId())
+                .oldType(oldType).oldAmount(oldAmount)
+                .newType(newType).newAmount(newAmount)
+                .entryType(WalletEntryType.UPDATE)
+                .build());
+        transactionRepository.save(transaction);
+
+        createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_UPDATE_TRANSACTION);
+        log.info("[END] transactionService.updateOwnTransaction successfully phoneNumber: {} ", member.getPhoneNumber());
+        return new BaseResponse<>(
+                ErrorConstant.UPDATE_TRANSACTION_SUCCESS.getCode(),
+                ErrorConstant.UPDATE_TRANSACTION_SUCCESS.getMessage(),
+                toMutationResponse(transaction, wallet.getBalance(), wallet.getTotalIncome(), wallet.getTotalExpense())
+        );
+    }
+
+    /**
+     * Soft-deletes the member's own transaction (status DELETED + deleted_at) and removes it from the wallet.
+     * Idempotent: deleting an already deleted transaction changes nothing.
+     */
+    @NewSpan
+    @Transactional(rollbackFor = Exception.class)
+    public BaseResponse<TransactionMutationResponse> deleteOwnTransaction(String memberId, String transactionId) {
+        Member member = validationService.getMemberById(memberId);
+        log.info("[START] transactionService.deleteOwnTransaction phoneNumber: {} ", member.getPhoneNumber());
+
+        Transaction transaction = transactionRepository.findOwnedForUpdate(transactionId, memberId)
+                .orElseThrow(() -> new NotFoundException(ErrorConstant.TRANSACTION_NOT_FOUND));
+
+        boolean alreadyDeleted = transaction.getDeletedAt() != null || transaction.getStatus() == TransactionStatus.DELETED;
+        if (!alreadyDeleted) {
+            // Only SUCCESS transactions were booked in the wallet (INQUIRY / FAILED never were).
+            if (transaction.getStatus() == TransactionStatus.SUCCESS) {
+                walletService.adjustTransactionWallet(AdjustTransactionWalletRequest.builder()
+                        .phoneNumber(member.getPhoneNumber())
+                        .transactionId(transaction.getId())
+                        .oldType(transaction.getTransactionType()).oldAmount(transaction.getAmount())
+                        .newType(null).newAmount(BigDecimal.ZERO)
+                        .entryType(WalletEntryType.DELETE)
+                        .build());
+            }
+            LocalDateTime now = timeService.nowUtc();
+            transaction.setStatus(TransactionStatus.DELETED);
+            transaction.setDeletedAt(now);
+            transaction.setUpdatedAt(now);
+            transaction.setModifiedBy(member.getPhoneNumber());
+            transactionRepository.save(transaction);
+            createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_DELETE_TRANSACTION);
+        }
+
+        GetMemberWalletResponse wallet = walletService.getMemberWallet(member.getPhoneNumber()).getData();
+        log.info("[END] transactionService.deleteOwnTransaction phoneNumber: {} alreadyDeleted: {}",
+                member.getPhoneNumber(), alreadyDeleted);
+        return new BaseResponse<>(
+                ErrorConstant.DELETE_TRANSACTION_SUCCESS.getCode(),
+                ErrorConstant.DELETE_TRANSACTION_SUCCESS.getMessage(),
+                toMutationResponse(transaction,
+                        wallet != null ? wallet.getBalance() : null,
+                        wallet != null ? wallet.getTotalIncome() : null,
+                        wallet != null ? wallet.getTotalExpense() : null)
+        );
+    }
+
+    private TransactionMutationResponse toMutationResponse(Transaction transaction, BigDecimal balance,
+                                                           BigDecimal totalIncome, BigDecimal totalExpense) {
+        TransactionMutationResponse response = new TransactionMutationResponse();
+        response.setTransaction(mapToHistoryResponse(transaction,
+                categoryService.byIds(Collections.singletonList(transaction.getCategoryId()))));
+        response.setBalance(balance);
+        response.setTotalIncome(totalIncome);
+        response.setTotalExpense(totalExpense);
+        return response;
+    }
+
     @NewSpan
     @Transactional
     public void updateTransaction(TransactionUpdateRequest request) {
@@ -234,18 +378,10 @@ public class TransactionService {
         memberActivityService.createMemberActivity(phoneNumber, activityEvent);
     }
 
-    private TransactionHistoryResponse mapToHistoryResponse(Transaction transaction) {
-        TransactionHistoryResponse response = new TransactionHistoryResponse();
-        response.setTransactionId(transaction.getId());
-        response.setReferenceNumber(transaction.getReferenceNumber());
-        response.setCategory(transaction.getTransactionCategory());
-        response.setType(transaction.getTransactionType());
-        response.setStatus(transaction.getStatus());
-        response.setAmount(transaction.getAmount());
-        response.setTransactionDesc(transaction.getTransactionDesc());
-        response.setTransactionDate(transaction.getTransactionDate());
-        return response;
+    private TransactionHistoryResponse mapToHistoryResponse(Transaction transaction, Map<String, FinanceCategory> categories) {
+        return TransactionMapper.toHistoryResponse(transaction, categories);
     }
+
 
     private List<ChartItemResponse> buildChartWithEmptyBucket(String period, List<Object[]> results, LocalDate today) {
         return switch (period) {

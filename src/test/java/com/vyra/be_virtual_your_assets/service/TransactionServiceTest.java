@@ -13,6 +13,7 @@ import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryRespons
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionUpdateRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletRequest;
 import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
+import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
@@ -51,6 +52,7 @@ class TransactionServiceTest {
     @Mock private MemberActivityService memberActivityService;
     @Mock private ValidationService validationService;
     @Mock private WalletService walletService;
+    @Mock private CategoryService categoryService;
 
     /** 2026-10-22 17:30 UTC = 2026-10-23 00:30 in Jakarta: "today" differs per zone. */
     private static final Instant NOW = Instant.parse("2026-10-22T17:30:00Z");
@@ -64,6 +66,9 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Any requested category resolves to the built-in "Other" of the transaction type.
+        lenient().when(categoryService.resolveForTransaction(any(), any(), any(), any()))
+                .thenAnswer(inv -> builtInOther(inv.getArgument(1)));
         member = new Member();
         member.setId("member-uuid-001");
         member.setFirstName("Budi");
@@ -372,6 +377,16 @@ class TransactionServiceTest {
     }
 
     @Test
+    void createTransaction_withoutDescription_shouldStoreEmptyText() {
+        CreateTransactionRequest request = buildCreateRequest(TransactionType.EXPENSE, BigDecimal.valueOf(10000));
+        request.setTransactionDesc(null);
+
+        Transaction saved = createAndCaptureFirstSave(request);
+
+        assertThat(saved.getTransactionDesc()).isEmpty();
+    }
+
+    @Test
     void createTransaction_invalidDate_shouldThrowBadRequestBeforeSaving() {
         CreateTransactionRequest request = buildCreateRequest(TransactionType.INCOME, BigDecimal.valueOf(10000));
         request.setTransactionDate("kemarin");
@@ -644,5 +659,14 @@ class TransactionServiceTest {
         r.setTotalIncome(BigDecimal.valueOf(500000));
         r.setTotalExpense(BigDecimal.ZERO);
         return r;
+    }
+
+    private static FinanceCategory builtInOther(TransactionType type) {
+        FinanceCategory category = new FinanceCategory();
+        category.setId(FinanceCategory.otherId(type));
+        category.setCode(type == TransactionType.INCOME ? "OTHERS_INCOME" : "OTHERS_EXPENSE");
+        category.setType(type);
+        category.setName("Other");
+        return category;
     }
 }
