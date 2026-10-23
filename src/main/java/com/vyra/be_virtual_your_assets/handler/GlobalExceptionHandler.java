@@ -13,9 +13,11 @@ import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -154,6 +156,20 @@ public class GlobalExceptionHandler {
                         null
                 )
         );
+    }
+
+    /** Path or query value of the wrong type, e.g. an unknown enum value or a malformed date. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<BaseResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest().body(
+                new BaseResponse<>(ErrorConstant.BAD_REQUEST.getCode(), "Invalid value for " + ex.getName(), null));
+    }
+
+    /** Malformed JSON or a value of the wrong type in the body (the body is never echoed back or logged). */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<BaseResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        return ResponseEntity.badRequest().body(
+                new BaseResponse<>(ErrorConstant.BAD_REQUEST.getCode(), "Invalid request body", null));
     }
 
 
