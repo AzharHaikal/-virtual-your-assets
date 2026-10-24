@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,6 +29,17 @@ public interface GoalRepository extends JpaRepository<Goal, String> {
     List<Goal> findAllOfMember(@Param("memberId") String memberId);
 
     long countByMemberIdAndDeletedAtIsNull(String memberId);
+
+    /** Active goals of active members due in [from, to], with their member. Rows: [Goal, Member]. */
+    @Query("""
+        SELECT g, m FROM Goal g, Member m
+        WHERE m.id = g.memberId
+          AND m.status = com.vyra.be_virtual_your_assets.constant.ActiveStatus.ACTIVE
+          AND g.deletedAt IS NULL
+          AND g.status = com.vyra.be_virtual_your_assets.constant.GoalStatus.ACTIVE
+          AND g.dueDate BETWEEN :from AND :to
+        """)
+    List<Object[]> findActiveDueBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /** Active savings targets of the member. Row: [count, sum of targets, sum of current values]. */
     @Query("""

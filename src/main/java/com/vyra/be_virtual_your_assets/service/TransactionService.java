@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.MemberActivityEvent;
 import com.vyra.be_virtual_your_assets.constant.WalletEntryType;
@@ -21,6 +22,7 @@ import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
 import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
+import com.vyra.be_virtual_your_assets.event.TransactionChangedEvent;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
@@ -31,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.InternalException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -44,8 +47,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,6 +64,8 @@ public class TransactionService {
     private final WalletService walletService;
     private final TimeService timeService;
     private final CategoryService categoryService;
+    private final ActivationService activationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @NewSpan
     public BaseResponse<GetChartResponse> getChart(String memberId, String period) {
@@ -127,6 +135,8 @@ public class TransactionService {
         transactionRepository.save(transaction);
 
         CreateTransactionResponse response = createTransactionResponse(transaction, walletData);
+        activationService.record(memberId, ActivationEvent.FIRST_TRANSACTION);
+        publishChange(memberId, transaction.getCategoryId(), transaction.getLocalDate(), null, null);
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_CREATE_TRANSACTION);
         log.info("[END] transactionService.createTransaction successfully phoneNumber: {} ", member.getPhoneNumber());
@@ -242,6 +252,8 @@ public class TransactionService {
         ZoneId zone = timeService.zoneOf(member);
         TransactionType oldType = transaction.getTransactionType();
         BigDecimal oldAmount = transaction.getAmount();
+        String oldCategoryId = transaction.getCategoryId();
+        LocalDate oldLocalDate = transaction.getLocalDate();
         TransactionType newType = request.getType() != null ? request.getType() : oldType;
         BigDecimal absolute = request.getAmount() != null ? request.getAmount() : oldAmount.abs();
         BigDecimal newAmount = newType == TransactionType.EXPENSE ? absolute.negate() : absolute;
@@ -276,6 +288,7 @@ public class TransactionService {
                 .entryType(WalletEntryType.UPDATE)
                 .build());
         transactionRepository.save(transaction);
+        publishChange(memberId, transaction.getCategoryId(), transaction.getLocalDate(), oldCategoryId, oldLocalDate);
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_UPDATE_TRANSACTION);
         log.info("[END] transactionService.updateOwnTransaction successfully phoneNumber: {} ", member.getPhoneNumber());
@@ -317,6 +330,7 @@ public class TransactionService {
             transaction.setUpdatedAt(now);
             transaction.setModifiedBy(member.getPhoneNumber());
             transactionRepository.save(transaction);
+            publishChange(memberId, transaction.getCategoryId(), transaction.getLocalDate(), null, null);
             createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_DELETE_TRANSACTION);
         }
 
@@ -331,6 +345,26 @@ public class TransactionService {
                         wallet != null ? wallet.getTotalIncome() : null,
                         wallet != null ? wallet.getTotalExpense() : null)
         );
+    }
+
+    /** Budgets of the old and the new category / day are checked once this transaction commits. */
+    private void publishChange(String memberId, String categoryId, LocalDate localDate,
+                               String oldCategoryId, LocalDate oldLocalDate) {
+        Set<String> categories = new HashSet<>();
+        Set<LocalDate> days = new HashSet<>();
+        if (categoryId != null) {
+            categories.add(categoryId);
+        }
+        if (oldCategoryId != null) {
+            categories.add(oldCategoryId);
+        }
+        if (localDate != null) {
+            days.add(localDate);
+        }
+        if (oldLocalDate != null && !Objects.equals(oldLocalDate, localDate)) {
+            days.add(oldLocalDate);
+        }
+        eventPublisher.publishEvent(new TransactionChangedEvent(memberId, categories, days));
     }
 
     private TransactionMutationResponse toMutationResponse(Transaction transaction, BigDecimal balance,
