@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -53,6 +54,8 @@ class TransactionServiceTest {
     @Mock private ValidationService validationService;
     @Mock private WalletService walletService;
     @Mock private CategoryService categoryService;
+    @Mock private ActivationService activationService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     /** 2026-10-22 17:30 UTC = 2026-10-23 00:30 in Jakarta: "today" differs per zone. */
     private static final Instant NOW = Instant.parse("2026-10-22T17:30:00Z");

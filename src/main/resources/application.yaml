@@ -78,6 +78,21 @@ management:
     enabled: true
     sampling:
       probability: 1.0
+  endpoints:
+    web:
+      exposure:
+        # health: public, for the external uptime monitor. prometheus: needs header X-Metrics-Token.
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    distribution:
+      # Latency p95 per endpoint for the dashboard and the "p95 > 500 ms" alert (docs/monitoring.md).
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.95,0.99
 
 # OpenAPI spec (/v3/api-docs) and Swagger UI (/swagger-ui.html): off unless enabled (never in production).
 springdoc:
@@ -90,6 +105,23 @@ crypto:
   secret-key: ${CRYPTO_SECRET_KEY}
 
 vyra:
+  # Base URL of this API as seen from outside; used in e-mailed links (data export download).
+  public-base-url: ${VYRA_PUBLIC_BASE_URL:http://localhost:8000}
+  scheduler:
+    # Reminder / push / export jobs. Safe with several instances (ShedLock); off for request-only processes.
+    enabled: ${VYRA_SCHEDULER_ENABLED:true}
+  metrics:
+    # Shared token for /actuator/prometheus (header X-Metrics-Token). Empty = metrics not readable.
+    token: ${VYRA_METRICS_TOKEN:}
+  push:
+    fcm:
+      # Firebase service account JSON (the file content or a path to it). Empty = push disabled.
+      credentials: ${FIREBASE_CREDENTIALS:}
+      project-id: ${FIREBASE_PROJECT_ID:}
+  export:
+    # How long a data export can be downloaded, and how often a member may request one.
+    ttl-hours: ${VYRA_EXPORT_TTL_HOURS:24}
+    min-interval-hours: ${VYRA_EXPORT_MIN_INTERVAL_HOURS:24}
   time:
     # Zone for new members without one, for legacy requests without an offset and for
     # day-based admin reports/filters (portal admins are in Indonesia).

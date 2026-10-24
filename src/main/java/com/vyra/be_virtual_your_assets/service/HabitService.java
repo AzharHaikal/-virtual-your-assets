@@ -1,10 +1,14 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.HabitCategory;
+import com.vyra.be_virtual_your_assets.constant.HabitDayStatus;
 import com.vyra.be_virtual_your_assets.constant.HabitScheduleType;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.CreateHabitRequest;
+import com.vyra.be_virtual_your_assets.dto.habit.HabitCalendarDayResponse;
+import com.vyra.be_virtual_your_assets.dto.habit.HabitCalendarResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitCompletionRequest;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitDayResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitResponse;
@@ -21,10 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -39,11 +49,14 @@ public class HabitService {
     static final int MAX_HABITS = 50;
     /** Today and the 6 days before it can be marked. */
     static final int EDITABLE_DAYS = 7;
+    /** Streaks look this many days back at most. */
+    static final int STREAK_LOOKBACK_DAYS = 400;
 
     private final HabitRepository habitRepository;
     private final HabitCompletionRepository completionRepository;
     private final ValidationService validationService;
     private final TimeService timeService;
+    private final ActivationService activationService;
 
     // =========================================================================
     // Read
@@ -71,6 +84,58 @@ public class HabitService {
                 ErrorConstant.HABIT_TODAY_SUCCESS.getMessage(), toResponses(memberId, habits, today));
     }
 
+    /** One month (default: the current one) of a habit, day by day. */
+    @Transactional(readOnly = true)
+    public BaseResponse<HabitCalendarResponse> getCalendar(String memberId, String habitId, YearMonth month) {
+        Habit habit = findOwned(memberId, habitId);
+        LocalDate today = today(memberId);
+        YearMonth period = month != null ? month : YearMonth.from(today);
+        Map<LocalDate, Integer> counts = completionRepository
+                .findByHabitIdAndLocalDateBetween(habit.getId(), period.atDay(1), period.atEndOfMonth()).stream()
+                .collect(Collectors.toMap(HabitCompletion::getLocalDate, HabitCompletion::getCount));
+
+        List<HabitCalendarDayResponse> days = new ArrayList<>(period.lengthOfMonth());
+        int scheduled = 0;
+        int done = 0;
+        for (LocalDate day = period.atDay(1); !day.isAfter(period.atEndOfMonth()); day = day.plusDays(1)) {
+            int count = counts.getOrDefault(day, 0);
+            HabitDayStatus status = dayStatus(habit, day, today, count);
+            if (status == HabitDayStatus.DONE || status == HabitDayStatus.PARTIAL || status == HabitDayStatus.MISSED) {
+                scheduled++;
+            }
+            if (status == HabitDayStatus.DONE) {
+                done++;
+            }
+            days.add(new HabitCalendarDayResponse(day, status, count));
+        }
+        HabitCalendarResponse response = new HabitCalendarResponse();
+        response.setHabitId(habit.getId());
+        response.setMonth(period);
+        response.setTargetCount(habit.getTargetCount());
+        response.setScheduledDays(scheduled);
+        response.setDoneDays(done);
+        response.setDays(days);
+        return new BaseResponse<>(ErrorConstant.HABIT_CALENDAR_SUCCESS.getCode(),
+                ErrorConstant.HABIT_CALENDAR_SUCCESS.getMessage(), response);
+    }
+
+    /** A done day is DONE even if the schedule changed since; days before the start or after today are out of range. */
+    static HabitDayStatus dayStatus(Habit habit, LocalDate day, LocalDate today, int count) {
+        if (day.isAfter(today) || day.isBefore(habit.getStartDate())) {
+            return HabitDayStatus.OUT_OF_RANGE;
+        }
+        if (count >= habit.getTargetCount()) {
+            return HabitDayStatus.DONE;
+        }
+        if (!habit.isScheduledOn(day)) {
+            return HabitDayStatus.NOT_SCHEDULED;
+        }
+        if (day.equals(today)) {
+            return HabitDayStatus.PENDING;
+        }
+        return count > 0 ? HabitDayStatus.PARTIAL : HabitDayStatus.MISSED;
+    }
+
     // =========================================================================
     // Write
     // =========================================================================
@@ -89,6 +154,9 @@ public class HabitService {
         habit.setColor(request.getColor().toUpperCase());
         habit.setTargetCount(request.getTargetCount() != null ? request.getTargetCount() : 1);
         habit.setScheduleDays(scheduleMask(request.getScheduleType(), request.getScheduleDays()));
+        habit.setReminderEnabled(request.isReminderEnabled());
+        habit.setReminderTime(minutes(request.getReminderTime()));
+        checkReminder(habit);
         habit.setStartDate(today);
         habit.setCreatedBy(memberId);
         habit.setCreatedAt(timeService.nowUtc());
@@ -120,6 +188,13 @@ public class HabitService {
         } else if (request.getScheduleDays() != null) {
             habit.setScheduleDays(scheduleMask(HabitScheduleType.SPECIFIC_DAYS, request.getScheduleDays()));
         }
+        if (request.getReminderTime() != null) {
+            habit.setReminderTime(minutes(request.getReminderTime()));
+        }
+        if (request.getReminderEnabled() != null) {
+            habit.setReminderEnabled(request.getReminderEnabled());
+        }
+        checkReminder(habit);
         touch(habit, memberId);
         habitRepository.save(habit);
         return new BaseResponse<>(ErrorConstant.HABIT_UPDATE_SUCCESS.getCode(),
@@ -160,6 +235,7 @@ public class HabitService {
         int count = request != null && request.getCount() != null ? request.getCount() : habit.getTargetCount();
         completionRepository.upsert(UUID.randomUUID().toString(), habit.getId(), memberId, localDate, count,
                 timeService.nowUtc());
+        activationService.record(memberId, ActivationEvent.FIRST_HABIT_COMPLETION);
         return new BaseResponse<>(ErrorConstant.HABIT_COMPLETION_SUCCESS.getCode(),
                 ErrorConstant.HABIT_COMPLETION_SUCCESS.getMessage(), toResponse(memberId, habit, today));
     }
@@ -196,6 +272,17 @@ public class HabitService {
         if (day.isBefore(today.minusDays(EDITABLE_DAYS - 1L))) {
             throw new BadRequestException(ErrorConstant.HABIT_DATE_TOO_OLD);
         }
+    }
+
+    private static void checkReminder(Habit habit) {
+        if (habit.isReminderEnabled() && habit.getReminderTime() == null) {
+            throw new BadRequestException(ErrorConstant.HABIT_REMINDER_TIME_REQUIRED);
+        }
+    }
+
+    /** Reminders are per minute. */
+    private static LocalTime minutes(LocalTime time) {
+        return time == null ? null : time.truncatedTo(ChronoUnit.MINUTES);
     }
 
     private static short scheduleMask(HabitScheduleType type, List<DayOfWeek> days) {
@@ -236,6 +323,11 @@ public class HabitService {
         Map<String, Map<LocalDate, Integer>> counts = completionRepository.findRange(memberId, monday, sunday).stream()
                 .collect(Collectors.groupingBy(HabitCompletion::getHabitId,
                         Collectors.toMap(HabitCompletion::getLocalDate, HabitCompletion::getCount)));
+        LocalDate streakFrom = today.minusDays(STREAK_LOOKBACK_DAYS);
+        Map<String, Set<LocalDate>> doneDays = new HashMap<>();
+        for (Object[] row : completionRepository.findDoneDays(memberId, streakFrom, today)) {
+            doneDays.computeIfAbsent((String) row[0], id -> new HashSet<>()).add((LocalDate) row[1]);
+        }
 
         return habits.stream().map(habit -> {
             Map<LocalDate, Integer> byDay = counts.getOrDefault(habit.getId(), Map.of());
@@ -272,6 +364,12 @@ public class HabitService {
             response.setWeekDone(weekDone);
             response.setWeekScheduled(weekScheduled);
             response.setWeek(week);
+            HabitStreakCalculator.Streak streak = HabitStreakCalculator.compute(
+                    habit, doneDays.getOrDefault(habit.getId(), Set.of()), today, streakFrom);
+            response.setCurrentStreak(streak.current());
+            response.setBestStreak(streak.best());
+            response.setReminderEnabled(habit.isReminderEnabled());
+            response.setReminderTime(habit.getReminderTime());
             return response;
         }).toList();
     }

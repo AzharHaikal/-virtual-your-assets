@@ -16,6 +16,7 @@ import lombok.Setter;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -60,6 +61,12 @@ public class Habit extends BaseEntity {
     private LocalDate startDate;
 
     private LocalDateTime archivedAt;
+
+    /** Local time of day (member's zone) of the daily reminder; used while {@link #reminderEnabled}. */
+    private LocalTime reminderTime;
+
+    @Column(nullable = false)
+    private boolean reminderEnabled;
 
     public boolean isArchived() {
         return archivedAt != null;

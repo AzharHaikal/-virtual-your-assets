@@ -4,6 +4,7 @@ import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.auth.*;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.AuthenticationService;
+import com.vyra.be_virtual_your_assets.service.PushTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,9 @@ class AuthenticationControllerTest {
 
     @Mock
     private Authentication authentication;
+
+    @Mock
+    private PushTokenService pushTokenService;
 
     @InjectMocks
     private AuthenticationController authenticationController;
@@ -152,10 +156,22 @@ class AuthenticationControllerTest {
         when(authentication.getPrincipal()).thenReturn(userDetails);
         when(authenticationService.logoutMember(MEMBER_ID, ACCESS_TOKEN)).thenReturn(expected);
 
-        BaseResponse<Void> result = authenticationController.logoutMember(authentication);
+        BaseResponse<Void> result = authenticationController.logoutMember(null, authentication);
 
         assertThat(result).isSameAs(expected);
         verify(authentication).getPrincipal();
+        verify(authenticationService).logoutMember(MEMBER_ID, ACCESS_TOKEN);
+    }
+
+    @Test
+    void logoutMember_withAPushToken_removesItFirst() {
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+        LogoutRequest request = new LogoutRequest();
+        request.setPushToken("fcm-token");
+
+        authenticationController.logoutMember(request, authentication);
+
+        verify(pushTokenService).unregister(MEMBER_ID, "fcm-token");
         verify(authenticationService).logoutMember(MEMBER_ID, ACCESS_TOKEN);
     }
 }

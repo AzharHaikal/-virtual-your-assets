@@ -44,6 +44,9 @@ public class UpdateGoalRequest {
     /** true removes the due date. */
     private boolean clearDueDate;
 
+    /** Only for a VALUE goal in IDR. */
+    private Boolean linkedToFinance;
+
     /** COMPLETED sets completedAt; any other status clears it. */
     private GoalStatus status;
 }

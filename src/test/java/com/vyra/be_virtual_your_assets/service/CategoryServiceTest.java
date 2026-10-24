@@ -12,6 +12,7 @@ import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.ConflictException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
+import com.vyra.be_virtual_your_assets.repository.BudgetRepository;
 import com.vyra.be_virtual_your_assets.repository.FinanceCategoryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +44,7 @@ class CategoryServiceTest {
     private static final String MEMBER = "member-1";
 
     @Mock private FinanceCategoryRepository repository;
+    @Mock private BudgetRepository budgetRepository;
     @Spy private TimeService timeService =
             new TimeService(Clock.fixed(Instant.parse("2026-10-22T10:00:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
 

@@ -204,6 +204,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     List<Transaction> findAllByUserPhoneNumber(String oldPhoneNumber);
 
+    /** The member's SUCCESS transactions in [from, to] (local dates), deleted ones excluded, oldest first (CSV export). */
+    @Query("""
+        SELECT t FROM Transaction t
+        WHERE t.memberId = :memberId
+          AND t.deletedAt IS NULL
+          AND t.status = com.vyra.be_virtual_your_assets.constant.transaction.TransactionStatus.SUCCESS
+          AND t.localDate >= :from AND t.localDate <= :to
+        ORDER BY t.localDate, t.transactionDate, t.id
+        """)
+    List<Transaction> findForExport(@Param("memberId") String memberId,
+                                    @Param("from") LocalDate from,
+                                    @Param("to") LocalDate to);
+
     /**
      * The member's own transaction (deleted ones included) with a row lock held until the surrounding
      * transaction ends, so two edits/deletes of the same transaction never both correct the wallet.

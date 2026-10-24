@@ -1,10 +1,15 @@
 package com.vyra.be_virtual_your_assets.controller;
 
+import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
+import com.vyra.be_virtual_your_assets.constant.TrendPeriod;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.mood.CreateMoodTagRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryResponse;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodTagResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTagsSummaryResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTrendResponse;
+import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.MoodService;
 import org.junit.jupiter.api.Test;
@@ -20,6 +25,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,5 +77,21 @@ class MoodControllerTest {
         BaseResponse<Void> deleted = new BaseResponse<>("VYRA-MTG-DEL-000", "ok", null);
         when(moodService.deleteTag("member-1", "t-1")).thenReturn(deleted);
         assertThat(controller.deleteTag("t-1", authentication)).isSameAs(deleted);
+    }
+
+    @Test
+    void trendAndTagsSummary_delegateWithTheAuthenticatedMember_andParseThePeriod() {
+        LocalDate day = LocalDate.of(2026, 10, 23);
+        BaseResponse<MoodTrendResponse> trend = new BaseResponse<>("VYRA-MOD-TRD-000", "ok", null);
+        when(moodService.getTrend("member-1", TrendPeriod.MONTH, day)).thenReturn(trend);
+        assertThat(controller.getTrend("month", day, authentication)).isSameAs(trend);
+
+        BaseResponse<MoodTagsSummaryResponse> tags = new BaseResponse<>("VYRA-MOD-TAG-000", "ok", null);
+        when(moodService.getTagsSummary("member-1", day.minusDays(6), day)).thenReturn(tags);
+        assertThat(controller.getTagsSummary(day.minusDays(6), day, authentication)).isSameAs(tags);
+
+        BadRequestException invalid = assertThrows(BadRequestException.class,
+                () -> controller.getTrend("year", null, authentication));
+        assertThat(invalid.getErrorConstant()).isEqualTo(ErrorConstant.INVALID_TREND_PERIOD);
     }
 }

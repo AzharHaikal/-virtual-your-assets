@@ -103,6 +103,36 @@ public class ApiPath {
     public static final String GOAL_PROGRESS = "/{goalId}/progress";
 
     // =========================================================================
+    // PHASE 2: budgets, trends & insights, notifications, push, exports, onboarding
+    // =========================================================================
+    public static final String V1_BUDGETS = "/api/v1/budgets";
+    public static final String BUDGET_ID = "/{budgetId}";
+    public static final String BUDGET_COPY_PREVIOUS = "/copy-previous";
+
+    public static final String MOOD_TREND = "/trend";
+    public static final String MOOD_TAGS_SUMMARY = "/tags-summary";
+    public static final String HABIT_CALENDAR = "/{habitId}/calendar";
+    public static final String V1_INSIGHTS_WEEKLY = "/api/v1/insights/weekly";
+
+    public static final String V1_NOTIFICATIONS = "/api/v1/notifications";
+    public static final String NOTIFICATION_UNREAD_COUNT = "/unread-count";
+    public static final String NOTIFICATION_READ = "/{notificationId}/read";
+    public static final String NOTIFICATION_READ_ALL = "/read-all";
+    public static final String NOTIFICATION_PREFERENCES = "/preferences";
+
+    public static final String USERS_ME_PUSH_TOKENS = "/push-tokens";
+    public static final String USERS_ME_PUSH_TOKEN = "/push-tokens/{token}";
+
+    public static final String TRANSACTIONS_EXPORT = "/export";
+    public static final String USERS_ME_EXPORT = "/export";
+    public static final String USERS_ME_EXPORT_ID = "/export/{exportId}";
+    public static final String USERS_ME_EXPORT_DOWNLOAD = "/export/{exportId}/download";
+    /** Public: the e-mailed link, authorised by its token (see SecurityConstant.PUBLIC_URL). */
+    public static final String V1_EXPORT_PUBLIC_DOWNLOAD = "/api/v1/exports/{exportId}/download";
+
+    public static final String USERS_ME_ONBOARDING_COMPLETE = "/onboarding/complete";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

@@ -85,6 +85,9 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
     private boolean isWhitelisted(String requestPath) {
         return Arrays.stream(SecurityConstant.WHITE_LIST_URL).anyMatch(pattern -> pathMatcher.match(pattern, requestPath))
-                || Arrays.stream(SecurityConstant.API_DOCS_URL).anyMatch(pattern -> pathMatcher.match(pattern, requestPath));
+                || Arrays.stream(SecurityConstant.API_DOCS_URL).anyMatch(pattern -> pathMatcher.match(pattern, requestPath))
+                || Arrays.stream(SecurityConstant.PUBLIC_URL).anyMatch(pattern -> pathMatcher.match(pattern, requestPath))
+                // Guarded by the metrics token in SecurityConfig instead of a member token.
+                || pathMatcher.match(SecurityConstant.METRICS_URL, requestPath);
     }
 }

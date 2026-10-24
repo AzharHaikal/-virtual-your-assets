@@ -8,6 +8,7 @@ import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
+import com.vyra.be_virtual_your_assets.repository.GoalRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,7 @@ class FinanceServiceTest {
     private static final String MEMBER = "member-1";
 
     @Mock private TransactionRepository transactionRepository;
+    @Mock private GoalRepository goalRepository;
     @Mock private CategoryService categoryService;
     @Mock private ValidationService validationService;
     /** 2026-10-22 17:30 UTC = 23 Oct in Jakarta. */
@@ -141,6 +143,21 @@ class FinanceServiceTest {
         assertThat(expense.get(1).getName()).isEqualTo("Kopi");
         assertThat(expense.get(1).getPercentage()).isEqualByComparingTo("25.0");
         assertThat(summary.getIncomeByCategory().get(0).getPercentage()).isEqualByComparingTo("100.0");
+        assertThat(summary.getSavings().getActiveGoals()).isZero();
+        assertThat(summary.getSavings().getTotalTarget()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void summary_includesTheActiveSavingsTargets() {
+        when(validationService.getMemberById(MEMBER)).thenReturn(member);
+        when(goalRepository.sumSavingsTargets(MEMBER)).thenReturn(List.<Object[]>of(
+                new Object[]{2L, new BigDecimal("15000000"), new BigDecimal("4500000")}));
+
+        FinanceSummaryResponse summary = financeService.getSummary(MEMBER, null, null).getData();
+
+        assertThat(summary.getSavings().getActiveGoals()).isEqualTo(2);
+        assertThat(summary.getSavings().getTotalTarget()).isEqualByComparingTo("15000000");
+        assertThat(summary.getSavings().getTotalSaved()).isEqualByComparingTo("4500000");
     }
 
     @Test

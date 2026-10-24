@@ -24,4 +24,6 @@ public class FinanceSummaryResponse {
     /** Biggest first. */
     private List<CategoryAmountResponse> expenseByCategory;
     private List<CategoryAmountResponse> incomeByCategory;
+    /** Active savings targets; not limited to [from, to]. */
+    private SavingsSummaryResponse savings;
 }

@@ -3,6 +3,7 @@ package com.vyra.be_virtual_your_assets.controller;
 import com.vyra.be_virtual_your_assets.constant.HabitCategory;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.CreateHabitRequest;
+import com.vyra.be_virtual_your_assets.dto.habit.HabitCalendarResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitCompletionRequest;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.UpdateHabitRequest;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,5 +83,13 @@ class HabitControllerTest {
         BaseResponse<HabitResponse> removed = new BaseResponse<>("VYRA-HBT-UCM-000", "ok", null);
         when(habitService.uncomplete("member-1", "h-1", DAY)).thenReturn(removed);
         assertThat(controller.uncomplete("h-1", DAY, authentication)).isSameAs(removed);
+    }
+
+    @Test
+    void calendar_delegatesWithTheAuthenticatedMember() {
+        BaseResponse<HabitCalendarResponse> calendar = new BaseResponse<>("VYRA-HBT-CAL-000", "ok", null);
+        when(habitService.getCalendar("member-1", "h-1", YearMonth.of(2026, 10))).thenReturn(calendar);
+
+        assertThat(controller.getCalendar("h-1", YearMonth.of(2026, 10), authentication)).isSameAs(calendar);
     }
 }

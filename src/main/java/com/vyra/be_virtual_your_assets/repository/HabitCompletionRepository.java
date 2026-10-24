@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface HabitCompletionRepository extends JpaRepository<HabitCompletion, String> {
 
@@ -38,4 +39,19 @@ public interface HabitCompletionRepository extends JpaRepository<HabitCompletion
     List<HabitCompletion> findRange(@Param("memberId") String memberId,
                                     @Param("from") LocalDate from,
                                     @Param("to") LocalDate to);
+
+    /** Days in [from, to] each of the member's habits reached its target. Rows: [habitId, localDate]. */
+    @Query("""
+        SELECT c.habitId, c.localDate FROM HabitCompletion c, Habit h
+        WHERE h.id = c.habitId AND c.memberId = :memberId
+          AND c.localDate BETWEEN :from AND :to
+          AND c.count >= h.targetCount
+        """)
+    List<Object[]> findDoneDays(@Param("memberId") String memberId,
+                                @Param("from") LocalDate from,
+                                @Param("to") LocalDate to);
+
+    List<HabitCompletion> findByHabitIdAndLocalDateBetween(String habitId, LocalDate from, LocalDate to);
+
+    Optional<HabitCompletion> findByHabitIdAndLocalDate(String habitId, LocalDate localDate);
 }

@@ -15,6 +15,7 @@ import com.vyra.be_virtual_your_assets.dto.wallet.TransactionWalletResponse;
 import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
+import com.vyra.be_virtual_your_assets.event.TransactionChangedEvent;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
@@ -26,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -34,6 +36,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,6 +58,8 @@ class TransactionServiceEditTest {
     @Mock private ValidationService validationService;
     @Mock private WalletService walletService;
     @Mock private CategoryService categoryService;
+    @Mock private ActivationService activationService;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @Spy private TimeService timeService =
             new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
 
@@ -85,6 +90,7 @@ class TransactionServiceEditTest {
         expense.setTransactionDesc("Makan siang");
         expense.setTransactionDate(LocalDateTime.of(2026, 10, 22, 5, 30));
         expense.setLocalDate(LocalDate.of(2026, 10, 22));
+        expense.setCategoryId("default-FOOD_AND_BEVERAGE");
     }
 
     // =========================================================================
@@ -135,6 +141,13 @@ class TransactionServiceEditTest {
         assertThat(expense.getLocalDate()).isEqualTo(LocalDate.of(2026, 10, 23));
         assertThat(expense.getTransactionDesc()).isEqualTo("Refund");
         assertThat(capturedAdjust().getNewType()).isEqualTo(TransactionType.INCOME);
+        // The budgets of the old category / day and of the new ones are checked after the commit.
+        ArgumentCaptor<TransactionChangedEvent> event = ArgumentCaptor.forClass(TransactionChangedEvent.class);
+        verify(eventPublisher).publishEvent(event.capture());
+        assertThat(event.getValue().memberId()).isEqualTo(MEMBER_ID);
+        assertThat(event.getValue().categoryIds()).contains("default-FOOD_AND_BEVERAGE", expense.getCategoryId());
+        assertThat(event.getValue().localDates()).containsExactlyInAnyOrder(
+                LocalDate.of(2026, 10, 22), LocalDate.of(2026, 10, 23));
     }
 
     @Test
@@ -191,6 +204,8 @@ class TransactionServiceEditTest {
         assertThat(result.getResponseStatus()).isEqualTo(ErrorConstant.DELETE_TRANSACTION_SUCCESS.getCode());
         assertThat(result.getData().getBalance()).isEqualByComparingTo("800000");
         verify(memberActivityService).createMemberActivity("628123456789", MemberActivityEvent.SUCCESS_DELETE_TRANSACTION);
+        verify(eventPublisher).publishEvent(new TransactionChangedEvent(MEMBER_ID,
+                Set.of("default-FOOD_AND_BEVERAGE"), Set.of(LocalDate.of(2026, 10, 22))));
     }
 
     @Test

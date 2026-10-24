@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.List;
 
 /** Only the fields that are sent change. */
@@ -33,4 +34,9 @@ public class UpdateHabitRequest {
     private HabitScheduleType scheduleType;
 
     private List<DayOfWeek> scheduleDays;
+
+    private Boolean reminderEnabled;
+
+    /** HH:mm, the member's local time. */
+    private LocalTime reminderTime;
 }
