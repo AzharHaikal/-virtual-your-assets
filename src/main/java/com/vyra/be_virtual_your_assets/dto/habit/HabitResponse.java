@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -34,4 +35,8 @@ public class HabitResponse {
     private int currentStreak;
     /** Longest such run in the last 400 days. */
     private int bestStreak;
+
+    /** Daily reminder at this local time (HH:mm, the member's zone) when enabled. */
+    private boolean reminderEnabled;
+    private LocalTime reminderTime;
 }

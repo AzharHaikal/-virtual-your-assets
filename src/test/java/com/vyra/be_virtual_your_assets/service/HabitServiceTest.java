@@ -29,6 +29,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -267,6 +268,31 @@ class HabitServiceTest {
         Habit habit = habit(Habit.EVERY_DAY, 1);
         assertThat(HabitService.dayStatus(habit, TODAY, TODAY, 0)).isEqualTo(HabitDayStatus.PENDING);
         assertThat(HabitService.dayStatus(habit, TODAY, TODAY, 1)).isEqualTo(HabitDayStatus.DONE);
+    }
+
+    @Test
+    void reminder_needsATime_andIsStoredPerMinute() {
+        CreateHabitRequest noTime = createRequest(HabitScheduleType.DAILY, List.of());
+        noTime.setReminderEnabled(true);
+        BadRequestException missing = assertThrows(BadRequestException.class,
+                () -> habitService.createHabit(MEMBER, noTime));
+        assertThat(missing.getErrorConstant()).isEqualTo(ErrorConstant.HABIT_REMINDER_TIME_REQUIRED);
+
+        CreateHabitRequest request = createRequest(HabitScheduleType.DAILY, List.of());
+        request.setReminderEnabled(true);
+        request.setReminderTime(LocalTime.of(7, 30, 45));
+        HabitResponse created = habitService.createHabit(MEMBER, request).getData();
+        assertThat(created.isReminderEnabled()).isTrue();
+        assertThat(created.getReminderTime()).isEqualTo(LocalTime.of(7, 30));
+
+        Habit habit = habit(Habit.EVERY_DAY, 1);
+        habit.setReminderTime(LocalTime.of(7, 0));
+        habit.setReminderEnabled(true);
+        when(habitRepository.findByIdAndMemberIdAndDeletedAtIsNull("h-1", MEMBER)).thenReturn(Optional.of(habit));
+        UpdateHabitRequest off = new UpdateHabitRequest();
+        off.setReminderEnabled(false);
+        assertThat(habitService.updateHabit(MEMBER, "h-1", off).getData().isReminderEnabled()).isFalse();
+        assertThat(habit.getReminderTime()).isEqualTo(LocalTime.of(7, 0)); // kept for turning it on again
     }
 
     @Test

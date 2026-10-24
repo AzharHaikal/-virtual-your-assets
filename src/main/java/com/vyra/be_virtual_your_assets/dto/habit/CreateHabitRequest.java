@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,4 +43,10 @@ public class CreateHabitRequest {
 
     /** Required for SPECIFIC_DAYS, ignored for DAILY. */
     private List<DayOfWeek> scheduleDays = new ArrayList<>();
+
+    /** Daily reminder (on scheduled days, while not done) at {@link #reminderTime}, the member's local time. */
+    private boolean reminderEnabled;
+
+    /** HH:mm; required when the reminder is enabled. */
+    private LocalTime reminderTime;
 }

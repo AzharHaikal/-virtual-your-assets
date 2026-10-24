@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -152,6 +154,9 @@ public class HabitService {
         habit.setColor(request.getColor().toUpperCase());
         habit.setTargetCount(request.getTargetCount() != null ? request.getTargetCount() : 1);
         habit.setScheduleDays(scheduleMask(request.getScheduleType(), request.getScheduleDays()));
+        habit.setReminderEnabled(request.isReminderEnabled());
+        habit.setReminderTime(minutes(request.getReminderTime()));
+        checkReminder(habit);
         habit.setStartDate(today);
         habit.setCreatedBy(memberId);
         habit.setCreatedAt(timeService.nowUtc());
@@ -183,6 +188,13 @@ public class HabitService {
         } else if (request.getScheduleDays() != null) {
             habit.setScheduleDays(scheduleMask(HabitScheduleType.SPECIFIC_DAYS, request.getScheduleDays()));
         }
+        if (request.getReminderTime() != null) {
+            habit.setReminderTime(minutes(request.getReminderTime()));
+        }
+        if (request.getReminderEnabled() != null) {
+            habit.setReminderEnabled(request.getReminderEnabled());
+        }
+        checkReminder(habit);
         touch(habit, memberId);
         habitRepository.save(habit);
         return new BaseResponse<>(ErrorConstant.HABIT_UPDATE_SUCCESS.getCode(),
@@ -260,6 +272,17 @@ public class HabitService {
         if (day.isBefore(today.minusDays(EDITABLE_DAYS - 1L))) {
             throw new BadRequestException(ErrorConstant.HABIT_DATE_TOO_OLD);
         }
+    }
+
+    private static void checkReminder(Habit habit) {
+        if (habit.isReminderEnabled() && habit.getReminderTime() == null) {
+            throw new BadRequestException(ErrorConstant.HABIT_REMINDER_TIME_REQUIRED);
+        }
+    }
+
+    /** Reminders are per minute. */
+    private static LocalTime minutes(LocalTime time) {
+        return time == null ? null : time.truncatedTo(ChronoUnit.MINUTES);
     }
 
     private static short scheduleMask(HabitScheduleType type, List<DayOfWeek> days) {
@@ -345,6 +368,8 @@ public class HabitService {
                     habit, doneDays.getOrDefault(habit.getId(), Set.of()), today, streakFrom);
             response.setCurrentStreak(streak.current());
             response.setBestStreak(streak.best());
+            response.setReminderEnabled(habit.isReminderEnabled());
+            response.setReminderTime(habit.getReminderTime());
             return response;
         }).toList();
     }
