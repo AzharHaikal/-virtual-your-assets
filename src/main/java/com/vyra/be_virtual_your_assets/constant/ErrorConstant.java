@@ -163,6 +163,50 @@ public enum ErrorConstant {
     GOAL_PROGRESS_EMPTY("VYRA-GOL-005", "Enter a value or a note"),
     GOAL_LIMIT_REACHED("VYRA-GOL-006", "You can have up to 50 goals"),
     GOAL_MILESTONE_LIMIT_REACHED("VYRA-GML-001", "A goal can have up to 50 milestones"),
+    GOAL_FINANCE_LINK_INVALID("VYRA-GOL-007", "Only a goal measured by a value in IDR can be linked to your finances"),
+
+    // Budgets (Phase 2.1)
+    BUDGET_LIST_SUCCESS("VYRA-BDG-LST-000", "Budgets retrieved successfully"),
+    BUDGET_CREATE_SUCCESS("VYRA-BDG-CRT-000", "Budget created"),
+    BUDGET_UPDATE_SUCCESS("VYRA-BDG-UPD-000", "Budget updated"),
+    BUDGET_DELETE_SUCCESS("VYRA-BDG-DEL-000", "Budget deleted"),
+    BUDGET_COPY_SUCCESS("VYRA-BDG-CPY-000", "Budgets copied from the previous month"),
+    BUDGET_NOT_FOUND("VYRA-BDG-404", "Budget could not be found"),
+    BUDGET_CATEGORY_NOT_EXPENSE("VYRA-BDG-001", "A budget can only be set for an expense category"),
+    BUDGET_ALREADY_EXISTS("VYRA-BDG-002", "This category already has a budget for that month"),
+
+    // Trends & insights (Phase 2.3)
+    MOOD_TREND_SUCCESS("VYRA-MOD-TRD-000", "Mood trend retrieved successfully"),
+    MOOD_TAGS_SUMMARY_SUCCESS("VYRA-MOD-TAG-000", "Mood tag summary retrieved successfully"),
+    HABIT_CALENDAR_SUCCESS("VYRA-HBT-CAL-000", "Habit calendar retrieved successfully"),
+    HABIT_REMINDER_TIME_REQUIRED("VYRA-HBT-007", "Choose a time for the reminder"),
+    INSIGHT_WEEKLY_SUCCESS("VYRA-INS-WKL-000", "Weekly summary retrieved successfully"),
+    INVALID_TREND_PERIOD("VYRA-INV-006", "Invalid period. Use week or month"),
+
+    // Notifications & push (Phase 2.4 - 2.6)
+    NOTIFICATION_LIST_SUCCESS("VYRA-NTF-LST-000", "Notifications retrieved successfully"),
+    NOTIFICATION_UNREAD_COUNT_SUCCESS("VYRA-NTF-CNT-000", "Unread notifications counted"),
+    NOTIFICATION_READ_SUCCESS("VYRA-NTF-RD-000", "Notification marked as read"),
+    NOTIFICATION_READ_ALL_SUCCESS("VYRA-NTF-RDA-000", "All notifications marked as read"),
+    NOTIFICATION_NOT_FOUND("VYRA-NTF-404", "Notification could not be found"),
+    NOTIFICATION_PREFERENCES_SUCCESS("VYRA-NTF-PRF-000", "Notification settings retrieved successfully"),
+    NOTIFICATION_PREFERENCES_SAVED("VYRA-NTF-PRF-001", "Notification settings saved"),
+    NOTIFICATION_QUIET_HOURS_INVALID("VYRA-NTF-001", "Set both the start and the end of quiet hours, and make them different"),
+    PUSH_TOKEN_SAVED("VYRA-PSH-000", "Device registered for notifications"),
+    PUSH_TOKEN_DELETED("VYRA-PSH-DEL-000", "Device removed from notifications"),
+
+    // Exports (Phase 2.7)
+    EXPORT_RANGE_TOO_LONG("VYRA-EXP-001", "Export at most 366 days at a time"),
+    DATA_EXPORT_REQUESTED("VYRA-EXP-REQ-000", "We are preparing your data. You will get an e-mail when it is ready"),
+    DATA_EXPORT_GET_SUCCESS("VYRA-EXP-GET-000", "Export status retrieved successfully"),
+    DATA_EXPORT_NOT_FOUND("VYRA-EXP-404", "Export could not be found"),
+    DATA_EXPORT_NOT_READY("VYRA-EXP-002", "Your export is not ready yet"),
+    DATA_EXPORT_EXPIRED("VYRA-EXP-410", "This download link has expired. Please request a new export"),
+    DATA_EXPORT_TOO_SOON("VYRA-EXP-429", "You can request one export per day. Please try again in"),
+
+    // Onboarding (Phase 2.8)
+    ONBOARDING_COMPLETE_SUCCESS("VYRA-ACC-ONB-000", "Welcome aboard"),
+    ACCOUNT_MODULES_REQUIRED("VYRA-ACC-004", "Choose at least one module"),
 
     // Idempotency-Key
     IDEMPOTENCY_KEY_INVALID("VYRA-IDM-001", "Invalid Idempotency-Key (max 100 characters)"),

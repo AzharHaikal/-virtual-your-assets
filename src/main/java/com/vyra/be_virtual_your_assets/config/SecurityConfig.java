@@ -24,6 +24,7 @@ public class SecurityConfig {
     private final AuthTokenFilter authTokenFilter;
     private final AdminTokenFilter adminTokenFilter;
     private final RateLimitFilter rateLimitFilter;
+    private final MetricsTokenAuthorizationManager metricsTokenAuthorizationManager;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -55,6 +56,10 @@ public class SecurityConfig {
                                 .permitAll()
                                 .requestMatchers(SecurityConstant.API_DOCS_URL)
                                 .permitAll()
+                                .requestMatchers(SecurityConstant.PUBLIC_URL)
+                                .permitAll()
+                                .requestMatchers(SecurityConstant.METRICS_URL)
+                                .access(metricsTokenAuthorizationManager)
                                 .anyRequest()
                                 .authenticated()
                 )
