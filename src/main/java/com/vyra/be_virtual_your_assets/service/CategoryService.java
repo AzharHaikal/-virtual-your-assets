@@ -12,12 +12,14 @@ import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.ConflictException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
+import com.vyra.be_virtual_your_assets.repository.BudgetRepository;
 import com.vyra.be_virtual_your_assets.repository.FinanceCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,7 @@ import java.util.stream.Collectors;
 public class CategoryService {
 
     private final FinanceCategoryRepository categoryRepository;
+    private final BudgetRepository budgetRepository;
     private final TimeService timeService;
 
     @Transactional(readOnly = true)
@@ -100,13 +103,15 @@ public class CategoryService {
                 ErrorConstant.CATEGORY_UPDATE_SUCCESS.getMessage(), toResponse(category));
     }
 
-    /** Soft delete: transactions already using it keep showing its name. */
+    /** Soft delete: transactions already using it keep showing its name; its budgets are deleted with it. */
     @Transactional
     public BaseResponse<Void> deleteCategory(String memberId, String categoryId) {
         FinanceCategory category = ownCategory(memberId, categoryId);
-        category.setDeletedAt(timeService.nowUtc());
+        LocalDateTime now = timeService.nowUtc();
+        category.setDeletedAt(now);
         category.setModifiedBy(memberId);
         categoryRepository.save(category);
+        budgetRepository.softDeleteByCategory(memberId, category.getId(), now);
         return new BaseResponse<>(ErrorConstant.CATEGORY_DELETE_SUCCESS.getCode(),
                 ErrorConstant.CATEGORY_DELETE_SUCCESS.getMessage(), null);
     }
