@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.auth.*;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.AuthenticationService;
+import com.vyra.be_virtual_your_assets.service.PushTokenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -20,6 +21,7 @@ import static com.vyra.be_virtual_your_assets.constant.ApiPath.*;
 @RequestMapping(ApiPath.V1_AUTH)
 public class AuthenticationController {
     private final AuthenticationService authenticationService;
+    private final PushTokenService pushTokenService;
 
     @PostMapping(REGISTER)
     public BaseResponse<RegisterResponse> registerMember(@Valid @RequestBody RegisterRequest request) {
@@ -56,9 +58,14 @@ public class AuthenticationController {
         return authenticationService.resetPin(request);
     }
 
+    /** The optional body carries this device's push token, so it stops receiving notifications. */
     @PostMapping(LOGOUT)
-    public BaseResponse<Void> logoutMember(Authentication authentication) {
+    public BaseResponse<Void> logoutMember(@Valid @RequestBody(required = false) LogoutRequest request,
+                                           Authentication authentication) {
         CustomUserDetails user = (CustomUserDetails) authentication.getPrincipal();
+        if (request != null && request.getPushToken() != null) {
+            pushTokenService.unregister(user.getMemberId(), request.getPushToken());
+        }
         return authenticationService.logoutMember(user.getMemberId(), user.getAccessToken());
     }
 

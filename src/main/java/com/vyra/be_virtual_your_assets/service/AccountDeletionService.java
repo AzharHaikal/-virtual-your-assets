@@ -14,6 +14,7 @@ import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
+import com.vyra.be_virtual_your_assets.repository.DevicePushTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import com.vyra.be_virtual_your_assets.util.OtpUtil;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class AccountDeletionService {
     private final MemberRepository memberRepository;
     private final MemberOtpRepository memberOtpRepository;
     private final MemberTokenRepository memberTokenRepository;
+    private final DevicePushTokenRepository pushTokenRepository;
     private final ValidationService validationService;
     private final LockoutService lockoutService;
     private final OtpService otpService;
@@ -109,6 +111,7 @@ public class AccountDeletionService {
 
         memberOtpRepository.delete(otp);
         memberTokenRepository.deleteByUserId(member.getId());
+        pushTokenRepository.deleteAllOfMember(member.getId());
         memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_DELETE_ACCOUNT);
         log.info("Member deleted their account. memberId: {}", memberId);
 

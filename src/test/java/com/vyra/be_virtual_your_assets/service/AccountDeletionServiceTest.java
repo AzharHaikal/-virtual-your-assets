@@ -12,6 +12,7 @@ import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.repository.MemberOtpRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
+import com.vyra.be_virtual_your_assets.repository.DevicePushTokenRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class AccountDeletionServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private MemberOtpRepository memberOtpRepository;
     @Mock private MemberTokenRepository memberTokenRepository;
+    @Mock private DevicePushTokenRepository pushTokenRepository;
     @Mock private ValidationService validationService;
     @Mock private LockoutService lockoutService;
     @Mock private OtpService otpService;
@@ -60,7 +62,7 @@ class AccountDeletionServiceTest {
     void setUp() {
         TimeService timeService = new TimeService(
                 Clock.fixed(Instant.parse("2026-10-24T02:00:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
-        service = new AccountDeletionService(memberRepository, memberOtpRepository, memberTokenRepository,
+        service = new AccountDeletionService(memberRepository, memberOtpRepository, memberTokenRepository, pushTokenRepository,
                 validationService, lockoutService, otpService, memberActivityService, passwordEncoder,
                 new SecurityPolicy(), timeService);
         member = new Member();
@@ -143,6 +145,7 @@ class AccountDeletionServiceTest {
         verify(memberRepository).save(member);
         verify(memberOtpRepository).delete(otp);
         verify(memberTokenRepository).deleteByUserId(MEMBER);
+        verify(pushTokenRepository).deleteAllOfMember(MEMBER);
         verify(memberActivityService).createMemberActivity(PHONE, MemberActivityEvent.SUCCESS_DELETE_ACCOUNT);
     }
 

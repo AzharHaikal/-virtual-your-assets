@@ -7,9 +7,11 @@ import com.vyra.be_virtual_your_assets.dto.notification.NotificationResponse;
 import com.vyra.be_virtual_your_assets.dto.notification.ReadAllResponse;
 import com.vyra.be_virtual_your_assets.dto.notification.UnreadCountResponse;
 import com.vyra.be_virtual_your_assets.dto.notification.UpdateNotificationPreferencesRequest;
+import com.vyra.be_virtual_your_assets.dto.push.RegisterPushTokenRequest;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.NotificationPreferenceService;
 import com.vyra.be_virtual_your_assets.service.NotificationService;
+import com.vyra.be_virtual_your_assets.service.PushTokenService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,9 +27,13 @@ class NotificationControllerTest {
 
     @Mock private NotificationService notificationService;
     @Mock private NotificationPreferenceService preferenceService;
+    @Mock private PushTokenService pushTokenService;
 
     @InjectMocks
     private NotificationController controller;
+
+    @InjectMocks
+    private PushTokenController pushTokenController;
 
     private final UsernamePasswordAuthenticationToken authentication =
             new UsernamePasswordAuthenticationToken(new CustomUserDetails("member-1", "token"), null);
@@ -63,4 +69,15 @@ class NotificationControllerTest {
         assertThat(controller.updatePreferences(request, authentication)).isSameAs(saved);
     }
 
+    @Test
+    void pushTokens_delegateWithTheAuthenticatedMember() {
+        RegisterPushTokenRequest request = new RegisterPushTokenRequest();
+        BaseResponse<Void> saved = new BaseResponse<>("VYRA-PSH-000", "ok", null);
+        when(pushTokenService.register("member-1", request)).thenReturn(saved);
+        assertThat(pushTokenController.register(request, authentication)).isSameAs(saved);
+
+        BaseResponse<Void> deleted = new BaseResponse<>("VYRA-PSH-DEL-000", "ok", null);
+        when(pushTokenService.unregister("member-1", "fcm-token")).thenReturn(deleted);
+        assertThat(pushTokenController.unregister("fcm-token", authentication)).isSameAs(deleted);
+    }
 }
