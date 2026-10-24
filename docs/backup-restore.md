@@ -5,8 +5,8 @@ Target (PRD NFR-08): scheduled backups and a restore procedure that is **tested*
 ## 1. What is backed up
 
 One logical dump (`pg_dump --format=custom`) of every application schema:
-`flyway`, `admin_idp`, `idp`, `wallet`, `transaction_finance`.
-The wallet balance stays encrypted in the dump (AES-256-GCM): a restore is only usable with the same `CRYPTO_SECRET_KEY`, so keep that key in the secret store, **never next to the backups**.
+`flyway`, `admin_idp`, `idp`, `wallet`, `transaction_finance`, `wellbeing` (mood & journal, habits, goals), `notification`.
+The wallet balance and the journal stay encrypted in the dump (AES-256-GCM): a restore is only usable with the same `CRYPTO_SECRET_KEY`, so keep that key in the secret store, **never next to the backups**.
 
 ## 2. Schedule
 

@@ -17,6 +17,7 @@ file="$BACKUP_DIR/vyra_${PGDATABASE}_$(date -u +%Y%m%dT%H%M%SZ).dump"
 
 pg_dump --format=custom --no-owner --no-privileges \
         --schema=flyway --schema=admin_idp --schema=idp --schema=wallet --schema=transaction_finance \
+        --schema=wellbeing --schema=notification \
         --file="$file"
 
 # A dump that pg_restore cannot list is not a backup.
