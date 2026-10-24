@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.GoalProgressType;
 import com.vyra.be_virtual_your_assets.constant.GoalStatus;
@@ -32,6 +33,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -44,12 +46,15 @@ import java.util.stream.Collectors;
 public class GoalService {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+    /** The only unit a savings target (linked to the finance overview) can have. */
+    static final String FINANCE_UNIT = "IDR";
 
     private final GoalRepository goalRepository;
     private final GoalMilestoneRepository milestoneRepository;
     private final GoalProgressLogRepository progressLogRepository;
     private final ValidationService validationService;
     private final TimeService timeService;
+    private final ActivationService activationService;
 
     // =========================================================================
     // Read
@@ -103,9 +108,12 @@ public class GoalService {
         goal.setTargetValue(request.getTargetValue());
         goal.setUnit(StringUtils.trimToNull(request.getUnit()));
         goal.setDueDate(request.getDueDate());
+        goal.setLinkedToFinance(request.isLinkedToFinance());
+        checkFinanceLink(goal);
         goal.setCreatedBy(memberId);
         goal.setCreatedAt(now);
         goalRepository.save(goal);
+        activationService.record(memberId, ActivationEvent.FIRST_GOAL);
 
         List<String> titles = request.getMilestones() != null ? request.getMilestones() : List.of();
         List<GoalMilestone> milestones = new ArrayList<>(titles.size());
@@ -153,6 +161,11 @@ public class GoalService {
             checkDueDate(request.getDueDate(), today);
             goal.setDueDate(request.getDueDate());
         }
+        if (request.getLinkedToFinance() != null) {
+            goal.setLinkedToFinance(request.getLinkedToFinance());
+        }
+        // Also after a unit change of a goal that is already linked.
+        checkFinanceLink(goal);
         if (request.getStatus() != null && request.getStatus() != goal.getStatus()) {
             goal.setStatus(request.getStatus());
             goal.setCompletedAt(request.getStatus() == GoalStatus.COMPLETED ? timeService.nowUtc() : null);
@@ -268,6 +281,23 @@ public class GoalService {
         }
     }
 
+    /** A linked goal must be a VALUE goal in IDR; an empty unit becomes IDR. */
+    private static void checkFinanceLink(Goal goal) {
+        if (!goal.isLinkedToFinance()) {
+            return;
+        }
+        if (goal.getProgressType() != GoalProgressType.VALUE) {
+            throw new BadRequestException(ErrorConstant.GOAL_FINANCE_LINK_INVALID);
+        }
+        if (goal.getUnit() == null) {
+            goal.setUnit(FINANCE_UNIT);
+        } else if (FINANCE_UNIT.equals(goal.getUnit().toUpperCase(Locale.ROOT))) {
+            goal.setUnit(FINANCE_UNIT);
+        } else {
+            throw new BadRequestException(ErrorConstant.GOAL_FINANCE_LINK_INVALID);
+        }
+    }
+
     private static GoalMilestone milestone(String goalId, String title, int position, LocalDateTime now) {
         GoalMilestone milestone = new GoalMilestone();
         milestone.setGoalId(goalId);
@@ -337,6 +367,7 @@ public class GoalService {
         response.setStatus(goal.getStatus());
         response.setCompletedAt(goal.getCompletedAt());
         response.setCreatedAt(goal.getCreatedAt());
+        response.setLinkedToFinance(goal.isLinkedToFinance());
         response.setMilestoneDone(done);
         response.setMilestoneTotal(milestones.size());
         response.setProgressPercent(progressPercent(goal, done, milestones.size()));

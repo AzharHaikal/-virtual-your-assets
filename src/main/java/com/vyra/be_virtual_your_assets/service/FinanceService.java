@@ -6,11 +6,13 @@ import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.common.PageResponse;
 import com.vyra.be_virtual_your_assets.dto.finance.CategoryAmountResponse;
 import com.vyra.be_virtual_your_assets.dto.finance.FinanceSummaryResponse;
+import com.vyra.be_virtual_your_assets.dto.finance.SavingsSummaryResponse;
 import com.vyra.be_virtual_your_assets.dto.transaction.TransactionHistoryResponse;
 import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Transaction;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
+import com.vyra.be_virtual_your_assets.repository.GoalRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionRepository;
 import com.vyra.be_virtual_your_assets.repository.TransactionSpecifications;
 import com.vyra.be_virtual_your_assets.repository.TransactionSpecifications.SortField;
@@ -39,6 +41,7 @@ public class FinanceService {
     static final int MAX_PAGE_SIZE = 100;
 
     private final TransactionRepository transactionRepository;
+    private final GoalRepository goalRepository;
     private final CategoryService categoryService;
     private final ValidationService validationService;
     private final TimeService timeService;
@@ -116,8 +119,18 @@ public class FinanceService {
         response.setPreviousExpense(sumOfType(previousRows, TransactionType.EXPENSE));
         response.setIncomeByCategory(income);
         response.setExpenseByCategory(expense);
+        response.setSavings(savings(memberId));
         return new BaseResponse<>(ErrorConstant.FINANCE_SUMMARY_SUCCESS.getCode(),
                 ErrorConstant.FINANCE_SUMMARY_SUCCESS.getMessage(), response);
+    }
+
+    private SavingsSummaryResponse savings(String memberId) {
+        List<Object[]> rows = goalRepository.sumSavingsTargets(memberId);
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return new SavingsSummaryResponse(0, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        Object[] row = rows.get(0);
+        return new SavingsSummaryResponse(((Number) row[0]).longValue(), toBigDecimal(row[1]), toBigDecimal(row[2]));
     }
 
     private static boolean isWholeMonth(LocalDate start, LocalDate end) {

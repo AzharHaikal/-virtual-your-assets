@@ -28,4 +28,13 @@ public interface GoalRepository extends JpaRepository<Goal, String> {
     List<Goal> findAllOfMember(@Param("memberId") String memberId);
 
     long countByMemberIdAndDeletedAtIsNull(String memberId);
+
+    /** Active savings targets of the member. Row: [count, sum of targets, sum of current values]. */
+    @Query("""
+        SELECT COUNT(g), COALESCE(SUM(g.targetValue), 0), COALESCE(SUM(g.currentValue), 0)
+        FROM Goal g
+        WHERE g.memberId = :memberId AND g.deletedAt IS NULL AND g.linkedToFinance = true
+          AND g.status = com.vyra.be_virtual_your_assets.constant.GoalStatus.ACTIVE
+        """)
+    List<Object[]> sumSavingsTargets(@Param("memberId") String memberId);
 }

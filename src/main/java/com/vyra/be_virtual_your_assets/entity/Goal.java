@@ -70,4 +70,8 @@ public class Goal extends BaseEntity {
     private GoalStatus status = GoalStatus.ACTIVE;
 
     private LocalDateTime completedAt;
+
+    /** A savings target: a VALUE goal in IDR shown in the finance overview (Phase 2.2). */
+    @Column(nullable = false)
+    private boolean linkedToFinance;
 }

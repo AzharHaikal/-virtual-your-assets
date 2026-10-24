@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.GoalCategory;
 import com.vyra.be_virtual_your_assets.constant.GoalProgressType;
@@ -58,6 +59,7 @@ class GoalServiceTest {
     @Mock private GoalMilestoneRepository milestoneRepository;
     @Mock private GoalProgressLogRepository progressLogRepository;
     @Mock private ValidationService validationService;
+    @Mock private ActivationService activationService;
 
     private GoalService goalService;
 
@@ -66,7 +68,7 @@ class GoalServiceTest {
         TimeService timeService = new TimeService(
                 Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
         goalService = new GoalService(goalRepository, milestoneRepository, progressLogRepository,
-                validationService, timeService);
+                validationService, timeService, activationService);
         Member member = new Member();
         member.setId(MEMBER);
         member.setTimezone("Asia/Jakarta");
@@ -225,6 +227,63 @@ class GoalServiceTest {
 
         verify(progressLogRepository, never()).save(any());
         assertThat(value.getCurrentValue()).isEqualByComparingTo("2");
+    }
+
+    // =========================================================================
+    // savings target (linked to finance)
+    // =========================================================================
+    @Test
+    void createGoal_linkedValueGoal_withoutUnit_becomesIdr_andCountsAsFirstGoal() {
+        CreateGoalRequest request = createRequest(GoalProgressType.VALUE);
+        request.setTargetValue(new BigDecimal("5000000"));
+        request.setLinkedToFinance(true);
+
+        GoalResponse result = goalService.createGoal(MEMBER, request).getData();
+
+        assertThat(result.isLinkedToFinance()).isTrue();
+        assertThat(result.getUnit()).isEqualTo("IDR");
+        verify(activationService).record(MEMBER, ActivationEvent.FIRST_GOAL);
+    }
+
+    @Test
+    void linkToFinance_onlyForValueGoalsInIdr() {
+        CreateGoalRequest milestones = createRequest(GoalProgressType.MILESTONE);
+        milestones.setLinkedToFinance(true);
+        assertError(ErrorConstant.GOAL_FINANCE_LINK_INVALID, () -> goalService.createGoal(MEMBER, milestones));
+
+        CreateGoalRequest otherUnit = createRequest(GoalProgressType.VALUE);
+        otherUnit.setTargetValue(new BigDecimal("12"));
+        otherUnit.setUnit("buku");
+        otherUnit.setLinkedToFinance(true);
+        assertError(ErrorConstant.GOAL_FINANCE_LINK_INVALID, () -> goalService.createGoal(MEMBER, otherUnit));
+
+        // Changing the unit of a linked goal is checked too.
+        Goal linked = goal(GoalProgressType.VALUE);
+        linked.setTargetValue(new BigDecimal("100"));
+        linked.setUnit("IDR");
+        linked.setLinkedToFinance(true);
+        when(goalRepository.findOwnedForUpdate("g-1", MEMBER)).thenReturn(Optional.of(linked));
+        UpdateGoalRequest unit = new UpdateGoalRequest();
+        unit.setUnit("USD");
+        assertError(ErrorConstant.GOAL_FINANCE_LINK_INVALID, () -> goalService.updateGoal(MEMBER, "g-1", unit));
+    }
+
+    @Test
+    void updateGoal_canLinkAndUnlink() {
+        Goal goal = goal(GoalProgressType.VALUE);
+        goal.setTargetValue(new BigDecimal("100"));
+        goal.setUnit("idr");
+        when(goalRepository.findOwnedForUpdate("g-1", MEMBER)).thenReturn(Optional.of(goal));
+
+        UpdateGoalRequest link = new UpdateGoalRequest();
+        link.setLinkedToFinance(true);
+        GoalResponse linked = goalService.updateGoal(MEMBER, "g-1", link).getData();
+        assertThat(linked.isLinkedToFinance()).isTrue();
+        assertThat(linked.getUnit()).isEqualTo("IDR");
+
+        UpdateGoalRequest unlink = new UpdateGoalRequest();
+        unlink.setLinkedToFinance(false);
+        assertThat(goalService.updateGoal(MEMBER, "g-1", unlink).getData().isLinkedToFinance()).isFalse();
     }
 
     // =========================================================================

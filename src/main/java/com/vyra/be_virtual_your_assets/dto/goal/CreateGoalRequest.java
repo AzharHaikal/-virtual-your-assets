@@ -50,6 +50,9 @@ public class CreateGoalRequest {
     /** Optional, the member's day; not before today. */
     private LocalDate dueDate;
 
+    /** A savings target shown in the finance overview; only for a VALUE goal in IDR (the unit may be left empty). */
+    private boolean linkedToFinance;
+
     /** Optional first milestones, in order. */
     @Size(max = GoalRules.MAX_MILESTONES, message = "A goal can have up to 50 milestones")
     private List<@NotBlank(message = "Milestone title is required")

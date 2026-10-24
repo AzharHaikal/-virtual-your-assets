@@ -26,6 +26,8 @@ public class GoalResponse {
     private GoalStatus status;
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
+    /** A savings target shown in the finance overview. */
+    private boolean linkedToFinance;
 
     /** 0..100, computed on the server: milestones done / total, or current / target. */
     private int progressPercent;
