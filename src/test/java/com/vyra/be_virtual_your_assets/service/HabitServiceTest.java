@@ -1,9 +1,12 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
+import com.vyra.be_virtual_your_assets.constant.HabitDayStatus;
 import com.vyra.be_virtual_your_assets.constant.HabitCategory;
 import com.vyra.be_virtual_your_assets.constant.HabitScheduleType;
 import com.vyra.be_virtual_your_assets.dto.habit.CreateHabitRequest;
+import com.vyra.be_virtual_your_assets.dto.habit.HabitCalendarResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitCompletionRequest;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.UpdateHabitRequest;
@@ -26,6 +29,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +56,7 @@ class HabitServiceTest {
     @Mock private HabitRepository habitRepository;
     @Mock private HabitCompletionRepository completionRepository;
     @Mock private ValidationService validationService;
+    @Mock private ActivationService activationService;
 
     private HabitService habitService;
 
@@ -59,7 +64,8 @@ class HabitServiceTest {
     void setUp() {
         TimeService timeService = new TimeService(
                 Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
-        habitService = new HabitService(habitRepository, completionRepository, validationService, timeService);
+        habitService = new HabitService(habitRepository, completionRepository, validationService, timeService,
+                activationService);
         Member member = new Member();
         member.setId(MEMBER);
         member.setTimezone("Asia/Jakarta");
@@ -210,6 +216,71 @@ class HabitServiceTest {
         verify(habitRepository).save(habit);
 
         assertThat(habitService.setArchived(MEMBER, "h-1", false).getData().isArchived()).isFalse();
+    }
+
+    // =========================================================================
+    // Phase 2: streak, calendar, reminder
+    // =========================================================================
+    @Test
+    void habits_carryTheirStreak_computedFromTheDoneDays() {
+        Habit habit = habit(Habit.EVERY_DAY, 1);
+        when(habitRepository.findAllOfMember(MEMBER)).thenReturn(List.of(habit));
+        when(completionRepository.findDoneDays(MEMBER, TODAY.minusDays(HabitService.STREAK_LOOKBACK_DAYS), TODAY))
+                .thenReturn(List.of(new Object[]{"h-1", TODAY.minusDays(2)}, new Object[]{"h-1", TODAY.minusDays(1)}));
+
+        HabitResponse result = habitService.getHabits(MEMBER, null, false).getData().get(0);
+
+        assertThat(result.getCurrentStreak()).isEqualTo(2);
+        assertThat(result.getBestStreak()).isEqualTo(2);
+    }
+
+    @Test
+    void calendar_marksEachDayOfTheMonth() {
+        // Mondays and Wednesdays only, target 2, started on 2026-10-05 (a Monday).
+        Habit habit = habit(Habit.mask(List.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY)), 2);
+        habit.setStartDate(LocalDate.of(2026, 10, 5));
+        when(habitRepository.findByIdAndMemberIdAndDeletedAtIsNull("h-1", MEMBER)).thenReturn(Optional.of(habit));
+        when(completionRepository.findByHabitIdAndLocalDateBetween("h-1", LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 31))).thenReturn(List.of(
+                completion(LocalDate.of(2026, 10, 5), 2),    // Mon: done
+                completion(LocalDate.of(2026, 10, 7), 1),    // Wed: partial
+                completion(LocalDate.of(2026, 10, 10), 2))); // Sat: done although not scheduled
+
+        HabitCalendarResponse result = habitService.getCalendar(MEMBER, "h-1", null).getData();
+
+        assertThat(result.getMonth()).isEqualTo(YearMonth.of(2026, 10));
+        assertThat(result.getDays()).hasSize(31);
+        assertThat(status(result, 1)).isEqualTo(HabitDayStatus.OUT_OF_RANGE);   // before the start
+        assertThat(status(result, 5)).isEqualTo(HabitDayStatus.DONE);
+        assertThat(status(result, 6)).isEqualTo(HabitDayStatus.NOT_SCHEDULED);
+        assertThat(status(result, 7)).isEqualTo(HabitDayStatus.PARTIAL);
+        assertThat(status(result, 10)).isEqualTo(HabitDayStatus.DONE);
+        assertThat(status(result, 12)).isEqualTo(HabitDayStatus.MISSED);
+        assertThat(status(result, 24)).isEqualTo(HabitDayStatus.OUT_OF_RANGE);  // future
+        // Mon/Wed from the 5th to today (23rd): 5,7,12,14,19,21, plus the done Saturday = 7; done: 5 and 10.
+        assertThat(result.getScheduledDays()).isEqualTo(7);
+        assertThat(result.getDoneDays()).isEqualTo(2);
+    }
+
+    @Test
+    void calendar_todayNotDoneIsPending() {
+        Habit habit = habit(Habit.EVERY_DAY, 1);
+        assertThat(HabitService.dayStatus(habit, TODAY, TODAY, 0)).isEqualTo(HabitDayStatus.PENDING);
+        assertThat(HabitService.dayStatus(habit, TODAY, TODAY, 1)).isEqualTo(HabitDayStatus.DONE);
+    }
+
+    @Test
+    void complete_countsAsTheFirstHabitCompletion() {
+        Habit habit = habit(Habit.EVERY_DAY, 1);
+        when(habitRepository.findByIdAndMemberIdAndDeletedAtIsNull("h-1", MEMBER)).thenReturn(Optional.of(habit));
+
+        habitService.complete(MEMBER, "h-1", TODAY, null);
+
+        verify(activationService).record(MEMBER, ActivationEvent.FIRST_HABIT_COMPLETION);
+    }
+
+    private static HabitDayStatus status(HabitCalendarResponse calendar, int dayOfMonth) {
+        return calendar.getDays().get(dayOfMonth - 1).getStatus();
     }
 
     // ------------------------------------------------------------------

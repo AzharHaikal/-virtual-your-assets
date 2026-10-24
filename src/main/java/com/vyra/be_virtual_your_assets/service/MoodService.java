@@ -1,11 +1,17 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
+import com.vyra.be_virtual_your_assets.constant.TrendPeriod;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.mood.CreateMoodTagRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTagCountResponse;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodTagResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTagsSummaryResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTrendPointResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTrendResponse;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MoodEntry;
 import com.vyra.be_virtual_your_assets.entity.MoodTag;
@@ -22,11 +28,19 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -47,15 +61,17 @@ public class MoodService {
     private final ValidationService validationService;
     private final TimeService timeService;
     private final TransactionTemplate transactionTemplate;
+    private final ActivationService activationService;
 
     public MoodService(MoodEntryRepository entryRepository, MoodTagRepository tagRepository,
                        ValidationService validationService, TimeService timeService,
-                       PlatformTransactionManager transactionManager) {
+                       PlatformTransactionManager transactionManager, ActivationService activationService) {
         this.entryRepository = entryRepository;
         this.tagRepository = tagRepository;
         this.validationService = validationService;
         this.timeService = timeService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.activationService = activationService;
     }
 
     // =========================================================================
@@ -75,6 +91,7 @@ public class MoodService {
             // Another check-in of the same day won the insert: update that one instead.
             saved = transactionTemplate.execute(status -> upsert(memberId, localDate, request));
         }
+        activationService.record(memberId, ActivationEvent.FIRST_MOOD);
         return new BaseResponse<>(ErrorConstant.MOOD_SAVE_SUCCESS.getCode(),
                 ErrorConstant.MOOD_SAVE_SUCCESS.getMessage(), toResponse(saved));
     }
@@ -139,6 +156,116 @@ public class MoodService {
         entryRepository.save(entry);
         return new BaseResponse<>(ErrorConstant.MOOD_DELETE_SUCCESS.getCode(),
                 ErrorConstant.MOOD_DELETE_SUCCESS.getMessage(), null);
+    }
+
+    // =========================================================================
+    // Trends
+    // =========================================================================
+
+    /**
+     * Mood over the calendar week (one point per day) or month (one point per week, Monday .. Sunday cut
+     * to the month) that contains {@code date} (default today, member's zone). A day or week without
+     * entries has a null average, never 0.
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse<MoodTrendResponse> getTrend(String memberId, TrendPeriod period, LocalDate date) {
+        Member member = validationService.getMemberById(memberId);
+        LocalDate anchor = date != null ? date : timeService.today(timeService.zoneOf(member));
+        TrendPeriod type = period != null ? period : TrendPeriod.WEEK;
+        LocalDate from = type == TrendPeriod.WEEK
+                ? anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) : anchor.withDayOfMonth(1);
+        LocalDate to = type == TrendPeriod.WEEK ? from.plusDays(6) : anchor.withDayOfMonth(anchor.lengthOfMonth());
+
+        Map<LocalDate, Short> scores = new HashMap<>();
+        for (MoodEntry entry : entryRepository.findRange(memberId, from, to)) {
+            scores.put(entry.getLocalDate(), entry.getMoodScore());
+        }
+        List<MoodTrendPointResponse> points = new ArrayList<>();
+        LocalDate start = from;
+        while (!start.isAfter(to)) {
+            LocalDate end = type == TrendPeriod.WEEK ? start
+                    : min(start.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)), to);
+            points.add(point(start, end, scores));
+            start = end.plusDays(1);
+        }
+
+        MoodTrendResponse response = new MoodTrendResponse();
+        response.setPeriod(type);
+        response.setFrom(from);
+        response.setTo(to);
+        response.setEntries(scores.size());
+        response.setAverage(average(scores.values()));
+        response.setPoints(points);
+        return new BaseResponse<>(ErrorConstant.MOOD_TREND_SUCCESS.getCode(),
+                ErrorConstant.MOOD_TREND_SUCCESS.getMessage(), response);
+    }
+
+    /** How often each tag was used in [from, to] (default: the last 30 days up to today). */
+    @Transactional(readOnly = true)
+    public BaseResponse<MoodTagsSummaryResponse> getTagsSummary(String memberId, LocalDate from, LocalDate to) {
+        Member member = validationService.getMemberById(memberId);
+        LocalDate end = to != null ? to : timeService.today(timeService.zoneOf(member));
+        LocalDate start = from != null ? from : end.minusDays(DEFAULT_RANGE_DAYS - 1L);
+        if (start.isAfter(end)) {
+            throw new BadRequestException(ErrorConstant.INVALID_DATE_RANGE);
+        }
+        List<MoodEntry> entries = entryRepository.findRange(memberId, start, end);
+        Map<String, MoodTagCountResponse> counts = new HashMap<>();
+        for (MoodEntry entry : entries) {
+            for (MoodTag tag : entry.getTags()) {
+                MoodTagCountResponse item = counts.computeIfAbsent(tag.getId(), id -> tagCount(tag));
+                item.setCount(item.getCount() + 1);
+            }
+        }
+        for (MoodTagCountResponse item : counts.values()) {
+            item.setPercent(BigDecimal.valueOf(item.getCount() * 100L)
+                    .divide(BigDecimal.valueOf(entries.size()), 1, RoundingMode.HALF_UP));
+        }
+        List<MoodTagCountResponse> tags = counts.values().stream()
+                .sorted(Comparator.comparingInt(MoodTagCountResponse::getCount).reversed()
+                        .thenComparing(MoodTagCountResponse::getName))
+                .toList();
+
+        MoodTagsSummaryResponse response = new MoodTagsSummaryResponse();
+        response.setFrom(start);
+        response.setTo(end);
+        response.setEntries(entries.size());
+        response.setTags(tags);
+        return new BaseResponse<>(ErrorConstant.MOOD_TAGS_SUMMARY_SUCCESS.getCode(),
+                ErrorConstant.MOOD_TAGS_SUMMARY_SUCCESS.getMessage(), response);
+    }
+
+    private static MoodTrendPointResponse point(LocalDate from, LocalDate to, Map<LocalDate, Short> scores) {
+        List<Short> values = new ArrayList<>();
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            Short score = scores.get(day);
+            if (score != null) {
+                values.add(score);
+            }
+        }
+        return new MoodTrendPointResponse(from, to, average(values), values.size());
+    }
+
+    /** Mean with 2 decimals; null for no values. */
+    static BigDecimal average(Collection<Short> values) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        long sum = values.stream().mapToLong(Short::longValue).sum();
+        return BigDecimal.valueOf(sum).divide(BigDecimal.valueOf(values.size()), 2, RoundingMode.HALF_UP);
+    }
+
+    private static LocalDate min(LocalDate a, LocalDate b) {
+        return a.isBefore(b) ? a : b;
+    }
+
+    private static MoodTagCountResponse tagCount(MoodTag tag) {
+        MoodTagCountResponse response = new MoodTagCountResponse();
+        response.setId(tag.getId());
+        response.setCode(tag.getCode());
+        response.setName(tag.getName());
+        response.setCustom(!tag.isBuiltIn());
+        return response;
     }
 
     // =========================================================================

@@ -4,6 +4,7 @@ import com.vyra.be_virtual_your_assets.constant.ApiPath;
 import com.vyra.be_virtual_your_assets.constant.HabitCategory;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.CreateHabitRequest;
+import com.vyra.be_virtual_your_assets.dto.habit.HabitCalendarResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitCompletionRequest;
 import com.vyra.be_virtual_your_assets.dto.habit.HabitResponse;
 import com.vyra.be_virtual_your_assets.dto.habit.UpdateHabitRequest;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 /** Habit tracker. Only for the member themself (no admin access). */
@@ -47,6 +49,16 @@ public class HabitController {
     @GetMapping(ApiPath.V1_HABITS + ApiPath.HABIT_TODAY)
     public BaseResponse<List<HabitResponse>> getToday(Authentication authentication) {
         return habitService.getToday(memberId(authentication));
+    }
+
+    /** month = yyyy-MM; default the current month in the member's zone. */
+    @GetMapping(ApiPath.V1_HABITS + ApiPath.HABIT_CALENDAR)
+    public BaseResponse<HabitCalendarResponse> getCalendar(
+            @PathVariable String habitId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth month,
+            Authentication authentication
+    ) {
+        return habitService.getCalendar(memberId(authentication), habitId, month);
     }
 
     @PostMapping(ApiPath.V1_HABITS)

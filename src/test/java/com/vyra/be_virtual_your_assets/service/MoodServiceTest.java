@@ -1,9 +1,14 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
+import com.vyra.be_virtual_your_assets.constant.TrendPeriod;
 import com.vyra.be_virtual_your_assets.dto.mood.CreateMoodTagRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTagCountResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTagsSummaryResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTrendResponse;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MoodEntry;
 import com.vyra.be_virtual_your_assets.entity.MoodTag;
@@ -49,6 +54,7 @@ class MoodServiceTest {
     @Mock private MoodTagRepository tagRepository;
     @Mock private ValidationService validationService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ActivationService activationService;
 
     private MoodService moodService;
     private Member member;
@@ -57,7 +63,8 @@ class MoodServiceTest {
     void setUp() {
         TimeService timeService = new TimeService(
                 Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
-        moodService = new MoodService(entryRepository, tagRepository, validationService, timeService, transactionManager);
+        moodService = new MoodService(entryRepository, tagRepository, validationService, timeService, transactionManager,
+                activationService);
         member = new Member();
         member.setId(MEMBER);
         member.setTimezone("Asia/Jakarta");
@@ -190,6 +197,85 @@ class MoodServiceTest {
 
         assertThrows(NotFoundException.class, () -> moodService.deleteTag(MEMBER, "mood-tag-WORK"));
         verify(tagRepository, never()).save(any());
+    }
+
+    // =========================================================================
+    // trends
+    // =========================================================================
+    @Test
+    void trend_week_isOnePointPerDayOfTheCalendarWeek_andEmptyDaysAreNull() {
+        lenient().when(validationService.getMemberById(MEMBER)).thenReturn(member);
+        LocalDate monday = LocalDate.of(2026, 10, 19);
+        when(entryRepository.findRange(MEMBER, monday, monday.plusDays(6))).thenReturn(List.of(
+                entryOn(monday, 4), entryOn(monday.plusDays(2), 2), entryOn(TODAY_JAKARTA, 5)));
+
+        MoodTrendResponse result = moodService.getTrend(MEMBER, TrendPeriod.WEEK, null).getData();
+
+        assertThat(result.getFrom()).isEqualTo(monday);
+        assertThat(result.getTo()).isEqualTo(monday.plusDays(6));
+        assertThat(result.getPoints()).hasSize(7);
+        assertThat(result.getPoints().get(0).getAverage()).isEqualByComparingTo("4");
+        assertThat(result.getPoints().get(1).getAverage()).isNull(); // not 0
+        assertThat(result.getPoints().get(1).getEntries()).isZero();
+        assertThat(result.getAverage()).isEqualByComparingTo("3.67");
+        assertThat(result.getEntries()).isEqualTo(3);
+    }
+
+    @Test
+    void trend_month_isOnePointPerWeekCutToTheMonth() {
+        lenient().when(validationService.getMemberById(MEMBER)).thenReturn(member);
+        LocalDate first = LocalDate.of(2026, 10, 1);
+        when(entryRepository.findRange(MEMBER, first, LocalDate.of(2026, 10, 31))).thenReturn(List.of(
+                entryOn(LocalDate.of(2026, 10, 2), 3), entryOn(LocalDate.of(2026, 10, 3), 4)));
+
+        MoodTrendResponse result = moodService.getTrend(MEMBER, TrendPeriod.MONTH, LocalDate.of(2026, 10, 15)).getData();
+
+        // Thu 1 - Sun 4, 5-11, 12-18, 19-25, 26-31
+        assertThat(result.getPoints()).extracting(p -> p.getFrom().getDayOfMonth()).containsExactly(1, 5, 12, 19, 26);
+        assertThat(result.getPoints().get(0).getTo()).isEqualTo(LocalDate.of(2026, 10, 4));
+        assertThat(result.getPoints().get(4).getTo()).isEqualTo(LocalDate.of(2026, 10, 31));
+        assertThat(result.getPoints().get(0).getAverage()).isEqualByComparingTo("3.50");
+        assertThat(result.getPoints().get(1).getAverage()).isNull();
+    }
+
+    @Test
+    void tagsSummary_countsTagsMostUsedFirst() {
+        lenient().when(validationService.getMemberById(MEMBER)).thenReturn(member);
+        MoodTag work = builtInTag("t-work", "WORK");
+        MoodTag family = builtInTag("t-family", "FAMILY");
+        MoodEntry a = entryOn(TODAY_JAKARTA, 4);
+        a.getTags().add(work);
+        a.getTags().add(family);
+        MoodEntry b = entryOn(TODAY_JAKARTA.minusDays(1), 2);
+        b.getTags().add(work);
+        MoodEntry c = entryOn(TODAY_JAKARTA.minusDays(2), 3);
+        when(entryRepository.findRange(MEMBER, TODAY_JAKARTA.minusDays(29), TODAY_JAKARTA)).thenReturn(List.of(a, b, c));
+
+        MoodTagsSummaryResponse result = moodService.getTagsSummary(MEMBER, null, null).getData();
+
+        assertThat(result.getEntries()).isEqualTo(3);
+        assertThat(result.getTags()).extracting(MoodTagCountResponse::getCode).containsExactly("WORK", "FAMILY");
+        assertThat(result.getTags().get(0).getCount()).isEqualTo(2);
+        assertThat(result.getTags().get(0).getPercent()).isEqualByComparingTo("66.7");
+    }
+
+    @Test
+    void saveEntry_countsAsTheFirstMood() {
+        when(validationService.getMemberById(MEMBER)).thenReturn(member);
+        when(entryRepository.saveAndFlush(any(MoodEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        moodService.saveEntry(MEMBER, TODAY_JAKARTA, request(4, null));
+
+        verify(activationService).record(MEMBER, ActivationEvent.FIRST_MOOD);
+    }
+
+    private static MoodEntry entryOn(LocalDate day, int score) {
+        MoodEntry entry = new MoodEntry();
+        entry.setId("e-" + day);
+        entry.setMemberId(MEMBER);
+        entry.setLocalDate(day);
+        entry.setMoodScore((short) score);
+        return entry;
     }
 
     // ------------------------------------------------------------------

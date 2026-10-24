@@ -1,11 +1,14 @@
 package com.vyra.be_virtual_your_assets.controller;
 
 import com.vyra.be_virtual_your_assets.constant.ApiPath;
+import com.vyra.be_virtual_your_assets.constant.TrendPeriod;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.mood.CreateMoodTagRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryRequest;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodEntryResponse;
 import com.vyra.be_virtual_your_assets.dto.mood.MoodTagResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTagsSummaryResponse;
+import com.vyra.be_virtual_your_assets.dto.mood.MoodTrendResponse;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.MoodService;
 import jakarta.validation.Valid;
@@ -45,6 +48,26 @@ public class MoodController {
     @GetMapping(ApiPath.V1_MOOD_ENTRIES + ApiPath.MOOD_TODAY)
     public BaseResponse<MoodEntryResponse> getToday(Authentication authentication) {
         return moodService.getToday(memberId(authentication));
+    }
+
+    /** period = week (default) or month; date = any day of it (default today, member's zone). */
+    @GetMapping(ApiPath.V1_MOOD_ENTRIES + ApiPath.MOOD_TREND)
+    public BaseResponse<MoodTrendResponse> getTrend(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Authentication authentication
+    ) {
+        return moodService.getTrend(memberId(authentication), TrendPeriod.parse(period), date);
+    }
+
+    /** from / to inclusive; default the last 30 days. */
+    @GetMapping(ApiPath.V1_MOOD_ENTRIES + ApiPath.MOOD_TAGS_SUMMARY)
+    public BaseResponse<MoodTagsSummaryResponse> getTagsSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Authentication authentication
+    ) {
+        return moodService.getTagsSummary(memberId(authentication), from, to);
     }
 
     /** Create or replace the entry of that day (yyyy-MM-dd, the member's local date). */
