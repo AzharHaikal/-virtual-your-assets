@@ -64,6 +64,13 @@ public enum MemberActivityEvent {
     FAILED_DELETE_ACCOUNT("Member failed to confirm deleting the account"),
     SUCCESS_DELETE_ACCOUNT("Member deleted the account"),
 
+    // DATA EXPORT (Phase 2.7)
+    EXPORT_TRANSACTIONS("Member exported transactions (CSV)"),
+    REQUEST_DATA_EXPORT("Member requested an export of all personal data"),
+    FAILED_DATA_EXPORT("Member failed to request a data export (wrong PIN)"),
+    DATA_EXPORT_READY("The member's data export is ready"),
+    DOWNLOAD_DATA_EXPORT("Member downloaded the data export"),
+
     // TRANSACTION
     ATTEMPT_CREATE_TRANSACTION("Member attempted to create a transaction"),
     SUCCESS_CREATE_TRANSACTION("Member successfully created the transaction"),

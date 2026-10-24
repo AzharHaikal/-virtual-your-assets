@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.AppLanguage;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import jakarta.mail.internet.MimeMessage;
@@ -8,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,45 @@ public class EmailClient {
         } catch (Exception e) {
             throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
         }
+    }
+
+    /** The personal data export is ready: a download link valid for 24 hours. */
+    public void sendDataExportEmail(String firstName, String email, String downloadLink, AppLanguage language) {
+        MimeMessage message = mailSender.createMimeMessage();
+        boolean id = language == AppLanguage.ID;
+        try {
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(email);
+            helper.setSubject(id ? "VYRA - Data Anda siap diunduh" : "VYRA - Your data is ready to download");
+            helper.setText(getDataExportHtmlTemplate(firstName, downloadLink, id), true);
+            mailSender.send(message);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
+        }
+    }
+
+    private String getDataExportHtmlTemplate(String firstName, String downloadLink, boolean id) {
+        String name = HtmlUtils.htmlEscape(firstName == null ? "" : firstName.trim());
+        String link = HtmlUtils.htmlEscape(downloadLink);
+        return "<div style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f9; padding: 50px 0; margin: 0;\">" +
+                "  <table align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"500\" style=\"background-color: #ffffff; border-radius: 20px; overflow: hidden;\">" +
+                "    <tr><td align=\"center\" style=\"background-color: #0A1D37; padding: 40px 0;\">" +
+                "      <h1 style=\"color: #ffffff; margin: 0; font-size: 32px; letter-spacing: 4px; font-weight: 800;\">VYRA</h1>" +
+                "    </td></tr>" +
+                "    <tr><td style=\"padding: 40px;\">" +
+                "      <p style=\"color: #444444; font-size: 16px;\">" + (id ? "Halo, " : "Hi, ") + "<strong>" + name + "</strong></p>" +
+                "      <p style=\"color: #666666; font-size: 15px; line-height: 1.6;\">" +
+                (id ? "Salinan seluruh data pribadi Anda sudah siap. Tautan di bawah ini berlaku selama 24 jam."
+                    : "A copy of all your personal data is ready. The link below works for 24 hours.") + "</p>" +
+                "      <div style=\"text-align: center; margin: 30px 0;\"><a href=\"" + link + "\" style=\"display: inline-block; padding: 14px 28px; background-color: #0A1D37; color: #ffffff; border-radius: 10px; text-decoration: none; font-weight: 700;\">" +
+                (id ? "Unduh data" : "Download data") + "</a></div>" +
+                "      <p style=\"color: #92400E; font-size: 13px; background-color: #FFFBEB; border-left: 4px solid #F59E0B; padding: 12px;\">" +
+                (id ? "File ini berisi jurnal Anda. Jangan bagikan tautan ini. Bila Anda tidak memintanya, segera ganti PIN Anda."
+                    : "The file contains your journal. Do not share this link. If you did not ask for it, change your PIN right away.") +
+                "</p>" +
+                "    </td></tr>" +
+                "  </table>" +
+                "</div>";
     }
 
     private String getOtpHtmlTemplate(String fullName, String otp) {
