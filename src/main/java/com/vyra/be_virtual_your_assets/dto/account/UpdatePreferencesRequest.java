@@ -1,9 +1,13 @@
 package com.vyra.be_virtual_your_assets.dto.account;
 
 import com.vyra.be_virtual_your_assets.constant.AppLanguage;
+import com.vyra.be_virtual_your_assets.constant.AppModule;
 import com.vyra.be_virtual_your_assets.constant.AppTheme;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+
+import java.util.List;
 
 /** Only the fields that are sent change. */
 @Data
@@ -19,4 +23,11 @@ public class UpdatePreferencesRequest {
     /** One of the supported ISO 4217 codes, e.g. IDR. */
     @Size(min = 3, max = 3, message = "Invalid currency")
     private String currency;
+
+    /** At least one; replaces the current choice. */
+    private List<AppModule> enabledModules;
+
+    /** Card order and visibility; cards left out are added at the end, shown. */
+    @Size(max = 20, message = "Too many cards")
+    private List<@Valid DashboardCardSetting> dashboardLayout;
 }

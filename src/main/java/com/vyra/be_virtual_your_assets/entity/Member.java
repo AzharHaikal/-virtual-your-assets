@@ -7,6 +7,8 @@ import com.vyra.be_virtual_your_assets.constant.AppTheme;
 import com.vyra.be_virtual_your_assets.service.TimeService;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -69,6 +71,18 @@ public class Member extends BaseEntity {
     /** ISO 4217 code used to format amounts; no exchange rates. */
     @Column(nullable = false, length = 3)
     private String currency;
+
+    /** Onboarding finished (Phase 2.8); null = show it. */
+    private LocalDateTime onboardingCompletedAt;
+
+    /** Comma separated {@code AppModule} names the member chose; null = all. */
+    @Column(length = 100)
+    private String enabledModules;
+
+    /** JSON list of {@code DashboardCardSetting} (order + hidden); null = the default home screen. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String dashboardLayout;
 
     @PrePersist
     void defaultPreferences() {

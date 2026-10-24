@@ -52,6 +52,12 @@ public class AccountController {
         return accountService.updatePreferences(memberId(authentication), request);
     }
 
+    /** Marks the onboarding as done; the app stops showing it on every device. */
+    @PostMapping(ApiPath.USERS_ME_ONBOARDING_COMPLETE)
+    public BaseResponse<AccountResponse> completeOnboarding(Authentication authentication) {
+        return accountService.completeOnboarding(memberId(authentication));
+    }
+
     /**
      * Raw image bytes as the body (Content-Type image/jpeg, image/png or image/webp). At most one byte
      * more than the limit is read, so a huge upload never fills the memory.

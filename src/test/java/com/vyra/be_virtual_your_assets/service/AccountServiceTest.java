@@ -1,9 +1,14 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.AppLanguage;
+import com.vyra.be_virtual_your_assets.constant.AppModule;
 import com.vyra.be_virtual_your_assets.constant.AppTheme;
+import com.vyra.be_virtual_your_assets.constant.DashboardCard;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.account.AccountResponse;
+import com.vyra.be_virtual_your_assets.dto.account.DashboardCardSetting;
 import com.vyra.be_virtual_your_assets.dto.account.UpdatePreferencesRequest;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberPhoto;
@@ -22,6 +27,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +50,7 @@ class AccountServiceTest {
     @Mock private ValidationService validationService;
     @Mock private MemberRepository memberRepository;
     @Mock private MemberPhotoRepository photoRepository;
+    @Mock private ActivationService activationService;
 
     private AccountService accountService;
     private Member member;
@@ -52,7 +59,8 @@ class AccountServiceTest {
     void setUp() {
         TimeService timeService = new TimeService(
                 Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
-        accountService = new AccountService(validationService, timeService, memberRepository, photoRepository);
+        accountService = new AccountService(validationService, timeService, memberRepository, photoRepository,
+                activationService, new ObjectMapper());
         member = new Member();
         member.setId(MEMBER);
         member.setFirstName("Azhar");
@@ -163,5 +171,62 @@ class AccountServiceTest {
     private static void assertError(ErrorConstant expected, org.junit.jupiter.api.function.Executable call) {
         BadRequestException ex = assertThrows(BadRequestException.class, call);
         assertThat(ex.getErrorConstant()).isEqualTo(expected);
+    }
+
+    // =========================================================================
+    // onboarding & home screen (Phase 2.8)
+    // =========================================================================
+    @Test
+    void newAccount_allModules_defaultLayout_onboardingNotDone() {
+        AccountResponse result = accountService.getAccount(MEMBER).getData();
+
+        assertThat(result.isOnboardingCompleted()).isFalse();
+        assertThat(result.getEnabledModules()).containsExactly(AppModule.values());
+        assertThat(result.getDashboardLayout()).extracting(DashboardCardSetting::getCard)
+                .containsExactly(DashboardCard.values());
+        assertThat(result.getDashboardLayout()).noneMatch(DashboardCardSetting::isHidden);
+    }
+
+    @Test
+    void updatePreferences_modulesAndLayout_areStoredAndNormalised() {
+        UpdatePreferencesRequest request = new UpdatePreferencesRequest();
+        request.setEnabledModules(List.of(AppModule.HABIT, AppModule.FINANCE, AppModule.HABIT));
+        request.setDashboardLayout(List.of(
+                new DashboardCardSetting(DashboardCard.GOALS, false),
+                new DashboardCardSetting(DashboardCard.BALANCE, true),
+                new DashboardCardSetting(DashboardCard.GOALS, true)));
+
+        AccountResponse result = accountService.updatePreferences(MEMBER, request).getData();
+
+        assertThat(member.getEnabledModules()).isEqualTo("FINANCE,HABIT");
+        assertThat(result.getEnabledModules()).containsExactly(AppModule.FINANCE, AppModule.HABIT);
+        assertThat(result.getDashboardLayout()).hasSize(DashboardCard.values().length);
+        assertThat(result.getDashboardLayout().get(0)).isEqualTo(new DashboardCardSetting(DashboardCard.GOALS, false));
+        assertThat(result.getDashboardLayout().get(1)).isEqualTo(new DashboardCardSetting(DashboardCard.BALANCE, true));
+        // The stored JSON reads back the same.
+        assertThat(accountService.getAccount(MEMBER).getData().getDashboardLayout()).isEqualTo(result.getDashboardLayout());
+
+        UpdatePreferencesRequest none = new UpdatePreferencesRequest();
+        none.setEnabledModules(List.of());
+        assertError(ErrorConstant.ACCOUNT_MODULES_REQUIRED, () -> accountService.updatePreferences(MEMBER, none));
+    }
+
+    @Test
+    void completeOnboarding_isIdempotent_andCountsOnce() {
+        AccountResponse first = accountService.completeOnboarding(MEMBER).getData();
+        assertThat(first.isOnboardingCompleted()).isTrue();
+        assertThat(first.getOnboardingCompletedAt()).isEqualTo(NOW);
+
+        accountService.completeOnboarding(MEMBER);
+        verify(activationService, org.mockito.Mockito.times(1)).record(MEMBER, ActivationEvent.ONBOARDING_COMPLETED);
+        assertThat(member.getOnboardingCompletedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void storedLayoutThatCannotBeRead_fallsBackToTheDefault() {
+        member.setDashboardLayout("not json");
+        assertThat(accountService.getAccount(MEMBER).getData().getDashboardLayout())
+                .extracting(DashboardCardSetting::getCard).containsExactly(DashboardCard.values());
+        assertThat(AccountService.enabledModules("MOOD,REMOVED")).containsExactly(AppModule.MOOD);
     }
 }

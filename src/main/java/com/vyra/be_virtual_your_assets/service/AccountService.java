@@ -1,9 +1,16 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.AppCurrency;
+import com.vyra.be_virtual_your_assets.constant.AppModule;
+import com.vyra.be_virtual_your_assets.constant.DashboardCard;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.dto.account.AccountResponse;
+import com.vyra.be_virtual_your_assets.dto.account.DashboardCardSetting;
 import com.vyra.be_virtual_your_assets.dto.account.UpdatePreferencesRequest;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberPhoto;
@@ -15,7 +22,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** The signed-in member's own account: profile, preferences shared by all devices and profile photo. */
 @Service
@@ -29,6 +42,8 @@ public class AccountService {
     private final TimeService timeService;
     private final MemberRepository memberRepository;
     private final MemberPhotoRepository photoRepository;
+    private final ActivationService activationService;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public BaseResponse<AccountResponse> getAccount(String memberId) {
@@ -57,11 +72,36 @@ public class AccountService {
             }
             member.setCurrency(currency);
         }
+        if (request.getEnabledModules() != null) {
+            if (request.getEnabledModules().isEmpty()) {
+                throw new BadRequestException(ErrorConstant.ACCOUNT_MODULES_REQUIRED);
+            }
+            member.setEnabledModules(EnumSet.copyOf(request.getEnabledModules()).stream()
+                    .map(Enum::name).collect(Collectors.joining(",")));
+        }
+        if (request.getDashboardLayout() != null) {
+            member.setDashboardLayout(writeLayout(normalizeLayout(request.getDashboardLayout())));
+        }
         member.setModifiedBy(memberId);
         member.setUpdatedAt(timeService.nowUtc());
         memberRepository.save(member);
         return new BaseResponse<>(ErrorConstant.ACCOUNT_PREFERENCES_SUCCESS.getCode(),
                 ErrorConstant.ACCOUNT_PREFERENCES_SUCCESS.getMessage(), toResponse(member));
+    }
+
+    /** Marks the onboarding as done (idempotent: the first time is kept). */
+    @Transactional
+    public BaseResponse<AccountResponse> completeOnboarding(String memberId) {
+        Member member = validationService.getMemberById(memberId);
+        if (member.getOnboardingCompletedAt() == null) {
+            member.setOnboardingCompletedAt(timeService.nowUtc());
+            member.setModifiedBy(memberId);
+            member.setUpdatedAt(timeService.nowUtc());
+            memberRepository.save(member);
+            activationService.record(memberId, ActivationEvent.ONBOARDING_COMPLETED);
+        }
+        return new BaseResponse<>(ErrorConstant.ONBOARDING_COMPLETE_SUCCESS.getCode(),
+                ErrorConstant.ONBOARDING_COMPLETE_SUCCESS.getMessage(), toResponse(member));
     }
 
     /**
@@ -142,6 +182,59 @@ public class AccountService {
         response.setCurrency(member.getCurrency());
         response.setPhotoUpdatedAt(photoRepository.findUpdatedAt(member.getId()).orElse(null));
         response.setCreatedAt(member.getCreatedAt());
+        response.setOnboardingCompleted(member.getOnboardingCompletedAt() != null);
+        response.setOnboardingCompletedAt(member.getOnboardingCompletedAt());
+        response.setEnabledModules(enabledModules(member.getEnabledModules()));
+        response.setDashboardLayout(normalizeLayout(readLayout(member.getDashboardLayout())));
         return response;
+    }
+
+    static List<AppModule> enabledModules(String stored) {
+        if (stored == null || stored.isBlank()) {
+            return List.of(AppModule.values());
+        }
+        List<AppModule> modules = new ArrayList<>();
+        for (String name : stored.split(",")) {
+            try {
+                modules.add(AppModule.valueOf(name.trim()));
+            } catch (IllegalArgumentException ignored) {
+                // A module that no longer exists.
+            }
+        }
+        return modules.isEmpty() ? List.of(AppModule.values()) : modules;
+    }
+
+    /** The given order without duplicates, then every missing card (shown) in the default order. */
+    static List<DashboardCardSetting> normalizeLayout(List<DashboardCardSetting> layout) {
+        Map<DashboardCard, DashboardCardSetting> cards = new LinkedHashMap<>();
+        for (DashboardCardSetting setting : layout) {
+            if (setting != null && setting.getCard() != null) {
+                cards.putIfAbsent(setting.getCard(), new DashboardCardSetting(setting.getCard(), setting.isHidden()));
+            }
+        }
+        for (DashboardCard card : DashboardCard.values()) {
+            cards.putIfAbsent(card, new DashboardCardSetting(card, false));
+        }
+        return new ArrayList<>(cards.values());
+    }
+
+    private List<DashboardCardSetting> readLayout(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<DashboardCardSetting>>() { });
+        } catch (JsonProcessingException e) {
+            // A layout the app cannot use: fall back to the default one.
+            return List.of();
+        }
+    }
+
+    private String writeLayout(List<DashboardCardSetting> layout) {
+        try {
+            return objectMapper.writeValueAsString(layout);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Dashboard layout is not serialisable", e);
+        }
     }
 }
