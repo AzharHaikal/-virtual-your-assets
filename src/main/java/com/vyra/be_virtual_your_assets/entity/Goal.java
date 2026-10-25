@@ -74,4 +74,7 @@ public class Goal extends BaseEntity {
     /** A savings target: a VALUE goal in IDR shown in the finance overview (Phase 2.2). */
     @Column(nullable = false)
     private boolean linkedToFinance;
+
+    /** When the cover image was last uploaded; null without one (the image is in goal_image). */
+    private LocalDateTime imageUpdatedAt;
 }

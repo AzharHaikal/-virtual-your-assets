@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vyra.be_virtual_your_assets.entity.Budget;
 import com.vyra.be_virtual_your_assets.entity.FinanceCategory;
 import com.vyra.be_virtual_your_assets.entity.Goal;
+import com.vyra.be_virtual_your_assets.entity.MemberPhoto;
+import com.vyra.be_virtual_your_assets.entity.GoalImage;
 import com.vyra.be_virtual_your_assets.entity.GoalMilestone;
 import com.vyra.be_virtual_your_assets.entity.GoalProgressLog;
 import com.vyra.be_virtual_your_assets.entity.Habit;
@@ -17,6 +19,8 @@ import com.vyra.be_virtual_your_assets.repository.FinanceCategoryRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalMilestoneRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalProgressLogRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalRepository;
+import com.vyra.be_virtual_your_assets.repository.MemberPhotoRepository;
+import com.vyra.be_virtual_your_assets.repository.GoalImageRepository;
 import com.vyra.be_virtual_your_assets.repository.HabitCompletionRepository;
 import com.vyra.be_virtual_your_assets.repository.HabitRepository;
 import com.vyra.be_virtual_your_assets.repository.MoodEntryRepository;
@@ -40,7 +44,8 @@ import java.util.zip.ZipOutputStream;
 
 /**
  * Builds the ZIP of a member's personal data: profile, transactions (CSV), own categories, budgets, mood
- * entries with the journal (decrypted), habits with their completions, goals with milestones and progress.
+ * entries with the journal (decrypted), habits with their completions, goals with milestones and progress,
+ * and the pictures the member uploaded (profile photo, goal covers).
  * Secrets (PIN hash, tokens) are never included. Deleted items are left out.
  */
 @Component
@@ -60,6 +65,8 @@ public class DataExportWriter {
     private final GoalRepository goalRepository;
     private final GoalMilestoneRepository milestoneRepository;
     private final GoalProgressLogRepository progressLogRepository;
+    private final GoalImageRepository goalImageRepository;
+    private final MemberPhotoRepository memberPhotoRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -78,7 +85,24 @@ public class DataExportWriter {
             json(zip, "budgets.json", budgets(memberId));
             json(zip, "mood_entries.json", moodEntries(memberId));
             json(zip, "habits.json", habits(memberId));
-            json(zip, "goals.json", goals(memberId));
+            List<Goal> goals = goalRepository.findAllOfMember(memberId);
+            Map<String, String> imageFiles = new LinkedHashMap<>();
+            for (Goal goal : goals) {
+                if (goal.getImageUpdatedAt() == null) {
+                    continue;
+                }
+                GoalImage image = goalImageRepository.findActive(goal.getId()).orElse(null);
+                if (image != null) {
+                    String file = "goal_images/goal-" + (imageFiles.size() + 1) + extension(image.getContentType());
+                    entry(zip, file, image.getContent());
+                    imageFiles.put(goal.getId(), file);
+                }
+            }
+            json(zip, "goals.json", goals(goals, imageFiles));
+            MemberPhoto photo = memberPhotoRepository.findById(memberId).orElse(null);
+            if (photo != null) {
+                entry(zip, "profile_photo" + extension(photo.getContentType()), photo.getContent());
+            }
         }
         return out.toByteArray();
     }
@@ -94,6 +118,8 @@ public class DataExportWriter {
                 mood_entries.json  mood check-ins and journal / mood dan jurnal
                 habits.json        habits and the days you did them / kebiasaan dan riwayatnya
                 goals.json         goals, milestones and progress / tujuan, milestone dan progres
+                goal_images/       pictures of your goals / gambar tujuan Anda (if any / jika ada)
+                profile_photo.*    your profile photo / foto profil Anda (if any / jika ada)
 
                 Dates are your own local dates; times are UTC (ending in Z).
                 Keep this file private: it contains your journal.
@@ -189,8 +215,7 @@ public class DataExportWriter {
         return item;
     }
 
-    private List<Map<String, Object>> goals(String memberId) {
-        List<Goal> goals = goalRepository.findAllOfMember(memberId);
+    private List<Map<String, Object>> goals(List<Goal> goals, Map<String, String> imageFiles) {
         List<String> ids = goals.stream().map(Goal::getId).toList();
         Map<String, List<GoalMilestone>> milestones = ids.isEmpty() ? Map.of()
                 : milestoneRepository.findAllOfGoals(ids).stream().collect(Collectors.groupingBy(GoalMilestone::getGoalId));
@@ -209,6 +234,7 @@ public class DataExportWriter {
             item.put("dueDate", g.getDueDate());
             item.put("status", g.getStatus());
             item.put("linkedToFinance", g.isLinkedToFinance());
+            item.put("image", imageFiles.get(g.getId()));
             item.put("milestones", milestones.getOrDefault(g.getId(), List.of()).stream().map(m -> {
                 Map<String, Object> milestone = new LinkedHashMap<>();
                 milestone.put("title", m.getTitle());
@@ -225,6 +251,14 @@ public class DataExportWriter {
             }).toList());
             return item;
         }).toList();
+    }
+
+    private static String extension(String contentType) {
+        return switch (contentType) {
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            default -> ".jpg";
+        };
     }
 
     private void json(ZipOutputStream zip, String name, Object value) throws IOException {

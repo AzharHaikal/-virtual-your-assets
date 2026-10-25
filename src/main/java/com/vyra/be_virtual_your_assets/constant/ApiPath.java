@@ -101,6 +101,7 @@ public class ApiPath {
     public static final String GOAL_MILESTONES = "/{goalId}/milestones";
     public static final String GOAL_MILESTONE_ID = "/{goalId}/milestones/{milestoneId}";
     public static final String GOAL_PROGRESS = "/{goalId}/progress";
+    public static final String GOAL_IMAGE = "/{goalId}/image";
 
     // =========================================================================
     // PHASE 2: budgets, trends & insights, notifications, push, exports, onboarding

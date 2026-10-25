@@ -1,6 +1,7 @@
 package com.vyra.be_virtual_your_assets.service;
 
 import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.GoalCategory;
 import com.vyra.be_virtual_your_assets.constant.GoalProgressType;
@@ -13,11 +14,13 @@ import com.vyra.be_virtual_your_assets.dto.goal.GoalRules;
 import com.vyra.be_virtual_your_assets.dto.goal.UpdateGoalRequest;
 import com.vyra.be_virtual_your_assets.dto.goal.UpdateMilestoneRequest;
 import com.vyra.be_virtual_your_assets.entity.Goal;
+import com.vyra.be_virtual_your_assets.entity.GoalImage;
 import com.vyra.be_virtual_your_assets.entity.GoalMilestone;
 import com.vyra.be_virtual_your_assets.entity.GoalProgressLog;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
+import com.vyra.be_virtual_your_assets.repository.GoalImageRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalMilestoneRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalProgressLogRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalRepository;
@@ -58,6 +61,7 @@ class GoalServiceTest {
     @Mock private GoalRepository goalRepository;
     @Mock private GoalMilestoneRepository milestoneRepository;
     @Mock private GoalProgressLogRepository progressLogRepository;
+    @Mock private GoalImageRepository imageRepository;
     @Mock private ValidationService validationService;
     @Mock private ActivationService activationService;
 
@@ -68,7 +72,7 @@ class GoalServiceTest {
         TimeService timeService = new TimeService(
                 Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
         goalService = new GoalService(goalRepository, milestoneRepository, progressLogRepository,
-                validationService, timeService, activationService);
+                imageRepository, validationService, timeService, activationService);
         Member member = new Member();
         member.setId(MEMBER);
         member.setTimezone("Asia/Jakarta");
@@ -356,6 +360,20 @@ class GoalServiceTest {
 
         assertThat(goal.getDeletedAt()).isEqualTo(NOW);
         verify(goalRepository).save(goal);
+    }
+
+    @Test
+    void deleteGoal_marksItsImageDeleted() {
+        Goal goal = goal(GoalProgressType.MILESTONE);
+        GoalImage image = new GoalImage();
+        when(goalRepository.findOwnedForUpdate("g-1", MEMBER)).thenReturn(Optional.of(goal));
+        when(imageRepository.findActive(goal.getId())).thenReturn(Optional.of(image));
+
+        goalService.deleteGoal(MEMBER, "g-1");
+
+        assertThat(image.getStatus()).isEqualTo(ActiveStatus.DELETED);
+        assertThat(image.getDeletedAt()).isEqualTo(NOW);
+        verify(imageRepository).save(image);
     }
 
     // =========================================================================

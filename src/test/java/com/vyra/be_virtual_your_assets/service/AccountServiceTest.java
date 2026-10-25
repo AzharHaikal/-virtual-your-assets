@@ -188,6 +188,18 @@ class AccountServiceTest {
     }
 
     @Test
+    void storedLayoutWithRemovedCards_keepsTheRestInOrder() {
+        member.setDashboardLayout("[{\"card\":\"QUICK_ACTIONS\",\"hidden\":false},{\"card\":\"GOALS\",\"hidden\":true},"
+                + "{\"card\":\"SUMMARY\",\"hidden\":false},{\"card\":\"BALANCE\",\"hidden\":false}]");
+
+        List<DashboardCardSetting> layout = accountService.getAccount(MEMBER).getData().getDashboardLayout();
+
+        assertThat(layout).hasSize(DashboardCard.values().length);
+        assertThat(layout.get(0)).isEqualTo(new DashboardCardSetting(DashboardCard.GOALS, true));
+        assertThat(layout.get(1)).isEqualTo(new DashboardCardSetting(DashboardCard.BALANCE, false));
+    }
+
+    @Test
     void updatePreferences_modulesAndLayout_areStoredAndNormalised() {
         UpdatePreferencesRequest request = new UpdatePreferencesRequest();
         request.setEnabledModules(List.of(AppModule.HABIT, AppModule.FINANCE, AppModule.HABIT));

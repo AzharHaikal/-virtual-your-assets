@@ -17,6 +17,9 @@ public class LoginRequest {
     @Pattern(regexp = "^\\d{6}$", message = "PIN must consist of exactly 6 digits")
     private String pin;
 
+    /** Stored with the session token (NOT NULL); without it the login was a 500 instead of a 400. */
+    @NotBlank(message = "Device ID is required")
+    @Size(max = 255, message = "Device ID must not exceed 255 characters")
     private String deviceId;
     private String deviceName;
     private String ipAddress;

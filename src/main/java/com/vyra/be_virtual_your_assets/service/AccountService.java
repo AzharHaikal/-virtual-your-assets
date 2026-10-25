@@ -2,6 +2,7 @@ package com.vyra.be_virtual_your_assets.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vyra.be_virtual_your_assets.constant.ActivationEvent;
 import com.vyra.be_virtual_your_assets.constant.AppCurrency;
@@ -223,7 +224,10 @@ public class AccountService {
             return List.of();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<List<DashboardCardSetting>>() { });
+            // Cards that were removed later (e.g. QUICK_ACTIONS) are read as null and skipped.
+            return objectMapper.readerFor(new TypeReference<List<DashboardCardSetting>>() { })
+                    .with(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+                    .readValue(json);
         } catch (JsonProcessingException e) {
             // A layout the app cannot use: fall back to the default one.
             return List.of();

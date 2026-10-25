@@ -6,6 +6,7 @@ import com.vyra.be_virtual_your_assets.dto.auth.*;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.AuthenticationService;
 import com.vyra.be_virtual_your_assets.service.PushTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -38,8 +39,11 @@ public class AuthenticationController {
         return authenticationService.verifyOtp(request);
     }
 
+    /** The IP of the session is the one the request came from, never a value sent by the app. */
     @PostMapping(LOGIN)
-    public BaseResponse<LoginResponse> loginMember(@Valid @RequestBody LoginRequest request) {
+    public BaseResponse<LoginResponse> loginMember(@Valid @RequestBody LoginRequest request,
+                                                   HttpServletRequest httpServletRequest) {
+        request.setIpAddress(httpServletRequest.getRemoteAddr());
         return authenticationService.loginMember(request);
     }
 

@@ -1,8 +1,11 @@
 package com.vyra.be_virtual_your_assets.integration;
 
+import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.AdminRole;
 import com.vyra.be_virtual_your_assets.constant.AppLanguage;
 import com.vyra.be_virtual_your_assets.constant.ConsentType;
+import com.vyra.be_virtual_your_assets.constant.GoalCategory;
+import com.vyra.be_virtual_your_assets.constant.GoalProgressType;
 import com.vyra.be_virtual_your_assets.constant.HabitCategory;
 import com.vyra.be_virtual_your_assets.constant.HabitScheduleType;
 import com.vyra.be_virtual_your_assets.constant.LegalDocumentType;
@@ -14,6 +17,7 @@ import com.vyra.be_virtual_your_assets.constant.transaction.TransactionType;
 import com.vyra.be_virtual_your_assets.dto.announcement.AnnouncementRequest;
 import com.vyra.be_virtual_your_assets.dto.category.AdminCategoryResponse;
 import com.vyra.be_virtual_your_assets.dto.category.CreateCategoryRequest;
+import com.vyra.be_virtual_your_assets.dto.goal.CreateGoalRequest;
 import com.vyra.be_virtual_your_assets.dto.habit.CreateHabitRequest;
 import com.vyra.be_virtual_your_assets.dto.insight.AdvancedInsightResponse;
 import com.vyra.be_virtual_your_assets.dto.legal.PublishLegalDocumentRequest;
@@ -28,8 +32,10 @@ import com.vyra.be_virtual_your_assets.dto.transaction.CreateTransactionRequest;
 import com.vyra.be_virtual_your_assets.entity.Admin;
 import com.vyra.be_virtual_your_assets.entity.AiReflection;
 import com.vyra.be_virtual_your_assets.entity.Member;
+import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import com.vyra.be_virtual_your_assets.repository.AdminRepository;
 import com.vyra.be_virtual_your_assets.repository.AiReflectionRepository;
+import com.vyra.be_virtual_your_assets.repository.GoalImageRepository;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.security.model.CustomAdminDetails;
 import com.vyra.be_virtual_your_assets.service.AdminCategoryService;
@@ -37,6 +43,8 @@ import com.vyra.be_virtual_your_assets.service.AdvancedInsightService;
 import com.vyra.be_virtual_your_assets.service.AiReflectionService;
 import com.vyra.be_virtual_your_assets.service.AnnouncementService;
 import com.vyra.be_virtual_your_assets.service.ConsentService;
+import com.vyra.be_virtual_your_assets.service.GoalImageService;
+import com.vyra.be_virtual_your_assets.service.GoalService;
 import com.vyra.be_virtual_your_assets.service.HabitService;
 import com.vyra.be_virtual_your_assets.service.LegalDocumentService;
 import com.vyra.be_virtual_your_assets.service.MoodService;
@@ -62,6 +70,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Phase 3 modules on a real PostgreSQL: the V26-V28 tables, the native aggregate queries of the product
@@ -91,6 +100,9 @@ class Phase3ModulesIT {
     @Autowired private AdvancedInsightService advancedInsightService;
     @Autowired private AiReflectionService aiReflectionService;
     @Autowired private AiReflectionRepository aiReflectionRepository;
+    @Autowired private GoalImageRepository goalImageRepository;
+    @Autowired private GoalService goalService;
+    @Autowired private GoalImageService goalImageService;
 
     private CustomAdminDetails admin;
 
@@ -243,6 +255,37 @@ class Phase3ModulesIT {
         AdvancedInsightResponse insight = advancedInsightService.get(member.getId()).getData();
         assertThat(insight.getMonths()).hasSize(12);
         assertThat(insight.getMonths().get(11).getExpense()).isEqualByComparingTo("25000");
+    }
+
+    @Test
+    void goalCoverImage_isStoredSeparatelyAndSoftDeleted() {
+        Member member = ItMembers.create(memberRepository, walletService);
+        CreateGoalRequest goal = new CreateGoalRequest();
+        goal.setTitle("Rumah impian");
+        goal.setCategory(GoalCategory.PERSONAL);
+        goal.setIcon("home");
+        goal.setColor("#3B82F6");
+        goal.setProgressType(GoalProgressType.VALUE);
+        goal.setTargetValue(BigDecimal.valueOf(500_000_000));
+        String goalId = goalService.createGoal(member.getId(), goal).getData().getId();
+
+        assertThat(goalImageService.save(member.getId(), goalId, PNG).getData().getImageUpdatedAt()).isNotNull();
+        assertThat(goalService.getGoals(member.getId(), List.of()).getData()).singleElement()
+                .satisfies(g -> assertThat(g.getImageUpdatedAt()).isNotNull());
+        assertThat(goalImageService.get(member.getId(), goalId).getContent()).isEqualTo(PNG);
+
+        assertThat(goalImageService.delete(member.getId(), goalId).getData().getImageUpdatedAt()).isNull();
+        assertThat(goalImageRepository.findById(goalId)).get()
+                .satisfies(i -> assertThat(i.getStatus()).isEqualTo(ActiveStatus.DELETED))
+                .satisfies(i -> assertThat(i.getDeletedAt()).isNotNull());
+        assertThrows(NotFoundException.class, () -> goalImageService.get(member.getId(), goalId));
+
+        // A new upload makes it active again; deleting the goal marks its image DELETED.
+        goalImageService.save(member.getId(), goalId, PNG);
+        assertThat(goalImageRepository.findActive(goalId)).isPresent();
+        goalService.deleteGoal(member.getId(), goalId);
+        assertThat(goalImageRepository.findById(goalId)).get()
+                .satisfies(i -> assertThat(i.getStatus()).isEqualTo(ActiveStatus.DELETED));
     }
 
     /** A member with a transaction, a mood check-in and a habit done today. */
