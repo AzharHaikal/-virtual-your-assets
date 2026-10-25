@@ -4,6 +4,7 @@ import com.vyra.be_virtual_your_assets.constant.GoalStatus;
 import com.vyra.be_virtual_your_assets.entity.HabitCompletion;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Notification;
+import com.vyra.be_virtual_your_assets.repository.AnnouncementRepository;
 import com.vyra.be_virtual_your_assets.repository.BudgetRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalRepository;
 import com.vyra.be_virtual_your_assets.repository.HabitCompletionRepository;
@@ -18,7 +19,7 @@ import java.util.Map;
 /**
  * Whether a notification held back (quiet hours, retry) is still worth pushing: a habit reminder of a day
  * that has passed or of a habit that is done, archived or deleted is not; neither is a goal no longer active
- * or a budget that was deleted.
+ * or a budget that was deleted, nor an announcement that was unpublished, deleted or has ended.
  */
 @Component
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class NotificationRelevance {
     private final HabitCompletionRepository completionRepository;
     private final GoalRepository goalRepository;
     private final BudgetRepository budgetRepository;
+    private final AnnouncementRepository announcementRepository;
     private final TimeService timeService;
 
     public boolean isRelevant(Notification notification, Member member) {
@@ -41,7 +43,11 @@ public class NotificationRelevance {
             case BUDGET_ALERT -> payload.get("budgetId") != null && budgetRepository
                     .findByIdAndMemberIdAndDeletedAtIsNull(payload.get("budgetId"), member.getId())
                     .isPresent();
-            case SYSTEM, ANNOUNCEMENT -> true;
+            case ANNOUNCEMENT -> payload.get("announcementId") != null && announcementRepository
+                    .findByIdAndDeletedAtIsNull(payload.get("announcementId"))
+                    .filter(a -> a.isActiveAt(timeService.nowUtc()))
+                    .isPresent();
+            case SYSTEM -> true;
         };
     }
 

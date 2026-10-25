@@ -40,6 +40,7 @@ class SystemConfigServiceTest {
     @Mock private SystemConfigRepository systemConfigRepository;
     @Mock private AdminAuthorizationService adminAuthorizationService;
     @Mock private AdminActivityService adminActivityService;
+    @Mock private SystemSettings systemSettings;
 
     @InjectMocks
     private SystemConfigService systemConfigService;
@@ -135,6 +136,53 @@ class SystemConfigServiceTest {
                 () -> systemConfigService.updateSetting(KEY, request("false"), administrator));
 
         verifyNoInteractions(systemConfigRepository, adminActivityService);
+    }
+
+    // =========================================================================
+    // OTP channels: at least one usable channel stays on
+    // =========================================================================
+    @Test
+    void updateSetting_whatsAppOnWithoutProvider_shouldBeRejected() {
+        when(systemSettings.isWhatsAppProviderAvailable()).thenReturn(false);
+        String key = SystemConfigKey.OTP_WHATSAPP_ENABLED.getKey();
+
+        BadRequestException e = assertThrows(BadRequestException.class,
+                () -> systemConfigService.updateSetting(key, request("true"), superAdmin));
+
+        assertThat(e.getErrorConstant()).isEqualTo(ErrorConstant.OTP_CHANNEL_REQUIRED);
+        verify(systemConfigRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSetting_emailOffWhileWhatsAppUnusable_shouldBeRejected() {
+        when(systemSettings.isWhatsAppProviderAvailable()).thenReturn(false);
+        String key = SystemConfigKey.OTP_EMAIL_ENABLED.getKey();
+
+        assertThrows(BadRequestException.class, () -> systemConfigService.updateSetting(key, request("false"), superAdmin));
+    }
+
+    @Test
+    void updateSetting_emailOffWithWhatsAppOn_shouldBeSavedAndEvictTheCache() {
+        when(systemSettings.isWhatsAppProviderAvailable()).thenReturn(true);
+        when(systemSettings.isEnabled(SystemConfigKey.OTP_WHATSAPP_ENABLED)).thenReturn(true);
+        String key = SystemConfigKey.OTP_EMAIL_ENABLED.getKey();
+        when(systemConfigRepository.findById(key)).thenReturn(Optional.empty());
+
+        systemConfigService.updateSetting(key, request("false"), superAdmin);
+
+        verify(systemConfigRepository).save(any(SystemConfig.class));
+        verify(systemSettings).evict();
+    }
+
+    @Test
+    void updateSetting_maintenanceMessage_keepsCaseAndTrims() {
+        String key = SystemConfigKey.MAINTENANCE_MESSAGE.getKey();
+        when(systemConfigRepository.findById(key)).thenReturn(Optional.empty());
+
+        SystemConfigResponse result = systemConfigService.updateSetting(key, request("  Back at 10:00 WIB "), superAdmin)
+                .getData();
+
+        assertThat(result.getValue()).isEqualTo("Back at 10:00 WIB");
     }
 
     // =========================================================================

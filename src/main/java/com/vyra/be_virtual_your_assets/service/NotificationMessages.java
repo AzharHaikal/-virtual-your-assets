@@ -16,8 +16,8 @@ public final class NotificationMessages {
     public record Message(String title, String body) {
     }
 
-    static final int MAX_TITLE = 120;
-    static final int MAX_BODY = 500;
+    public static final int MAX_TITLE = 120;
+    public static final int MAX_BODY = 500;
 
     private NotificationMessages() {
     }
@@ -26,6 +26,14 @@ public final class NotificationMessages {
         return id(language)
                 ? message("Waktunya " + habitName, "Jaga konsistensimu, tandai selesai hari ini.")
                 : message("Time for " + habitName, "Keep your streak going: mark it done today.");
+    }
+
+    public static Message reportResolved(AppLanguage language) {
+        return id(language)
+                ? message("Laporan Anda sudah ditangani",
+                        "Terima kasih sudah melapor. Tim VYRA telah menindaklanjuti laporan Anda.")
+                : message("Your report was handled",
+                        "Thank you for reporting. The VYRA team has followed up on your report.");
     }
 
     /** {@code percent} 80..100+: from 100 the budget is used up. */

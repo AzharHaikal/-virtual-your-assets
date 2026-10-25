@@ -1,9 +1,10 @@
 package com.vyra.be_virtual_your_assets.config;
 
 import com.vyra.be_virtual_your_assets.constant.SecurityConstant;
-import com.vyra.be_virtual_your_assets.security.filter.AdminTokenFilter;
 import com.vyra.be_virtual_your_assets.ratelimit.RateLimitFilter;
+import com.vyra.be_virtual_your_assets.security.filter.AdminTokenFilter;
 import com.vyra.be_virtual_your_assets.security.filter.AuthTokenFilter;
+import com.vyra.be_virtual_your_assets.security.filter.MaintenanceFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -25,6 +26,7 @@ public class SecurityConfig {
     private final AdminTokenFilter adminTokenFilter;
     private final RateLimitFilter rateLimitFilter;
     private final MetricsTokenAuthorizationManager metricsTokenAuthorizationManager;
+    private final MaintenanceFilter maintenanceFilter;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -77,6 +79,11 @@ public class SecurityConfig {
                 .addFilterBefore(
                         rateLimitFilter,
                         AuthTokenFilter.class
+                )
+                // Maintenance mode answers member requests with 503 before anything else runs.
+                .addFilterBefore(
+                        maintenanceFilter,
+                        RateLimitFilter.class
                 );
 
         return http.build();

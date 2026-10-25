@@ -37,7 +37,20 @@ public enum AdminActivityEvent {
 
     // REPORTS
     EXPORT_REPORT("Exported a report"),
-    EXPORT_AUDIT_TRAIL("Exported audit trail data");
+    EXPORT_AUDIT_TRAIL("Exported audit trail data"),
+
+    // PRODUCT CONFIGURATION (Phase 3)
+    CREATE_CATEGORY("Created a built-in category"),
+    UPDATE_CATEGORY("Updated a built-in category"),
+    DEACTIVATE_CATEGORY("Deactivated a built-in category"),
+    ACTIVATE_CATEGORY("Activated a built-in category"),
+    CREATE_ANNOUNCEMENT("Created an announcement"),
+    UPDATE_ANNOUNCEMENT("Updated an announcement"),
+    PUBLISH_ANNOUNCEMENT("Published an announcement"),
+    UNPUBLISH_ANNOUNCEMENT("Unpublished an announcement"),
+    DELETE_ANNOUNCEMENT("Deleted an announcement"),
+    PUBLISH_LEGAL_DOCUMENT("Published a legal document version"),
+    UPDATE_USER_REPORT("Updated a user report");
 
     private final String description;
 }

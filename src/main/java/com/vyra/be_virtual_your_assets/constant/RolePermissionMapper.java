@@ -24,7 +24,10 @@ public final class RolePermissionMapper {
                     AdminPermission.REPORT_VIEW,
                     AdminPermission.REPORT_EXPORT,
                     AdminPermission.AUDIT_VIEW,
-                    AdminPermission.SETTINGS_VIEW
+                    AdminPermission.SETTINGS_VIEW,
+                    AdminPermission.CATEGORY_MANAGE,
+                    AdminPermission.ANNOUNCEMENT_MANAGE,
+                    AdminPermission.REPORT_HANDLE
             ),
 
             AdminRole.OPERATOR, EnumSet.of(
@@ -33,7 +36,8 @@ public final class RolePermissionMapper {
                     AdminPermission.MEMBER_MANAGE,
                     AdminPermission.REPORT_VIEW,
                     AdminPermission.AUDIT_VIEW,
-                    AdminPermission.SETTINGS_VIEW
+                    AdminPermission.SETTINGS_VIEW,
+                    AdminPermission.REPORT_HANDLE
             ),
 
             AdminRole.VIEWER, EnumSet.of(

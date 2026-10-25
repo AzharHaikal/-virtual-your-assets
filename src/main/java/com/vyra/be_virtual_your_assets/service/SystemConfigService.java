@@ -36,6 +36,7 @@ public class SystemConfigService {
     private final SystemConfigRepository systemConfigRepository;
     private final AdminAuthorizationService adminAuthorizationService;
     private final AdminActivityService adminActivityService;
+    private final SystemSettings systemSettings;
 
     public BaseResponse<List<SystemConfigResponse>> getSettings() {
         adminAuthorizationService.requirePermission(AdminPermission.SETTINGS_VIEW);
@@ -63,6 +64,7 @@ public class SystemConfigService {
         SystemConfigKey key = SystemConfigKey.fromKey(configKey)
                 .orElseThrow(() -> new BadRequestException(ErrorConstant.SYSTEM_CONFIG_NOT_FOUND));
         String value = normalize(key, request.getValue());
+        checkOtpChannels(key, value);
 
         SystemConfig config = systemConfigRepository.findById(key.getKey()).orElseGet(() -> {
             SystemConfig created = new SystemConfig();
@@ -73,6 +75,7 @@ public class SystemConfigService {
         config.setUpdatedBy(currentAdmin.getAdminId());
         config.setUpdatedAt(LocalDateTime.now());
         systemConfigRepository.save(config);
+        systemSettings.evict();
 
         adminActivityService.createAdminActivity(currentAdmin.getAdminId(), null,
                 AdminActivityEvent.UPDATE_SYSTEM_CONFIG, key.getKey() + " = " + value, null, null);
@@ -86,11 +89,33 @@ public class SystemConfigService {
     }
 
     private static String normalize(SystemConfigKey key, String raw) {
+        if (key.getType() == SystemConfigKey.ValueType.TEXT) {
+            return raw.trim();
+        }
         String value = raw.trim().toLowerCase(Locale.ROOT);
         if (key.getType() == SystemConfigKey.ValueType.BOOLEAN && !value.equals("true") && !value.equals("false")) {
             throw new BadRequestException(ErrorConstant.SYSTEM_CONFIG_INVALID_VALUE);
         }
         return value;
+    }
+
+    /**
+     * Members must always be able to receive an OTP: WhatsApp can only be switched on with a provider, and
+     * e-mail can only be switched off while WhatsApp is on.
+     */
+    private void checkOtpChannels(SystemConfigKey key, String value) {
+        boolean whatsAppUsable = systemSettings.isWhatsAppProviderAvailable();
+        if (key == SystemConfigKey.OTP_WHATSAPP_ENABLED && "true".equals(value) && !whatsAppUsable) {
+            throw new BadRequestException(ErrorConstant.OTP_CHANNEL_REQUIRED);
+        }
+        if (key == SystemConfigKey.OTP_EMAIL_ENABLED && "false".equals(value)
+                && !(whatsAppUsable && systemSettings.isEnabled(SystemConfigKey.OTP_WHATSAPP_ENABLED))) {
+            throw new BadRequestException(ErrorConstant.OTP_CHANNEL_REQUIRED);
+        }
+        if (key == SystemConfigKey.OTP_WHATSAPP_ENABLED && "false".equals(value)
+                && !systemSettings.isEnabled(SystemConfigKey.OTP_EMAIL_ENABLED)) {
+            throw new BadRequestException(ErrorConstant.OTP_CHANNEL_REQUIRED);
+        }
     }
 
     private static SystemConfigResponse toResponse(SystemConfigKey key, SystemConfig stored) {

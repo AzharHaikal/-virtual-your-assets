@@ -6,6 +6,7 @@ import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.BusinessException;
 import com.vyra.be_virtual_your_assets.exception.ConflictException;
 import com.vyra.be_virtual_your_assets.exception.GoneException;
+import com.vyra.be_virtual_your_assets.exception.ServiceUnavailableException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
@@ -123,6 +124,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GoneException.class)
     public ResponseEntity<BaseResponse<Void>> handleGone(GoneException ex) {
         return ResponseEntity.status(HttpStatus.GONE).body(
+                new BaseResponse<>(
+                        ex.getErrorConstant().getCode(),
+                        ex.getErrorConstant().getMessage(),
+                        null
+                )
+        );
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<BaseResponse<Void>> handleServiceUnavailable(ServiceUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
                 new BaseResponse<>(
                         ex.getErrorConstant().getCode(),
                         ex.getErrorConstant().getMessage(),

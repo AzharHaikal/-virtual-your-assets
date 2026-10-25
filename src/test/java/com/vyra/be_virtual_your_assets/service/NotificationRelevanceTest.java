@@ -1,13 +1,16 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.constant.AnnouncementStatus;
 import com.vyra.be_virtual_your_assets.constant.GoalStatus;
 import com.vyra.be_virtual_your_assets.constant.NotificationType;
+import com.vyra.be_virtual_your_assets.entity.Announcement;
 import com.vyra.be_virtual_your_assets.entity.Budget;
 import com.vyra.be_virtual_your_assets.entity.Goal;
 import com.vyra.be_virtual_your_assets.entity.Habit;
 import com.vyra.be_virtual_your_assets.entity.HabitCompletion;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.Notification;
+import com.vyra.be_virtual_your_assets.repository.AnnouncementRepository;
 import com.vyra.be_virtual_your_assets.repository.BudgetRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalRepository;
 import com.vyra.be_virtual_your_assets.repository.HabitCompletionRepository;
@@ -21,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -39,6 +43,7 @@ class NotificationRelevanceTest {
     @Mock private HabitCompletionRepository completionRepository;
     @Mock private GoalRepository goalRepository;
     @Mock private BudgetRepository budgetRepository;
+    @Mock private AnnouncementRepository announcementRepository;
 
     private NotificationRelevance relevance;
     private final Member member = new Member();
@@ -46,6 +51,7 @@ class NotificationRelevanceTest {
     @BeforeEach
     void setUp() {
         relevance = new NotificationRelevance(habitRepository, completionRepository, goalRepository, budgetRepository,
+                announcementRepository,
                 new TimeService(Clock.fixed(Instant.parse("2026-10-22T05:00:00Z"), ZoneOffset.UTC), "Asia/Jakarta"));
         member.setId("m-1");
         member.setTimezone("Asia/Jakarta");
@@ -85,6 +91,24 @@ class NotificationRelevanceTest {
         assertThat(relevance.isRelevant(notification(NotificationType.BUDGET_ALERT, Map.of("budgetId", "b-gone")), member)).isFalse();
 
         assertThat(relevance.isRelevant(notification(NotificationType.SYSTEM, null), member)).isTrue();
+    }
+
+    @Test
+    void announcement_relevantWhileStillShown() {
+        Announcement announcement = new Announcement();
+        announcement.setStatus(AnnouncementStatus.PUBLISHED);
+        announcement.setStartsAt(LocalDateTime.of(2026, 10, 22, 0, 0));
+        when(announcementRepository.findByIdAndDeletedAtIsNull("a-1")).thenReturn(Optional.of(announcement));
+        Notification notification = notification(NotificationType.ANNOUNCEMENT, Map.of("announcementId", "a-1"));
+        assertThat(relevance.isRelevant(notification, member)).isTrue();
+
+        announcement.setEndsAt(LocalDateTime.of(2026, 10, 22, 4, 0));
+        assertThat(relevance.isRelevant(notification, member)).isFalse();
+
+        announcement.setEndsAt(null);
+        announcement.setStatus(AnnouncementStatus.UNPUBLISHED);
+        assertThat(relevance.isRelevant(notification, member)).isFalse();
+        assertThat(relevance.isRelevant(notification(NotificationType.ANNOUNCEMENT, Map.of()), member)).isFalse();
     }
 
     private static Notification habitReminder(LocalDate day) {
