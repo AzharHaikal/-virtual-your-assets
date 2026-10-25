@@ -118,6 +118,14 @@ vyra:
       # Firebase service account JSON (the file content or a path to it). Empty = push disabled.
       credentials: ${FIREBASE_CREDENTIALS:}
       project-id: ${FIREBASE_PROJECT_ID:}
+  otp:
+    # A WhatsApp OTP provider is wired in (WhatsAppClient). Until then WhatsApp OTP cannot be switched on.
+    whatsapp-provider-available: ${VYRA_OTP_WHATSAPP_PROVIDER_AVAILABLE:false}
+  ai:
+    # Claude API key for the weekly AI reflection (member opt-in). Empty = feature off.
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${VYRA_AI_MODEL:claude-opus-5-5}
+    timeout-seconds: ${VYRA_AI_TIMEOUT_SECONDS:60}
   export:
     # How long a data export can be downloaded, and how often a member may request one.
     ttl-hours: ${VYRA_EXPORT_TTL_HOURS:24}

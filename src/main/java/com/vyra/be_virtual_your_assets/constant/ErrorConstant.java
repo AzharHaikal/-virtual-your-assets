@@ -204,6 +204,50 @@ public enum ErrorConstant {
     DATA_EXPORT_EXPIRED("VYRA-EXP-410", "This download link has expired. Please request a new export"),
     DATA_EXPORT_TOO_SOON("VYRA-EXP-429", "You can request one export per day. Please try again in"),
 
+    // Product configuration (Phase 3.2)
+    SYSTEM_STATUS_SUCCESS("VYRA-STS-000", "Status retrieved successfully"),
+    MAINTENANCE_MODE("VYRA-MNT-503", "VYRA is under maintenance. Please try again later"),
+    OTP_CHANNEL_REQUIRED("VYRA-SET-003", "At least one OTP channel must stay on, and WhatsApp needs a configured provider"),
+    ADMIN_CATEGORY_LIST_SUCCESS("VYRA-ACT-LST-000", "Built-in categories retrieved successfully"),
+    ADMIN_CATEGORY_SAVE_SUCCESS("VYRA-ACT-SAV-000", "Built-in category saved"),
+    ADMIN_CATEGORY_PROTECTED("VYRA-ACT-001", "The \"Other\" categories are needed as a fallback and cannot be deactivated"),
+    ANNOUNCEMENT_LIST_SUCCESS("VYRA-ANN-LST-000", "Announcements retrieved successfully"),
+    ANNOUNCEMENT_SAVE_SUCCESS("VYRA-ANN-SAV-000", "Announcement saved"),
+    ANNOUNCEMENT_DELETE_SUCCESS("VYRA-ANN-DEL-000", "Announcement deleted"),
+    ANNOUNCEMENT_NOT_FOUND("VYRA-ANN-404", "Announcement could not be found"),
+    ANNOUNCEMENT_PERIOD_INVALID("VYRA-ANN-001", "The end must be after the start"),
+    LEGAL_DOCUMENT_SUCCESS("VYRA-LGL-000", "Legal document retrieved successfully"),
+    LEGAL_DOCUMENT_PUBLISHED("VYRA-LGL-PUB-000", "Legal document published"),
+    LEGAL_DOCUMENT_NOT_FOUND("VYRA-LGL-404", "No published version of this document yet"),
+
+    // Product metrics (Phase 3.3)
+    PRODUCT_METRICS_SUCCESS("VYRA-MTR-000", "Product metrics retrieved successfully"),
+
+    // User reports (Phase 3.4)
+    USER_REPORT_CREATED("VYRA-URP-CRT-000", "Thank you, your report was sent"),
+    USER_REPORT_LIST_SUCCESS("VYRA-URP-LST-000", "Reports retrieved successfully"),
+    USER_REPORT_DETAIL_SUCCESS("VYRA-URP-DTL-000", "Report retrieved successfully"),
+    USER_REPORT_UPDATE_SUCCESS("VYRA-URP-UPD-000", "Report updated"),
+    USER_REPORT_NOT_FOUND("VYRA-URP-404", "Report could not be found"),
+    USER_REPORT_ATTACHMENT_INVALID("VYRA-URP-001", "Attach a JPEG, PNG or WebP image of at most 1 MB"),
+    USER_REPORT_TOO_MANY("VYRA-URP-429", "You have sent many reports today. Please try again in"),
+    USER_REPORT_ASSIGNEE_INVALID("VYRA-URP-002", "The report can only be assigned to an active admin who can handle reports"),
+
+    // Advanced analytics & AI reflection (Phase 3.5)
+    INSIGHT_ADVANCED_SUCCESS("VYRA-INS-ADV-000", "Insights retrieved successfully"),
+    CONSENT_LIST_SUCCESS("VYRA-CNS-000", "Consents retrieved successfully"),
+    CONSENT_SAVED("VYRA-CNS-001", "Consent saved"),
+    CONSENT_TYPE_NOT_FOUND("VYRA-CNS-404", "Unknown consent type"),
+    AI_REFLECTION_LIST_SUCCESS("VYRA-AIR-LST-000", "Reflections retrieved successfully"),
+    AI_REFLECTION_STATUS_SUCCESS("VYRA-AIR-STS-000", "Reflection status retrieved successfully"),
+    AI_REFLECTION_CREATED("VYRA-AIR-CRT-000", "Reflection created"),
+    AI_REFLECTION_DELETED("VYRA-AIR-DEL-000", "Reflection deleted"),
+    AI_REFLECTION_NOT_FOUND("VYRA-AIR-404", "Reflection could not be found"),
+    AI_REFLECTION_CONSENT_REQUIRED("VYRA-AIR-001", "Turn on AI reflection in your privacy settings first"),
+    AI_REFLECTION_UNAVAILABLE("VYRA-AIR-002", "AI reflection is not available right now"),
+    AI_REFLECTION_EXISTS("VYRA-AIR-003", "There is already a reflection for this week. Delete it to create a new one"),
+    AI_REFLECTION_NO_DATA("VYRA-AIR-004", "Not enough data for that week yet"),
+
     // Onboarding (Phase 2.8)
     ONBOARDING_COMPLETE_SUCCESS("VYRA-ACC-ONB-000", "Welcome aboard"),
     ACCOUNT_MODULES_REQUIRED("VYRA-ACC-004", "Choose at least one module"),

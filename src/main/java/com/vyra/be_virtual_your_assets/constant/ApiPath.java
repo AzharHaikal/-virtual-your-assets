@@ -133,6 +133,38 @@ public class ApiPath {
     public static final String USERS_ME_ONBOARDING_COMPLETE = "/onboarding/complete";
 
     // =========================================================================
+    // PHASE 3: product configuration, metrics, user reports, insights & AI
+    // =========================================================================
+    /** Public: maintenance status for the app before / without signing in. */
+    public static final String V1_STATUS = "/api/v1/status";
+    /** Public: latest published legal document, {type} = privacy | terms. */
+    public static final String V1_LEGAL = "/api/v1/legal/{type}";
+    public static final String V1_ANNOUNCEMENTS = "/api/v1/announcements";
+    public static final String V1_USER_REPORTS = "/api/v1/user-reports";
+    public static final String V1_INSIGHTS_ADVANCED = "/api/v1/insights/advanced";
+    public static final String V1_REFLECTIONS = "/api/v1/insights/reflections";
+    public static final String REFLECTIONS_STATUS = "/status";
+    public static final String REFLECTION_ID = "/{reflectionId}";
+    public static final String USERS_ME_CONSENTS = "/consents";
+    public static final String USERS_ME_CONSENT = "/consents/{type}";
+
+    public static final String V1_ADMIN_CATEGORIES = "/api/v1/admin/categories";
+    public static final String ADMIN_CATEGORY_ID = "/{categoryId}";
+    public static final String ADMIN_CATEGORY_ACTIVATE = "/{categoryId}/activate";
+    public static final String ADMIN_CATEGORY_DEACTIVATE = "/{categoryId}/deactivate";
+    public static final String V1_ADMIN_ANNOUNCEMENTS = "/api/v1/admin/announcements";
+    public static final String ADMIN_ANNOUNCEMENT_ID = "/{announcementId}";
+    public static final String ADMIN_ANNOUNCEMENT_PUBLISH = "/{announcementId}/publish";
+    public static final String ADMIN_ANNOUNCEMENT_UNPUBLISH = "/{announcementId}/unpublish";
+    public static final String V1_ADMIN_LEGAL = "/api/v1/admin/legal-documents";
+    public static final String ADMIN_LEGAL_ID = "/{documentId}";
+    public static final String V1_ADMIN_METRICS = "/api/v1/admin/metrics/product";
+    public static final String V1_ADMIN_SYSTEM_STATUS = "/api/v1/admin/system/status";
+    public static final String V1_ADMIN_USER_REPORTS = "/api/v1/admin/user-reports";
+    public static final String ADMIN_USER_REPORT_ID = "/{reportId}";
+    public static final String ADMIN_USER_REPORT_ATTACHMENT = "/{reportId}/attachment";
+
+    // =========================================================================
     // ADMIN AUTH CONTROLLER
     // =========================================================================
     public static final String V1_ADMIN_AUTH = "/api/v1/admin/auth";

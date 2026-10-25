@@ -19,6 +19,34 @@ public enum SystemConfigKey {
             ValueType.BOOLEAN,
             "true",
             "Allow Super Admin to view member-level transactions and balances"
+    ),
+
+    MAINTENANCE_ENABLED(
+            "maintenance.enabled",
+            ValueType.BOOLEAN,
+            "false",
+            "Maintenance mode: the member app gets 503 and shows the maintenance message (admin portal keeps working)"
+    ),
+
+    MAINTENANCE_MESSAGE(
+            "maintenance.message",
+            ValueType.TEXT,
+            "",
+            "Message shown in the app during maintenance (empty = the app's default text)"
+    ),
+
+    OTP_EMAIL_ENABLED(
+            "otp.email.enabled",
+            ValueType.BOOLEAN,
+            "true",
+            "Send verification codes by e-mail"
+    ),
+
+    OTP_WHATSAPP_ENABLED(
+            "otp.whatsapp.enabled",
+            ValueType.BOOLEAN,
+            "false",
+            "Send verification codes by WhatsApp (needs a WhatsApp Business API provider)"
     );
 
     private final String key;
@@ -31,6 +59,8 @@ public enum SystemConfigKey {
     }
 
     public enum ValueType {
-        BOOLEAN
+        BOOLEAN,
+        /** Free text, at most 500 characters. */
+        TEXT
     }
 }

@@ -25,5 +25,12 @@ public enum AdminPermission {
     AUDIT_VIEW,
 
     SETTINGS_VIEW,
-    SETTINGS_MANAGE
+    SETTINGS_MANAGE,
+
+    /** Built-in transaction categories shared by every member. */
+    CATEGORY_MANAGE,
+    /** Announcements shown to members (banner + notification). */
+    ANNOUNCEMENT_MANAGE,
+    /** The queue of problems / abuse reported by members; never opens their private data. */
+    REPORT_HANDLE
 }

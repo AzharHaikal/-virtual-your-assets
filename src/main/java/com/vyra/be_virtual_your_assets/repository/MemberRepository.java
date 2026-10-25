@@ -37,6 +37,9 @@ public interface MemberRepository extends JpaRepository<Member, String> {
 
     long countByStatus(ActiveStatus status);
 
+    /** Members of a status in a stable order, page by page (announcement delivery). */
+    Page<Member> findByStatusOrderByIdAsc(ActiveStatus status, Pageable pageable);
+
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
     List<Member> findTop5ByOrderByCreatedAtDesc();

@@ -28,6 +28,9 @@ public class SecurityConstant {
             "/actuator/health",
             "/actuator/health/**",
             "/api/v1/exports/*/download",
+            // Phase 3: maintenance status and legal documents (app before sign-in, landing page).
+            "/api/v1/status",
+            "/api/v1/legal/*",
     };
 
     /** Prometheus metrics: only with the header {@link #METRICS_TOKEN_HEADER} = {@code vyra.metrics.token}. */

@@ -22,6 +22,30 @@ public interface FinanceCategoryRepository extends JpaRepository<FinanceCategory
 
     Optional<FinanceCategory> findByIdAndDeletedAtIsNull(String id);
 
+    /** Built-in categories, deactivated ones included (portal). */
+    @Query("""
+        SELECT c FROM FinanceCategory c
+        WHERE c.memberId IS NULL
+        ORDER BY c.type, c.position, LOWER(c.name)
+        """)
+    List<FinanceCategory> findAllBuiltIn();
+
+    @Query("SELECT COALESCE(MAX(c.position), 0) FROM FinanceCategory c WHERE c.memberId IS NULL")
+    int maxBuiltInPosition();
+
+    /** An active built-in category of the type has this name (other than {@code excludeId}). */
+    @Query("""
+        SELECT COUNT(c) > 0 FROM FinanceCategory c
+        WHERE c.memberId IS NULL
+          AND c.type = :type
+          AND LOWER(c.name) = LOWER(:name)
+          AND c.deletedAt IS NULL
+          AND c.id <> :excludeId
+        """)
+    boolean existsActiveBuiltInName(@Param("type") TransactionType type,
+                                    @Param("name") String name,
+                                    @Param("excludeId") String excludeId);
+
     long countByMemberIdAndDeletedAtIsNull(String memberId);
 
     @Query("""
