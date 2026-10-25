@@ -19,6 +19,7 @@ import com.vyra.be_virtual_your_assets.entity.GoalMilestone;
 import com.vyra.be_virtual_your_assets.entity.GoalProgressLog;
 import com.vyra.be_virtual_your_assets.exception.BadRequestException;
 import com.vyra.be_virtual_your_assets.exception.NotFoundException;
+import com.vyra.be_virtual_your_assets.repository.GoalImageRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalMilestoneRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalProgressLogRepository;
 import com.vyra.be_virtual_your_assets.repository.GoalRepository;
@@ -52,6 +53,7 @@ public class GoalService {
     private final GoalRepository goalRepository;
     private final GoalMilestoneRepository milestoneRepository;
     private final GoalProgressLogRepository progressLogRepository;
+    private final GoalImageRepository imageRepository;
     private final ValidationService validationService;
     private final TimeService timeService;
     private final ActivationService activationService;
@@ -176,11 +178,16 @@ public class GoalService {
                 ErrorConstant.GOAL_UPDATE_SUCCESS.getMessage(), toDetail(goal, today));
     }
 
-    /** Soft delete; milestones and progress entries stay in the database. */
+    /** Soft delete; milestones and progress entries stay in the database, the cover image is marked DELETED. */
     @Transactional
     public BaseResponse<Void> deleteGoal(String memberId, String goalId) {
         Goal goal = findOwnedForUpdate(memberId, goalId);
-        goal.setDeletedAt(timeService.nowUtc());
+        LocalDateTime now = timeService.nowUtc();
+        goal.setDeletedAt(now);
+        imageRepository.findActive(goal.getId()).ifPresent(image -> {
+            image.markDeleted(now);
+            imageRepository.save(image);
+        });
         goal.setModifiedBy(memberId);
         goalRepository.save(goal);
         return new BaseResponse<>(ErrorConstant.GOAL_DELETE_SUCCESS.getCode(),
@@ -368,6 +375,7 @@ public class GoalService {
         response.setCompletedAt(goal.getCompletedAt());
         response.setCreatedAt(goal.getCreatedAt());
         response.setLinkedToFinance(goal.isLinkedToFinance());
+        response.setImageUpdatedAt(goal.getImageUpdatedAt());
         response.setMilestoneDone(done);
         response.setMilestoneTotal(milestones.size());
         response.setProgressPercent(progressPercent(goal, done, milestones.size()));

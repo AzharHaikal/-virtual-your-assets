@@ -28,6 +28,8 @@ public class GoalResponse {
     private LocalDateTime createdAt;
     /** A savings target shown in the finance overview. */
     private boolean linkedToFinance;
+    /** Null without a cover image; changes when a new one is uploaded (GET /goals/{id}/image). */
+    private LocalDateTime imageUpdatedAt;
 
     /** 0..100, computed on the server: milestones done / total, or current / target. */
     private int progressPercent;

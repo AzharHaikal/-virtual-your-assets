@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.dto.auth.*;
 import com.vyra.be_virtual_your_assets.security.model.CustomUserDetails;
 import com.vyra.be_virtual_your_assets.service.AuthenticationService;
 import com.vyra.be_virtual_your_assets.service.PushTokenService;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -91,14 +92,18 @@ class AuthenticationControllerTest {
     // loginMember
     // =========================================================================
     @Test
-    void loginMember_shouldDelegateToServiceAndReturnResponse() {
+    void loginMember_shouldDelegateToServiceWithTheRequestIp() {
         LoginRequest request = new LoginRequest();
+        request.setIpAddress("1.2.3.4"); // sent by the app: ignored
         BaseResponse<LoginResponse> expected = new BaseResponse<>("VYRA-LGN-000", "Logged in", new LoginResponse());
         when(authenticationService.loginMember(request)).thenReturn(expected);
+        MockHttpServletRequest http = new MockHttpServletRequest();
+        http.setRemoteAddr("10.0.0.7");
 
-        BaseResponse<LoginResponse> result = authenticationController.loginMember(request);
+        BaseResponse<LoginResponse> result = authenticationController.loginMember(request, http);
 
         assertThat(result).isSameAs(expected);
+        assertThat(request.getIpAddress()).isEqualTo("10.0.0.7");
         verify(authenticationService).loginMember(request);
     }
 
