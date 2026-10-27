@@ -1,0 +1,12 @@
+# SIT profile: SPRING_PROFILES_ACTIVE=sit (or --spring.profiles.active=sit).
+# Only what differs from application.yaml; an environment variable still wins over these defaults.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/sit_vyra_assets}
+
+# Swagger UI on by default for integration testing.
+springdoc:
+  api-docs:
+    enabled: ${VYRA_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${VYRA_API_DOCS_ENABLED:true}

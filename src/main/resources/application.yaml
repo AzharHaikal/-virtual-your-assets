@@ -1,3 +1,9 @@
+# Main configuration, shared by every environment. A profile adds its own file on top:
+#   SPRING_PROFILES_ACTIVE=sit  -> application-sit.yaml  (database sit_vyra_assets)
+#   SPRING_PROFILES_ACTIVE=uat  -> application-uat.yaml  (database uat_vyra_assets)
+#   SPRING_PROFILES_ACTIVE=prod -> application-prod.yaml (database prod_vyra_assets)
+#   no profile                  -> the defaults below (local development, database vyra_assets)
+# Environment variables (DATABASE_URL, ...) always win over the values in these files.
 server:
   port: ${PORT:8000}
   # Behind a reverse proxy (Render, nginx, ...) the real client address comes from X-Forwarded-For.
