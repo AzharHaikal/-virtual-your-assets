@@ -1,0 +1,12 @@
+# Production profile: SPRING_PROFILES_ACTIVE=prod (or --spring.profiles.active=prod).
+# Only what differs from application.yaml; an environment variable still wins over these defaults.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/prod_vyra_assets}
+
+# OpenAPI spec and Swagger UI never open in production, whatever VYRA_API_DOCS_ENABLED says.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
