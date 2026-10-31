@@ -1,0 +1,15 @@
+#!/bin/sh
+# Local safeguard against pushing to an environment branch (install: sh scripts/setup-git-hooks.sh).
+# Not a security boundary - it can be skipped with --no-verify. GitLab branch protection is what rejects
+# direct pushes to dev, sit, uat and prod; this hook only gives an early, friendly message.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/dev|refs/heads/sit|refs/heads/uat|refs/heads/prod|refs/heads/main)
+      branch=${remote_ref#refs/heads/}
+      echo "pre-push: '$branch' only changes through merge requests (feature branch -> dev -> sit -> uat -> prod)." >&2
+      echo "Push a feature branch instead, e.g. git push -u origin feature/<name>, and open a merge request to dev." >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0
