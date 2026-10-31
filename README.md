@@ -500,3 +500,11 @@ Project ini menggunakan lisensi internal / proprietary.
 ---
 
 > ✨ **VYRA** — Virtual Your Assets | Backend API dengan fokus pada keamanan, kualitas kode, dan skalabilitas.
+
+## 🌿 Branch & Rilis
+
+- `dev`, `sit`, `uat`, `prod` diproteksi di GitLab: **tidak ada yang bisa push langsung** (termasuk maintainer), force push dan hapus branch tidak bisa. Perubahan hanya lewat merge request; pipeline harus hijau dan semua thread harus selesai. Default branch: `dev`.
+- Alur: `feature/<nama>` dari `dev` → MR ke `dev` → MR promosi `dev → sit` → `sit → uat` → `uat → prod`. Tidak boleh melompati environment dan tidak ada merge balik dari `sit`/`uat`/`prod` ke `dev`: job `merge-flow-check` (`scripts/ci/check-merge-flow.sh`) menolaknya.
+- Nama branch: `feature/`, `fix/`, `hotfix/`, `chore/`, `docs/`, `refactor/`, `test/`, `ci/`.
+- Darurat: `hotfix/*` → `prod` hanya dengan label `emergency-release` dan di-merge maintainer; setelah itu MR hotfix yang sama ke `dev`.
+- Sekali per clone: `sh scripts/setup-git-hooks.sh` (atau `git config core.hooksPath .githooks`). Hook pre-push menolak push ke branch environment — pengaman lokal saja; GitLab yang menegakkan aturannya.

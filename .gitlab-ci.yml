@@ -87,26 +87,15 @@ build-jar:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Release flow: feature/* -> dev -> sit -> uat -> prod (-> main as a copy of prod).
-# sit/uat/prod are protected (no direct push); this job fails a merge request whose source is not
-# the previous environment, and "Pipelines must succeed" then blocks the merge.
+# Release flow: feature branch -> dev -> sit -> uat -> prod (prod -> main keeps main a copy of prod).
+# scripts/ci/check-merge-flow.sh rejects every other source/target pair (no skipped environment, nothing merged
+# back into dev); its self-test runs first. dev/sit/uat/prod are protected (merge requests only) and
+# "Pipelines must succeed" turns a failed check into a blocked merge. See README > branches and releases.
 merge-flow-check:
   stage: flow-check
   image: alpine:latest
   script:
-    - |
-      case "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" in
-        sit)  expected=dev ;;
-        uat)  expected=sit ;;
-        prod) expected=uat ;;
-        main) expected=prod ;;
-        *)    echo "Target $CI_MERGE_REQUEST_TARGET_BRANCH_NAME: any source allowed."; exit 0 ;;
-      esac
-      if [ "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" != "$expected" ]; then
-        echo "Merge into '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME' must come from '$expected', not '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME'."
-        echo "Flow: feature/* -> dev -> sit -> uat -> prod"
-        exit 1
-      fi
-      echo "OK: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME -> $CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - sh scripts/ci/check-merge-flow.test.sh
+    - sh scripts/ci/check-merge-flow.sh
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
