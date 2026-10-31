@@ -311,6 +311,8 @@ public enum ErrorConstant {
     ADMIN_RESET_PASSWORD_SUCCESS("VYRA-ADM-RPW-000", "Admin password has been reset successfully"),
     ADMIN_CANNOT_MODIFY_SELF_STATUS("VYRA-ADM-STS-001", "You cannot change the status of your own account"),
     ADMIN_CANNOT_DELETE_SELF("VYRA-ADM-DEL-001", "You cannot delete your own account"),
+    ADMIN_ROLE_NOT_ALLOWED("VYRA-ADM-ROL-001", "You can only manage admin accounts with a lower role than yours"),
+    ADMIN_CANNOT_CHANGE_OWN_ROLE("VYRA-ADM-ROL-002", "You cannot change the role of your own account"),
     ADMIN_GET_PROFILE_SUCCESS("VYRA-ADM-PRF-000", "Admin profile retrieved successfully"),
 
     // =========================================================================
