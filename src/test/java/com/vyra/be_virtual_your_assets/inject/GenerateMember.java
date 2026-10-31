@@ -12,6 +12,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Random;
 
+/**
+ * Development tool (run its main method from the IDE): writes inject/source/members_seed.csv for the
+ * inject-member profile. Lives in the test sources so javafaker stays out of the application jar.
+ */
 @Slf4j
 public class GenerateMember {
     private static final Faker faker = new Faker(new Locale("en"));

@@ -44,9 +44,10 @@ run-tests:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Builds the schema from db/migration on an empty PostgreSQL and starts the app with
-# ddl-auto=validate: fails when an entity changes without a matching migration.
-migration-check:
+# Every *IT against an empty PostgreSQL: SchemaMigrationIT builds the schema from db/migration and starts
+# the app with ddl-auto=validate (fails when an entity changes without a matching migration); the others
+# check cross-account access, security hardening and concurrency (wallet, OTP attempts, edits) on a real DB.
+integration-test:
   stage: unit-test
   image: maven:3.9.6-eclipse-temurin-17
   services:
@@ -63,7 +64,12 @@ migration-check:
     MAIL_PASSWORD: ci
     CRYPTO_SECRET_KEY: 0123456789abcdef0123456789abcdef
   script:
-    - mvn test -Dtest=SchemaMigrationIT -Dvyra.it.db=true -Dsurefire.failIfNoSpecifiedTests=false
+    - mvn test -Dtest='*IT' -Dvyra.it.db=true -Dsurefire.failIfNoSpecifiedTests=false
+  artifacts:
+    paths:
+      - target/surefire-reports/
+    expire_in: 1 hour
+    when: always
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'

@@ -6,6 +6,7 @@ import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.repository.MemberRepository;
 import com.vyra.be_virtual_your_assets.service.WalletService;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +35,8 @@ final class ItMembers {
                 .status(ActiveStatus.ACTIVE)
                 .timezone("Asia/Jakarta")
                 .build();
+        // Set like registration does: metrics count members by created_at (NULL was never counted).
+        member.setCreatedAt(LocalDateTime.now());
         memberRepository.saveAndFlush(member);
 
         CreateWalletRequest wallet = new CreateWalletRequest();
