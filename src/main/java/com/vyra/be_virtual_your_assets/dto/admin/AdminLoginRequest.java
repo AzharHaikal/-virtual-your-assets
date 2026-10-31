@@ -10,7 +10,9 @@ import lombok.Data;
 public class AdminLoginRequest {
     @NotBlank(message = "Email is required")
     @Email(message = "Please enter a valid email address")
-    @Size(max = 30, message = "Email address must not exceed 30 characters")
+    // Same limit as AdminRegisterRequest / AdminUpdateRequest: an admin created with a longer address
+    // (up to 50) could otherwise never sign in.
+    @Size(max = 50, message = "Email address must not exceed 50 characters")
     private String email;
 
     @NotNull(message = "Password is required")

@@ -35,6 +35,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticationService {
+    static final String UNKNOWN_DEVICE = "Unknown device";
+
     private final MemberRepository memberRepository;
     private final MemberOtpRepository memberOtpRepository;
     private final MemberTokenRepository memberTokenRepository;
@@ -240,7 +242,8 @@ public class AuthenticationService {
         memberToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
         memberToken.setRefreshTokenExpiredAt(TokenUtil.refreshTokenExpiredAt());
         memberToken.setDeviceId(request.getDeviceId());
-        memberToken.setDeviceName(request.getDeviceName());
+        // device_name is NOT NULL: without a default a login without it was a 500.
+        memberToken.setDeviceName(StringUtils.defaultIfBlank(request.getDeviceName(), UNKNOWN_DEVICE));
         memberToken.setIpAddress(request.getIpAddress());
         memberToken.setCreatedAt(LocalDateTime.now());
         memberTokenRepository.save(memberToken);

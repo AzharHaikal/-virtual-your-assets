@@ -21,6 +21,7 @@ import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -252,6 +253,21 @@ class AuthenticationServiceTest {
         assertThat(result.getData().getAccessToken()).isNotBlank();
         assertThat(result.getData().getRefreshToken()).isNotBlank();
         verify(memberTokenRepository).save(any(MemberToken.class));
+    }
+
+    @Test
+    void loginMember_withoutDeviceName_shouldStoreUnknownDeviceInsteadOfFailingOnTheNotNullColumn() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        LoginRequest request = buildLoginRequest();
+        request.setDeviceName("  ");
+        when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+        when(passwordEncoder.matches("123456", "hashed-pin")).thenReturn(true);
+        ArgumentCaptor<MemberToken> saved = ArgumentCaptor.forClass(MemberToken.class);
+        when(memberTokenRepository.save(saved.capture())).thenReturn(new MemberToken());
+
+        authenticationService.loginMember(request);
+
+        assertThat(saved.getValue().getDeviceName()).isEqualTo(AuthenticationService.UNKNOWN_DEVICE);
     }
 
     // =========================================================================

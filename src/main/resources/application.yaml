@@ -35,6 +35,12 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     default-schema: flyway
+    postgresql:
+      # Session-level migration lock instead of one held by an open transaction: CREATE INDEX CONCURRENTLY
+      # (V31) waits for every open transaction and would otherwise wait for Flyway's own lock until
+      # lock_timeout. Needs a direct connection or a session pooler (e.g. Supabase session mode), not
+      # transaction pooling.
+      transactional-lock: false
     placeholders:
       # V7 (timestamp -> timestamptz): zone of the values written before V7.
       # legacyServerZone = JVM zone of the machine that wrote created_at/updated_at (development laptops: WIB).
@@ -92,6 +98,11 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # Health = the app and its database. The mail check logged in to SMTP on every probe: a mail outage, or a
+    # host that blocks SMTP (Render Free), turned /actuator/health DOWN (503) although the API works.
+    mail:
+      enabled: false
   metrics:
     distribution:
       # Latency p95 per endpoint for the dashboard and the "p95 > 500 ms" alert (docs/monitoring.md).
@@ -113,6 +124,10 @@ crypto:
 vyra:
   # Base URL of this API as seen from outside; used in e-mailed links (data export download).
   public-base-url: ${VYRA_PUBLIC_BASE_URL:http://localhost:8000}
+  cors:
+    # Browser origins allowed to call /api/** (comma-separated), e.g. https://vyra.netlify.app for the
+    # portal + landing page. * = any origin (local development). The mobile app does not need CORS.
+    allowed-origins: ${VYRA_CORS_ALLOWED_ORIGINS:*}
   scheduler:
     # Reminder / push / export jobs. Safe with several instances (ShedLock); off for request-only processes.
     enabled: ${VYRA_SCHEDULER_ENABLED:true}
