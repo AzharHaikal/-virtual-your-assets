@@ -77,7 +77,7 @@ public class LockoutService {
         });
 
         if (attempts != null && attempts >= policy.getPinMaxAttempts()) {
-            log.warn("Member locked after {} wrong PIN attempts. phoneNumber: {}", attempts, member.getPhoneNumber());
+            log.warn("Member locked after {} wrong PIN attempts. memberId: {}", attempts, member.getId());
             member.setPinLockedUntil(until);
             memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ACCOUNT_LOCKED);
             throw new TooManyRequestsException(ErrorConstant.ACCOUNT_LOCKED, policy.getPinLockMinutes() * 60L);

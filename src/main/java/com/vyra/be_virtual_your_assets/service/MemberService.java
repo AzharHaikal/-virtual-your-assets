@@ -56,26 +56,26 @@ public class MemberService {
     @NewSpan
     public BaseResponse<GetMemberResponse> getMember(String memberId) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] memberService.getMember phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] memberService.getMember memberId: {}", member.getId());
 
         BaseResponse<GetMemberWalletResponse> getWalletResponse;
         try {
-            log.info("Get member wallet. phoneNumber: {} ", member.getPhoneNumber());
+            log.info("Get member wallet. memberId: {}", member.getId());
             getWalletResponse = walletService.getMemberWallet(member.getPhoneNumber());
             if (!ErrorConstant.GET_MEMBER_WALLET_SUCCESS.getCode().equals(getWalletResponse.getResponseStatus())) {
-                log.info("Failed when get member wallet. phoneNumber: {} ", member.getPhoneNumber());
+                log.info("Failed when get member wallet. memberId: {}", member.getId());
                 throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);
             }
         } catch (BusinessException e) {
-            log.warn("get member wallet {} encountered an exception: {}", member.getPhoneNumber(), e.getMessage());
+            log.warn("get member wallet {} encountered an exception: {}", member.getId(), e.getMessage());
             throw e;
         } catch (Exception e) {
-            log.error("Unexpected error during get member wallet {}, message: {}", member.getPhoneNumber(), e.getMessage(), e);
+            log.error("Unexpected error during get member wallet {}, message: {}{}", member.getId(), e.getMessage(), e);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }
 
         GetMemberResponse response = getGetMemberResponse(member, getWalletResponse);
-        log.info("[END] memberService.getMember successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] memberService.getMember successfully memberId: {}", member.getId());
 
         return new BaseResponse<>(
                 ErrorConstant.GET_MEMBER_SUCCESS.getCode(),
@@ -88,7 +88,7 @@ public class MemberService {
     @Transactional(readOnly = true)
     public BaseResponse<PageResponse<MemberActivityResponse>> getMemberActivity(String memberId, int page, int size) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] memberService.getMemberActivity phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] memberService.getMemberActivity memberId: {}", member.getId());
 
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
@@ -108,7 +108,7 @@ public class MemberService {
                         .toList()
         );
 
-        log.info("[END] memberService.getMemberActivity successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] memberService.getMemberActivity successfully memberId: {}", member.getId());
 
         return new BaseResponse<>(
                 ErrorConstant.GET_MEMBER_ACTIVITY_SUCCESS.getCode(),
@@ -125,7 +125,7 @@ public class MemberService {
         String existingPhone = member.getPhoneNumber();
         String existingEmail = member.getEmail();
 
-        log.info("[START] memberService.updateProfile phoneNumber: {}", existingPhone);
+        log.info("[START] memberService.updateProfile");
         createMemberActivity(existingPhone, MemberActivityEvent.ATTEMPT_UPDATE_PROFILE);
 
         // Validated before anything is modified; applied below (no PIN needed).
@@ -136,7 +136,7 @@ public class MemberService {
         if (isContactChange(member, request)) {
             lockoutService.assertPinNotLocked(member);
             if (request.getPin() == null || !passwordEncoder.matches(request.getPin(), member.getPin())) {
-                log.warn("Profile contact change rejected, PIN missing or wrong. phoneNumber: {}", existingPhone);
+                log.warn("Profile contact change rejected, PIN missing or wrong");
                 createMemberActivity(existingPhone, MemberActivityEvent.FAILED_UPDATE_PROFILE);
                 lockoutService.onPinFailure(member); // throws 429 when this attempt reaches the limit
                 throw new BusinessException(ErrorConstant.INVALID_PIN_MISS_MATCH);
@@ -166,7 +166,7 @@ public class MemberService {
         response.setTimezone(member.getTimezone());
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_UPDATE_PROFILE);
-        log.info("[END] memberService.updateProfile successfully phoneNumber: {}", member.getPhoneNumber());
+        log.info("[END] memberService.updateProfile successfully memberId: {}", member.getId());
 
         return new BaseResponse<>(
                 ErrorConstant.UPDATE_PROFILE_SUCCESS.getCode(),
@@ -184,14 +184,14 @@ public class MemberService {
         String effectiveNewEmail = updateProfile.isEmailChanged() ? request.getEmail() : existingEmail;
 
         if (updateProfile.isPhoneChanged()) {
-            log.info("Syncing wallet data due to phone number change from {} to {}", existingPhone, effectiveNewPhone);
+            log.info("Syncing wallet data after a phone number change");
             WalletUpdateRequest walletRequest = new WalletUpdateRequest();
             walletRequest.setOldPhoneNumber(existingPhone);
             walletRequest.setNewPhoneNumber(effectiveNewPhone);
             walletService.updateMemberWallet(walletRequest);
         }
 
-        log.info("Syncing transaction data for phoneNumber: {}", existingPhone);
+        log.info("Syncing transaction data");
         TransactionUpdateRequest txRequest = new TransactionUpdateRequest();
         txRequest.setOldPhoneNumber(existingPhone);
         txRequest.setNewPhoneNumber(effectiveNewPhone);
@@ -204,13 +204,13 @@ public class MemberService {
     @Transactional
     public BaseResponse<Void> changePin(String memberId, ChangePinRequest request, String currentAccessToken) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] authenticationService.changePin phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] authenticationService.changePin memberId: {}", member.getId());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CHANGE_PIN);
 
         lockoutService.assertPinNotLocked(member);
 
         if (!passwordEncoder.matches(request.getOldPin(), member.getPin())) {
-            log.info("Failed pin doesn't match. phoneNumber: {} ", member.getPhoneNumber());
+            log.info("Failed pin doesn't match. memberId: {}", member.getId());
             createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.FAILED_CHANGE_PIN);
             lockoutService.onPinFailure(member); // throws 429 when this attempt reaches the limit
             throw new BusinessException(ErrorConstant.INVALID_PIN_MISS_MATCH);
@@ -229,7 +229,7 @@ public class MemberService {
         }
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_CHANGE_PIN);
-        log.info("[END] authenticationService.changePin successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] authenticationService.changePin successfully memberId: {}", member.getId());
 
         return new BaseResponse<>(
                 ErrorConstant.CHANGE_PIN_SUCCESS.getCode(),
