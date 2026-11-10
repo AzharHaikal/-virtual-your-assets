@@ -21,6 +21,8 @@ public class LoginRequest {
     @NotBlank(message = "Device ID is required")
     @Size(max = 255, message = "Device ID must not exceed 255 characters")
     private String deviceId;
+    /** Optional; stored as "Unknown device" when empty (the column is NOT NULL). */
+    @Size(max = 255, message = "Device name must not exceed 255 characters")
     private String deviceName;
     private String ipAddress;
 

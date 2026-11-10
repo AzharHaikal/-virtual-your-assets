@@ -6,6 +6,7 @@ import com.vyra.be_virtual_your_assets.constant.AppLanguage;
 import com.vyra.be_virtual_your_assets.constant.ConsentType;
 import com.vyra.be_virtual_your_assets.constant.GoalCategory;
 import com.vyra.be_virtual_your_assets.constant.GoalProgressType;
+import com.vyra.be_virtual_your_assets.constant.GoalStatus;
 import com.vyra.be_virtual_your_assets.constant.HabitCategory;
 import com.vyra.be_virtual_your_assets.constant.HabitScheduleType;
 import com.vyra.be_virtual_your_assets.constant.LegalDocumentType;
@@ -54,6 +55,7 @@ import com.vyra.be_virtual_your_assets.service.TimeService;
 import com.vyra.be_virtual_your_assets.service.TransactionService;
 import com.vyra.be_virtual_your_assets.service.UserReportService;
 import com.vyra.be_virtual_your_assets.service.WalletService;
+import com.vyra.be_virtual_your_assets.service.WellbeingReportService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -103,6 +105,7 @@ class Phase3ModulesIT {
     @Autowired private GoalImageRepository goalImageRepository;
     @Autowired private GoalService goalService;
     @Autowired private GoalImageService goalImageService;
+    @Autowired private WellbeingReportService wellbeingReportService;
 
     private CustomAdminDetails admin;
 
@@ -289,6 +292,41 @@ class Phase3ModulesIT {
     }
 
     /** A member with a transaction, a mood check-in and a habit done today. */
+    @Test
+    void wellbeingReports_runTheirQueriesAndFindTheMember() {
+        Member member = activeMember();
+        CreateGoalRequest goal = new CreateGoalRequest();
+        goal.setTitle("Dana darurat");
+        goal.setCategory(GoalCategory.FINANCE);
+        goal.setIcon("savings");
+        goal.setColor("#3B82F6");
+        goal.setProgressType(GoalProgressType.VALUE);
+        goal.setTargetValue(BigDecimal.valueOf(10_000_000));
+        goalService.createGoal(member.getId(), goal);
+
+        LocalDate today = timeService.today(timeService.zoneOf(member));
+        String keyword = member.getEmail().toUpperCase();
+
+        assertThat(wellbeingReportService.getMoodReport(today.minusDays(1), today, keyword, 0, 10).getData().getContent())
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getMoodScore()).isEqualTo(4);
+                    assertThat(m.getMemberName()).isEqualTo("IT Member");
+                    // Stored encrypted, decrypted for the Super Admin.
+                    assertThat(m.getNote()).isEqualTo("Hari yang tenang");
+                });
+        assertThat(wellbeingReportService.getHabitReport(today.minusDays(6), today, keyword, 0, 10).getData().getContent())
+                .singleElement()
+                .satisfies(h -> {
+                    assertThat(h.getCompletedDays()).isEqualTo(1);
+                    assertThat(h.getLastActivityDate()).isEqualTo(today);
+                });
+        assertThat(wellbeingReportService.getGoalReport(GoalStatus.ACTIVE, keyword, 0, 10).getData().getContent())
+                .singleElement()
+                .satisfies(g -> assertThat(g.getTitle()).isEqualTo("Dana darurat"));
+        assertThat(wellbeingReportService.getGoalReport(GoalStatus.COMPLETED, keyword, 0, 10).getData().getContent()).isEmpty();
+    }
+
     private Member activeMember() {
         Member member = ItMembers.create(memberRepository, walletService);
         CreateTransactionRequest expense = new CreateTransactionRequest();
@@ -301,6 +339,7 @@ class Phase3ModulesIT {
         LocalDate today = timeService.today(timeService.zoneOf(member));
         MoodEntryRequest mood = new MoodEntryRequest();
         mood.setMoodScore(4);
+        mood.setNote("Hari yang tenang");
         moodService.saveEntry(member.getId(), today, mood);
 
         CreateHabitRequest habit = new CreateHabitRequest();

@@ -99,8 +99,8 @@ public class AdminAuthenticationService {
 
         AdminToken adminToken = new AdminToken();
         adminToken.setAdminId(admin.getId());
-        adminToken.setAccessToken(accessToken);
-        adminToken.setRefreshToken(refreshToken);
+        adminToken.setAccessToken(TokenUtil.hash(accessToken));
+        adminToken.setRefreshToken(TokenUtil.hash(refreshToken));
         adminToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
         adminToken.setRefreshTokenExpiredAt(TokenUtil.refreshTokenExpiredAt());
         adminToken.setDeviceId(request.getDeviceId());
@@ -141,7 +141,7 @@ public class AdminAuthenticationService {
     @NewSpan
     @Transactional(noRollbackFor = BusinessException.class)
     public BaseResponse<AdminRefreshTokenResponse> refreshToken(AdminRefreshTokenRequest request) {
-        AdminToken adminToken = adminTokenRepository.findByRefreshToken(request.getRefreshToken())
+        AdminToken adminToken = adminTokenRepository.findByRefreshToken(TokenUtil.hash(request.getRefreshToken()))
                 .orElseThrow(() -> new BusinessException(ErrorConstant.ADMIN_INVALID_REFRESH_TOKEN));
 
         if (adminToken.getRefreshTokenExpiredAt().isBefore(LocalDateTime.now())) {
@@ -158,8 +158,8 @@ public class AdminAuthenticationService {
         String newAccessToken = TokenUtil.generateAccessToken();
         String newRefreshToken = TokenUtil.generateRefreshToken();
 
-        adminToken.setAccessToken(newAccessToken);
-        adminToken.setRefreshToken(newRefreshToken);
+        adminToken.setAccessToken(TokenUtil.hash(newAccessToken));
+        adminToken.setRefreshToken(TokenUtil.hash(newRefreshToken));
         adminToken.setAccessTokenExpiredAt(TokenUtil.accessTokenExpiredAt());
         adminToken.setRefreshTokenExpiredAt(TokenUtil.refreshTokenExpiredAt());
         adminTokenRepository.save(adminToken);

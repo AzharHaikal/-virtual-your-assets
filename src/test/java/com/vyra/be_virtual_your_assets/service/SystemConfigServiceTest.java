@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SystemConfigServiceTest {
 
-    private static final String KEY = SystemConfigKey.MEMBER_TRANSACTION_DETAIL_ENABLED.getKey();
+    private static final String KEY = SystemConfigKey.MAINTENANCE_ENABLED.getKey();
 
     @Mock private SystemConfigRepository systemConfigRepository;
     @Mock private AdminAuthorizationService adminAuthorizationService;
@@ -71,7 +71,7 @@ class SystemConfigServiceTest {
 
         SystemConfigResponse item = systemConfigService.getSettings().getData().get(0);
 
-        assertThat(item.getValue()).isEqualTo(SystemConfigKey.MEMBER_TRANSACTION_DETAIL_ENABLED.getDefaultValue());
+        assertThat(item.getValue()).isEqualTo(SystemConfigKey.MAINTENANCE_ENABLED.getDefaultValue());
         assertThat(item.getUpdatedAt()).isNull();
     }
 

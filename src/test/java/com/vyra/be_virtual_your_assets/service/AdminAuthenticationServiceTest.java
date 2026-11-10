@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.AdminActivityEvent;
@@ -152,7 +153,7 @@ class AdminAuthenticationServiceTest {
         existingToken.setRefreshToken("old-refresh-token");
         existingToken.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(10));
 
-        when(adminTokenRepository.findByRefreshToken("old-refresh-token")).thenReturn(Optional.of(existingToken));
+        when(adminTokenRepository.findByRefreshToken(TokenUtil.hash("old-refresh-token"))).thenReturn(Optional.of(existingToken));
         when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
         when(adminTokenRepository.save(any(AdminToken.class))).thenReturn(existingToken);
 
@@ -172,7 +173,7 @@ class AdminAuthenticationServiceTest {
         existingToken.setAdminId("admin-id-001");
         existingToken.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(10));
         admin.setStatus(ActiveStatus.SUSPENDED);
-        when(adminTokenRepository.findByRefreshToken("old-refresh-token")).thenReturn(Optional.of(existingToken));
+        when(adminTokenRepository.findByRefreshToken(TokenUtil.hash("old-refresh-token"))).thenReturn(Optional.of(existingToken));
         when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -190,7 +191,7 @@ class AdminAuthenticationServiceTest {
     void refreshToken_notFound_shouldThrowInvalidRefreshToken() {
         AdminRefreshTokenRequest request = new AdminRefreshTokenRequest();
         request.setRefreshToken("unknown-token");
-        when(adminTokenRepository.findByRefreshToken("unknown-token")).thenReturn(Optional.empty());
+        when(adminTokenRepository.findByRefreshToken(TokenUtil.hash("unknown-token"))).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> adminAuthenticationService.refreshToken(request));
@@ -210,7 +211,7 @@ class AdminAuthenticationServiceTest {
         expiredToken.setRefreshToken("expired-token");
         expiredToken.setRefreshTokenExpiredAt(LocalDateTime.now().minusMinutes(1));
 
-        when(adminTokenRepository.findByRefreshToken("expired-token")).thenReturn(Optional.of(expiredToken));
+        when(adminTokenRepository.findByRefreshToken(TokenUtil.hash("expired-token"))).thenReturn(Optional.of(expiredToken));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> adminAuthenticationService.refreshToken(request));

@@ -120,6 +120,7 @@ public class ReportService {
             String keyword, int page, int size
     ) {
         adminAuthorizationService.requirePermission(AdminPermission.REPORT_VIEW);
+        adminAuthorizationService.requireExportIfBulk(size);
         // One row per member transaction: member-level data. Aggregates stay on getIncomeExpenseReport.
         adminAuthorizationService.requireMemberTransactionAccess();
         if (page <= 0) {
@@ -153,6 +154,7 @@ public class ReportService {
 
     public BaseResponse<PageResponse<MemberReportItemResponse>> getMemberReport(int page, int size) {
         adminAuthorizationService.requirePermission(AdminPermission.REPORT_VIEW);
+        adminAuthorizationService.requireExportIfBulk(size);
 
         Page<Member> memberPage = memberRepository.searchMembers("", null, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE)));
 

@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.security.filter;
 
+import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import com.vyra.be_virtual_your_assets.constant.SecurityConstant;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.entity.Admin;
@@ -61,7 +62,7 @@ public class AdminTokenFilter extends OncePerRequestFilter {
 
         String accessToken = authorizationHeader.substring(7);
 
-        AdminToken adminToken = adminTokenRepository.findByAccessToken(accessToken).orElse(null);
+        AdminToken adminToken = adminTokenRepository.findByAccessToken(TokenUtil.hash(accessToken)).orElse(null);
         if (adminToken == null) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid Token");
             return;

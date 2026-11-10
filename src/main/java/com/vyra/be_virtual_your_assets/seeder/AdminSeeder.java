@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -28,8 +30,14 @@ import java.time.LocalDateTime;
 @Slf4j
 public class AdminSeeder implements ApplicationRunner {
 
+    /** Built-in fallback of vyra.admin.seed.password; only acceptable for local development. */
+    static final String DEFAULT_PASSWORD = "ChangeMe123!";
+    static final int MIN_DEPLOYED_PASSWORD_LENGTH = 12;
+    private static final Profiles DEPLOYED = Profiles.of("sit", "uat", "prod");
+
     private final AdminRepository adminRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final Environment environment;
 
     @Value("${vyra.admin.seed.name:Super Administrator}")
     private String seedName;
@@ -40,7 +48,7 @@ public class AdminSeeder implements ApplicationRunner {
     @Value("${vyra.admin.seed.phone-number:628000000000}")
     private String seedPhoneNumber;
 
-    @Value("${vyra.admin.seed.password:ChangeMe123!}")
+    @Value("${vyra.admin.seed.password:" + DEFAULT_PASSWORD + "}")
     private String seedPassword;
 
     @Override
@@ -50,11 +58,21 @@ public class AdminSeeder implements ApplicationRunner {
             return;
         }
 
+        // An empty VYRA_ADMIN_SEED_PASSWORD (e.g. copied from .env.example) counts as not set.
+        String password = seedPassword == null || seedPassword.isBlank() ? DEFAULT_PASSWORD : seedPassword;
+        if (environment.acceptsProfiles(DEPLOYED)
+                && (DEFAULT_PASSWORD.equals(password) || password.length() < MIN_DEPLOYED_PASSWORD_LENGTH)) {
+            // Fail the first start instead of shipping a SUPER_ADMIN with a password that is in the source code.
+            throw new IllegalStateException("Set VYRA_ADMIN_SEED_PASSWORD to a strong password (at least "
+                    + MIN_DEPLOYED_PASSWORD_LENGTH + " characters, not the built-in default) before the first start"
+                    + " of a sit/uat/prod environment: it becomes the password of the first SUPER_ADMIN.");
+        }
+
         Admin admin = new Admin();
         admin.setName(seedName);
         admin.setEmail(seedEmail.toLowerCase().trim());
         admin.setPhoneNumber(seedPhoneNumber);
-        admin.setPassword(passwordEncoder.encode(seedPassword));
+        admin.setPassword(passwordEncoder.encode(password));
         admin.setRole(AdminRole.SUPER_ADMIN);
         admin.setStatus(ActiveStatus.ACTIVE);
         admin.setCreatedBy("SYSTEM");

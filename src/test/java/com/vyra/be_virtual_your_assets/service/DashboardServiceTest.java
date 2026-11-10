@@ -182,7 +182,7 @@ class DashboardServiceTest {
 
     @Test
     void getRecentTransactions_withoutTransactionAccess_shouldThrowForbiddenAndNotQuery() {
-        doThrow(new ForbiddenException(ErrorConstant.MEMBER_TRANSACTION_ACCESS_DISABLED))
+        doThrow(new ForbiddenException(ErrorConstant.ADMIN_UNAUTHORIZED))
                 .when(adminAuthorizationService).requireMemberTransactionAccess();
 
         assertThrows(ForbiddenException.class, () -> dashboardService.getRecentTransactions());

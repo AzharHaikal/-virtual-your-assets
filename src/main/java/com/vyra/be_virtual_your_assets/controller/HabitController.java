@@ -30,7 +30,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 
-/** Habit tracker. Only for the member themself (no admin access). */
+/** Habit tracker. Member endpoints (own data only); the SUPER_ADMIN reads it via {@link WellbeingReportController}. */
 @RestController
 @RequiredArgsConstructor
 public class HabitController {

@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.filter;
 
+import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.AdminRole;
 import com.vyra.be_virtual_your_assets.entity.Admin;
@@ -105,7 +106,7 @@ class AdminTokenFilterTest {
         request.addHeader("Authorization", "Bearer unknown-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(adminTokenRepository.findByAccessToken("unknown-token")).thenReturn(Optional.empty());
+        when(adminTokenRepository.findByAccessToken(TokenUtil.hash("unknown-token"))).thenReturn(Optional.empty());
 
         adminTokenFilter.doFilter(request, response, filterChain);
 
@@ -123,7 +124,7 @@ class AdminTokenFilterTest {
         token.setAdminId("admin-id-001");
         token.setAccessToken("expired-token");
         token.setAccessTokenExpiredAt(LocalDateTime.now().minusMinutes(1));
-        when(adminTokenRepository.findByAccessToken("expired-token")).thenReturn(Optional.of(token));
+        when(adminTokenRepository.findByAccessToken(TokenUtil.hash("expired-token"))).thenReturn(Optional.of(token));
 
         adminTokenFilter.doFilter(request, response, filterChain);
 
@@ -141,7 +142,7 @@ class AdminTokenFilterTest {
         token.setAdminId("admin-id-001");
         token.setAccessToken("valid-token");
         token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(5));
-        when(adminTokenRepository.findByAccessToken("valid-token")).thenReturn(Optional.of(token));
+        when(adminTokenRepository.findByAccessToken(TokenUtil.hash("valid-token"))).thenReturn(Optional.of(token));
         when(adminRepository.findById("admin-id-001")).thenReturn(Optional.empty());
 
         adminTokenFilter.doFilter(request, response, filterChain);
@@ -163,7 +164,7 @@ class AdminTokenFilterTest {
         Admin admin = new Admin();
         admin.setId("admin-id-001");
         admin.setStatus(ActiveStatus.SUSPENDED);
-        when(adminTokenRepository.findByAccessToken("valid-token")).thenReturn(Optional.of(token));
+        when(adminTokenRepository.findByAccessToken(TokenUtil.hash("valid-token"))).thenReturn(Optional.of(token));
         when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
 
         adminTokenFilter.doFilter(request, response, filterChain);
@@ -185,7 +186,7 @@ class AdminTokenFilterTest {
         token.setAdminId("admin-id-001");
         token.setAccessToken("valid-token");
         token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(5));
-        when(adminTokenRepository.findByAccessToken("valid-token")).thenReturn(Optional.of(token));
+        when(adminTokenRepository.findByAccessToken(TokenUtil.hash("valid-token"))).thenReturn(Optional.of(token));
 
         Admin admin = new Admin();
         admin.setId("admin-id-001");

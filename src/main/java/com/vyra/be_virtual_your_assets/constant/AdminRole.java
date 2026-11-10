@@ -8,5 +8,10 @@ public enum AdminRole {
     SUPER_ADMIN,
     ADMINISTRATOR,
     OPERATOR,
-    VIEWER
+    VIEWER;
+
+    /** True when this role is higher than {@code other} in the order above. */
+    public boolean outranks(AdminRole other) {
+        return other != null && ordinal() < other.ordinal();
+    }
 }

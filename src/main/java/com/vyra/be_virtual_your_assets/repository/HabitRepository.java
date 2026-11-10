@@ -1,10 +1,13 @@
 package com.vyra.be_virtual_your_assets.repository;
 
 import com.vyra.be_virtual_your_assets.entity.Habit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -56,4 +59,35 @@ public interface HabitRepository extends JpaRepository<Habit, String> {
           AND h.reminderTime <= :to
         """)
     List<Object[]> findReminderCandidatesUpTo(@Param("zone") String zone, @Param("to") LocalTime to);
+
+    // ─── Portal Habit report (SUPER_ADMIN) ───────────────────────────────────────
+
+    /** Habits started on or before :to, not deleted, with their member ([Habit, Member]). */
+    @Query(value = """
+        SELECT h, m FROM Habit h
+        JOIN Member m ON m.id = h.memberId
+        WHERE h.deletedAt IS NULL
+          AND h.startDate <= :to
+          AND m.deletedAt IS NULL
+          AND (
+            LOWER(m.email) LIKE :pattern
+            OR m.phoneNumber LIKE :pattern
+            OR LOWER(CONCAT(m.firstName, ' ', m.lastName)) LIKE :pattern
+          )
+        ORDER BY m.firstName, m.lastName, h.createdAt, h.id
+        """, countQuery = """
+        SELECT COUNT(h) FROM Habit h
+        JOIN Member m ON m.id = h.memberId
+        WHERE h.deletedAt IS NULL
+          AND h.startDate <= :to
+          AND m.deletedAt IS NULL
+          AND (
+            LOWER(m.email) LIKE :pattern
+            OR m.phoneNumber LIKE :pattern
+            OR LOWER(CONCAT(m.firstName, ' ', m.lastName)) LIKE :pattern
+          )
+        """)
+    Page<Object[]> findForReport(@Param("to") LocalDate to,
+                                 @Param("pattern") String pattern,
+                                 Pageable pageable);
 }
