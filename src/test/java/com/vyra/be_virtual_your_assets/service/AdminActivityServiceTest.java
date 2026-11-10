@@ -94,8 +94,9 @@ class AdminActivityServiceTest {
     // request context + name resolution + defaults
     // =========================================================================
     @Test
-    void createAdminActivity_withoutIpAndDevice_shouldUseForwardedForAndUserAgentFromRequest() {
+    void createAdminActivity_withoutIpAndDevice_shouldUseRemoteAddrAndUserAgent_notAClientSetForwardedFor() {
         MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("198.51.100.10");
         request.addHeader("X-Forwarded-For", "203.0.113.7, 10.0.0.1");
         request.addHeader("User-Agent", "Mozilla/5.0 Test");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
@@ -103,7 +104,7 @@ class AdminActivityServiceTest {
         adminActivityService.createAdminActivity("a-1", "Budi", AdminActivityEvent.UPDATE_ADMIN, null, null);
 
         AdminActivity saved = captureSaved();
-        assertThat(saved.getIpAddress()).isEqualTo("203.0.113.7");
+        assertThat(saved.getIpAddress()).isEqualTo("198.51.100.10");
         assertThat(saved.getDevice()).isEqualTo("Mozilla/5.0 Test");
     }
 

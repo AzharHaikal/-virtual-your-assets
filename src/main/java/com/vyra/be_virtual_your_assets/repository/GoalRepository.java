@@ -1,13 +1,17 @@
 package com.vyra.be_virtual_your_assets.repository;
 
+import com.vyra.be_virtual_your_assets.constant.GoalStatus;
 import com.vyra.be_virtual_your_assets.entity.Goal;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,4 +53,35 @@ public interface GoalRepository extends JpaRepository<Goal, String> {
           AND g.status = com.vyra.be_virtual_your_assets.constant.GoalStatus.ACTIVE
         """)
     List<Object[]> sumSavingsTargets(@Param("memberId") String memberId);
+
+    // ─── Portal Goal report (SUPER_ADMIN) ────────────────────────────────────────
+
+    /** Goals in the statuses, not deleted, with their member ([Goal, Member]), newest first. */
+    @Query(value = """
+        SELECT g, m FROM Goal g
+        JOIN Member m ON m.id = g.memberId
+        WHERE g.deletedAt IS NULL
+          AND g.status IN :statuses
+          AND m.deletedAt IS NULL
+          AND (
+            LOWER(m.email) LIKE :pattern
+            OR m.phoneNumber LIKE :pattern
+            OR LOWER(CONCAT(m.firstName, ' ', m.lastName)) LIKE :pattern
+          )
+        ORDER BY g.createdAt DESC, g.id
+        """, countQuery = """
+        SELECT COUNT(g) FROM Goal g
+        JOIN Member m ON m.id = g.memberId
+        WHERE g.deletedAt IS NULL
+          AND g.status IN :statuses
+          AND m.deletedAt IS NULL
+          AND (
+            LOWER(m.email) LIKE :pattern
+            OR m.phoneNumber LIKE :pattern
+            OR LOWER(CONCAT(m.firstName, ' ', m.lastName)) LIKE :pattern
+          )
+        """)
+    Page<Object[]> findForReport(@Param("statuses") Collection<GoalStatus> statuses,
+                                 @Param("pattern") String pattern,
+                                 Pageable pageable);
 }

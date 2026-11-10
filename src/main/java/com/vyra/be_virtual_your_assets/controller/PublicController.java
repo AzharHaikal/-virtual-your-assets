@@ -14,6 +14,7 @@ import com.vyra.be_virtual_your_assets.service.LegalDocumentService;
 import com.vyra.be_virtual_your_assets.service.SystemSettings;
 import com.vyra.be_virtual_your_assets.service.TimeService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,7 +35,7 @@ public class PublicController {
         boolean maintenance = systemSettings.isEnabled(SystemConfigKey.MAINTENANCE_ENABLED);
         return new BaseResponse<>(ErrorConstant.SYSTEM_STATUS_SUCCESS.getCode(),
                 ErrorConstant.SYSTEM_STATUS_SUCCESS.getMessage(),
-                new AppStatusResponse(maintenance, maintenance ? MaintenanceFilter.message(systemSettings) : null,
+                new AppStatusResponse(maintenance, maintenance ? MaintenanceFilter.message(systemSettings, LocaleContextHolder.getLocale()) : null,
                         timeService.nowUtc()));
     }
 

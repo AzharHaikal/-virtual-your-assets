@@ -1,0 +1,10 @@
+# Build context for the Dockerfile: sources only, never local secrets or build output.
+.git/
+.idea/
+*.iml
+target/
+.env
+.env.*
+!.env.example
+**/application-local.*
+**/application-secret.*

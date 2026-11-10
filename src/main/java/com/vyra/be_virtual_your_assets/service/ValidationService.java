@@ -53,7 +53,8 @@ public class ValidationService {
     public MemberOtp verifyOtp(Member member, VerifyOtpRequest request) {
         log.info("[START] validationService.verifyOtp phoneNumber: {}", member.getPhoneNumber());
 
-        MemberOtp memberOtp = memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(member.getPhoneNumber(), request.getOtpType())
+        // Locked: parallel wrong guesses are counted one after another (callers are transactional).
+        MemberOtp memberOtp = memberOtpRepository.findLatestForUpdate(member.getPhoneNumber(), request.getOtpType())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.OTP_NOT_FOUND));
 
         if (memberOtp.getExpiredAt().isBefore(LocalDateTime.now())) throw new BusinessException(ErrorConstant.OTP_EXPIRED);

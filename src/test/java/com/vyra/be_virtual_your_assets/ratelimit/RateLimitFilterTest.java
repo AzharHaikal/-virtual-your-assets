@@ -44,6 +44,20 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void theMessageFollowsAcceptLanguage() throws Exception {
+        RateLimitFilter f = filter(true);
+        for (int i = 0; i < 10; i++) call(f, request("POST", "/api/v1/auth/login", "10.0.0.1"));
+        MockHttpServletRequest indonesian = request("POST", "/api/v1/auth/login", "10.0.0.1");
+        indonesian.addHeader("Accept-Language", "id");
+
+        MockHttpServletResponse blocked = call(f, indonesian);
+
+        assertThat(blocked.getStatus()).isEqualTo(429);
+        assertThat(blocked.getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
+                .contains("Terlalu banyak permintaan. Silakan coba lagi dalam");
+    }
+
+    @Test
     void anotherClientIsNotAffected() throws Exception {
         RateLimitFilter f = filter(true);
         for (int i = 0; i < 11; i++) call(f, request("POST", "/api/v1/auth/login", "10.0.0.1"));

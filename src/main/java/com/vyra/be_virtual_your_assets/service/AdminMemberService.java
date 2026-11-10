@@ -51,6 +51,7 @@ public class AdminMemberService {
 
     public BaseResponse<PageResponse<AdminMemberListItemResponse>> getMemberList(String keyword, ActiveStatus status, int page, int size) {
         adminAuthorizationService.requirePermission(AdminPermission.MEMBER_VIEW);
+        adminAuthorizationService.requireExportIfBulk(size);
 
         Page<Member> memberPage = memberRepository.searchMembers(
                 StringUtils.isNotBlank(keyword) ? keyword.trim() : "",

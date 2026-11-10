@@ -33,9 +33,8 @@ public class AdminAuthenticationController {
 
     @PostMapping(ADMIN_LOGIN)
     public BaseResponse<AdminLoginResponse> login(@Valid @RequestBody AdminLoginRequest request, HttpServletRequest httpServletRequest) {
-        if (request.getIpAddress() == null || request.getIpAddress().isBlank()) {
-            request.setIpAddress(httpServletRequest.getRemoteAddr());
-        }
+        // The audit trail and the session record the address the server saw, never one the client chose.
+        request.setIpAddress(httpServletRequest.getRemoteAddr());
         return adminAuthenticationService.login(request);
     }
 

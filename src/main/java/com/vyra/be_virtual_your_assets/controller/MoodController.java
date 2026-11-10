@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 
-/** Mood check-in, journal and tags. Only for the member themself (no admin access). */
+/** Mood check-in, journal and tags. Member endpoints (own data only); the SUPER_ADMIN reads it via {@link WellbeingReportController}. */
 @RestController
 @RequiredArgsConstructor
 public class MoodController {

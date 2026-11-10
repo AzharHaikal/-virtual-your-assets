@@ -5,6 +5,7 @@ import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.constant.SystemConfigKey;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
 import com.vyra.be_virtual_your_assets.service.SystemSettings;
+import com.vyra.be_virtual_your_assets.util.ApiLocale;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Maintenance mode ({@code maintenance.enabled}): every member API answers 503 with the maintenance
@@ -58,12 +60,17 @@ public class MaintenanceFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getOutputStream(), new BaseResponse<>(
-                ErrorConstant.MAINTENANCE_MODE.getCode(), message(systemSettings), null));
+                ErrorConstant.MAINTENANCE_MODE.getCode(), message(systemSettings, ApiLocale.of(request)), null));
     }
 
-    /** The portal's message, or the default text. */
+    /** The portal's message, or the default text in English. */
     public static String message(SystemSettings settings) {
+        return message(settings, Locale.ENGLISH);
+    }
+
+    /** The portal's message as it was typed, or the default text in {@code locale}. */
+    public static String message(SystemSettings settings, Locale locale) {
         return StringUtils.defaultIfBlank(settings.text(SystemConfigKey.MAINTENANCE_MESSAGE),
-                ErrorConstant.MAINTENANCE_MODE.getMessage());
+                ErrorConstant.MAINTENANCE_MODE.getMessage(locale));
     }
 }

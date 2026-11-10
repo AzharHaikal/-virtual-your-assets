@@ -12,10 +12,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -25,6 +28,8 @@ class AdminSeederTest {
     @Mock private AdminRepository adminRepository;
     @Mock private BCryptPasswordEncoder passwordEncoder;
     @Mock private ApplicationArguments applicationArguments;
+    // Unstubbed: no sit/uat/prod profile active, i.e. local development.
+    @Mock private Environment environment;
 
     @InjectMocks
     private AdminSeeder adminSeeder;
@@ -78,5 +83,52 @@ class AdminSeederTest {
         ArgumentCaptor<Admin> captor = ArgumentCaptor.forClass(Admin.class);
         verify(adminRepository).save(captor.capture());
         assertThat(captor.getValue().getEmail()).isEqualTo("superadmin@vyra.local");
+    }
+
+    @Test
+    void run_deployedProfileWithTheBuiltInDefaultPassword_shouldFailInsteadOfSeeding() {
+        when(adminRepository.count()).thenReturn(0L);
+        when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> adminSeeder.run(applicationArguments));
+
+        assertThat(ex.getMessage()).contains("VYRA_ADMIN_SEED_PASSWORD");
+        verify(adminRepository, never()).save(any(Admin.class));
+    }
+
+    @Test
+    void run_deployedProfileWithAShortPassword_shouldFailInsteadOfSeeding() {
+        ReflectionTestUtils.setField(adminSeeder, "seedPassword", "Short1!");
+        when(adminRepository.count()).thenReturn(0L);
+        when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> adminSeeder.run(applicationArguments));
+
+        verify(adminRepository, never()).save(any(Admin.class));
+    }
+
+    @Test
+    void run_deployedProfileWithAStrongPassword_shouldSeed() {
+        ReflectionTestUtils.setField(adminSeeder, "seedPassword", "A-long-unique-Passw0rd");
+        when(adminRepository.count()).thenReturn(0L);
+        when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
+        when(passwordEncoder.encode("A-long-unique-Passw0rd")).thenReturn("hashed");
+
+        adminSeeder.run(applicationArguments);
+
+        verify(adminRepository).save(any(Admin.class));
+    }
+
+    @Test
+    void run_localWithAnEmptyPassword_shouldUseTheDefaultInsteadOfAnUnusableBlankPassword() {
+        ReflectionTestUtils.setField(adminSeeder, "seedPassword", "");
+        when(adminRepository.count()).thenReturn(0L);
+        when(passwordEncoder.encode(AdminSeeder.DEFAULT_PASSWORD)).thenReturn("hashed-default");
+
+        adminSeeder.run(applicationArguments);
+
+        ArgumentCaptor<Admin> captor = ArgumentCaptor.forClass(Admin.class);
+        verify(adminRepository).save(captor.capture());
+        assertThat(captor.getValue().getPassword()).isEqualTo("hashed-default");
     }
 }

@@ -1,0 +1,6 @@
+# UAT profile: SPRING_PROFILES_ACTIVE=uat (or --spring.profiles.active=uat).
+# Only what differs from application.yaml; an environment variable still wins over these defaults.
+# Otherwise the same as production, so user testing sees what will go live.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/uat_vyra_assets}
