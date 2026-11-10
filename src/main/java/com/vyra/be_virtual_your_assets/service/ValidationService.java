@@ -51,7 +51,7 @@ public class ValidationService {
     }
 
     public MemberOtp verifyOtp(Member member, VerifyOtpRequest request) {
-        log.info("[START] validationService.verifyOtp phoneNumber: {}", member.getPhoneNumber());
+        log.info("[START] validationService.verifyOtp memberId: {}", member.getId());
 
         // Locked: parallel wrong guesses are counted one after another (callers are transactional).
         MemberOtp memberOtp = memberOtpRepository.findLatestForUpdate(member.getPhoneNumber(), request.getOtpType())
@@ -73,7 +73,7 @@ public class ValidationService {
                 memberRepository.save(member);
                 memberOtpRepository.deleteByPhoneNumber(member.getPhoneNumber());
                 log.warn("Max attempts {} reached for {}. OTP verification locked for {} minutes.",
-                        currentAttempts, member.getPhoneNumber(), securityPolicy.getOtpLockMinutes());
+                        currentAttempts, member.getId(), securityPolicy.getOtpLockMinutes());
                 throw new BusinessException(ErrorConstant.MAX_ATTEMPTS_REACHED,
                         securityPolicy.getOtpLockMinutes() + " minutes.");
             } else {
@@ -106,18 +106,18 @@ public class ValidationService {
     }
 
     public ValidateIsUpdateProfile validateIsUpdateProfile(Member member, UpdateProfileRequest request) {
-        log.info("Validate request update profile. phoneNumber: {}", member.getPhoneNumber());
+        log.info("Validate request update profile. memberId: {}", member.getId());
         ValidateIsUpdateProfile isUpdateProfile = new ValidateIsUpdateProfile();
 
         if (StringUtils.isNotBlank(request.getFirstName())) member.setFirstName(request.getFirstName().trim());
         if (StringUtils.isNotBlank(request.getLastName())) member.setLastName(request.getLastName().trim());
 
         if (StringUtils.isNotBlank(request.getEmail())) {
-            log.info("Check email already exist. phoneNumber: {}", member.getPhoneNumber());
+            log.info("Check email already exist. memberId: {}", member.getId());
             memberRepository.findByEmailIgnoreCase(request.getEmail())
                     .ifPresent(existingMember -> {
                         if (!existingMember.getId().equals(member.getId())) {
-                            log.warn("Email already exist for another account. phoneNumber: {}", member.getPhoneNumber());
+                            log.warn("Email already exist for another account. memberId: {}", member.getId());
                             throw new BusinessException(ErrorConstant.EMAIL_ALREADY_EXIST_V2);
                         }
                     });
@@ -126,11 +126,11 @@ public class ValidationService {
         }
 
         if (StringUtils.isNotBlank(request.getPhoneNumber())) {
-            log.info("Check phone number already exist. phoneNumber: {}", member.getPhoneNumber());
+            log.info("Check phone number already exist. memberId: {}", member.getId());
             memberRepository.findByPhoneNumber(request.getPhoneNumber())
                     .ifPresent(existingMember -> {
                         if (!existingMember.getId().equals(member.getId())) {
-                            log.warn("Phone number already exist for another account. phoneNumber: {}", member.getPhoneNumber());
+                            log.warn("Phone number already exist for another account. memberId: {}", member.getId());
                             throw new BusinessException(ErrorConstant.PHONE_NUMBER_ALREADY_EXIST_V2);
                         }
                     });

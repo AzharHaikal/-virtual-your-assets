@@ -233,8 +233,7 @@ public class InjectionDataMember implements CommandLineRunner {
             txTemplate.executeWithoutResult(status -> executeSingleInsert(dto));
             return true; // Sukses diinsert eceran
         } catch (Exception e) {
-            log.error("[INJECT-FALLBACK] ❌ Row truly failed -> Phone: {} | Email: {} | Error: {}",
-                    dto.phoneNumber, dto.email, e.getMessage());
+            log.error("[INJECT-FALLBACK] ❌ Row truly failed -> Error: {}", e.getMessage());
             return false; // Memang datanya yang cacat / duplikat
         }
     }

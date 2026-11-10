@@ -11,7 +11,7 @@ import lombok.Data;
 public class ResendOtpRequest {
     @NotBlank(message = "Email address is required")
     @Email(message = "Please enter a valid email address")
-    @Size(max = 30, message = "Email address must not exceed 30 characters")
+    @Size(max = 100, message = "Email address must not exceed 100 characters")
     private String email;
 
     @NotNull

@@ -138,7 +138,7 @@ class DataExportServiceTest {
         assertThat(export.getExpiresAt()).isEqualTo(NOW.plusHours(24));
         assertThat(export.getDownloadTokenHash()).hasSize(64);
         ArgumentCaptor<String> link = ArgumentCaptor.forClass(String.class);
-        verify(emailClient).sendDataExportEmail(eq("Azhar"), eq("a@b.c"), link.capture(), eq(AppLanguage.ID));
+        verify(emailClient).sendDataExportEmail(eq("Azhar"), eq("a@b.c"), link.capture());
         assertThat(link.getValue()).startsWith("https://api.vyra.test/api/v1/exports/e-1/download?token=");
         String token = link.getValue().substring(link.getValue().indexOf("token=") + 6);
         assertThat(DataExportService.sha256(token)).isEqualTo(export.getDownloadTokenHash());
@@ -158,7 +158,7 @@ class DataExportServiceTest {
         when(exportRepository.findById("e-2")).thenReturn(Optional.of(ok));
         doReturn(new byte[]{1}).when(writer).write(member);
         doThrow(new BusinessException(ErrorConstant.EMAIL_SEND_FAILED))
-                .when(emailClient).sendDataExportEmail(anyString(), anyString(), anyString(), any());
+                .when(emailClient).sendDataExportEmail(anyString(), anyString(), anyString());
         service.process("e-2");
         assertThat(ok.getStatus()).isEqualTo(DataExportStatus.READY);
     }
