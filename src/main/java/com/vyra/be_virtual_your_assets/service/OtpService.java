@@ -24,7 +24,7 @@ public class OtpService {
     public void sendOtp(String fullName, String email, String phoneNumber, String otp) {
         if (systemSettings.isEnabled(SystemConfigKey.OTP_WHATSAPP_ENABLED)) {
             // TODO: Send OTP via WhatsApp once WhatsAppClient has a provider.
-            log.warn("WhatsApp OTP is switched on but no WhatsApp provider is configured. phoneNumber: {}", phoneNumber);
+            log.warn("WhatsApp OTP is switched on but no WhatsApp provider is configured.");
         }
         if (!systemSettings.isEnabled(SystemConfigKey.OTP_EMAIL_ENABLED)) {
             return;
@@ -33,20 +33,10 @@ public class OtpService {
             emailClient.sendOtpEmail(fullName, email, otp);
             /* whatsAppClient.sendMessage(phoneNumber, message); */
         } catch (Exception e) {
-            log.warn("resendOtp {} encountered an exception: {}", phoneNumber, e.getMessage());
+            log.warn("Sending the OTP e-mail failed: {}", e.getMessage());
             throw new BusinessException(ErrorConstant.EMAIL_SEND_FAILED);
         }
     }
 
-    /*
-    @Async
-    public void sendPrankHack(String fullName, String email) {
-        try {
-            emailClient.sendPrankHack(fullName, email);
-        } catch (Exception e) {
-            throw new BusinessException(ErrorConstant.INTERNAL_SERVER_ERROR);
-        }
-    }
-    */
 
 }

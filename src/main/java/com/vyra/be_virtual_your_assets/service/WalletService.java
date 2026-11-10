@@ -38,13 +38,13 @@ public class WalletService {
     @Transactional
     @NewSpan
     public BaseResponse<CreateWalletResponse> createWallet(CreateWalletRequest request) {
-        log.info("[START] walletService.createMemberWallet phoneNumber: {} ", request.getPhoneNumber());
+        log.info("[START] walletService.createMemberWallet");
 
         // One wallet per member / phone number. A second row would make every lookup by
         // phone number fail for that member.
         if (memberWalletRepository.existsByMemberId(request.getMemberId())
                 || memberWalletRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()) {
-            log.warn("Wallet already exists. phoneNumber: {} ", request.getPhoneNumber());
+            log.warn("Wallet already exists");
             throw new BusinessException(ErrorConstant.CREATE_WALLET_FAILED);
         }
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_CREATE_WALLET);
@@ -73,7 +73,7 @@ public class WalletService {
         response.setBalance(walletStatement.getBalance());
 
         memberActivityService.createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_CREATE_WALLET);
-        log.info("[END] walletService.createMemberWallet successfully phoneNumber: {} ", request.getPhoneNumber());
+        log.info("[END] walletService.createMemberWallet successfully");
 
         return new BaseResponse<>(
                 ErrorConstant.CREATE_WALLET_SUCCESS.getCode(),
@@ -113,7 +113,7 @@ public class WalletService {
 
     @NewSpan
     public BaseResponse<GetMemberWalletResponse> getMemberWallet(String phoneNumber) {
-        log.info("[START] walletService.getMemberWallet. phoneNumber: {} ", phoneNumber);
+        log.info("[START] walletService.getMemberWallet");
 
         WalletStatement getWallet = walletStatementRepository.findByPhoneNumber(phoneNumber)
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
@@ -124,7 +124,7 @@ public class WalletService {
         response.setTotalExpense(getWallet.getTotalExpense());
         response.setBalance(getWallet.getBalance());
 
-        log.info("[END] walletService.getMemberWallet successfully. phoneNumber: {} ", phoneNumber);
+        log.info("[END] walletService.getMemberWallet successfully");
 
         return new BaseResponse<>(
                 ErrorConstant.GET_MEMBER_WALLET_SUCCESS.getCode(),
@@ -136,7 +136,7 @@ public class WalletService {
     @NewSpan
     @Transactional
     public void updateMemberWallet(WalletUpdateRequest request) {
-        log.info("[START] walletService.updateMemberWallet. searching by old phone: {} ", request.getOldPhoneNumber());
+        log.info("[START] walletService.updateMemberWallet.");
 
         WalletStatement walletStatement = walletStatementRepository.findByPhoneNumberForUpdate(request.getOldPhoneNumber())
                 .orElseThrow(() -> new BusinessException(ErrorConstant.MEMBER_NOT_FOUND));
@@ -152,13 +152,13 @@ public class WalletService {
         memberWallet.setModifiedBy(request.getNewPhoneNumber());
         memberWallet.setUpdatedAt(LocalDateTime.now());
 
-        log.info("[END] walletService.updateMemberWallet successfully phoneNumber: {} ", request.getOldPhoneNumber());
+        log.info("[END] walletService.updateMemberWallet successfully");
     }
 
     @Transactional(rollbackFor = Exception.class)
     @NewSpan
     public BaseResponse<TransactionWalletResponse> createTransactionWallet(TransactionWalletRequest request) {
-        log.info("[START] walletService.createTransactionWallet phoneNumber: {} ", request.getPhoneNumber());
+        log.info("[START] walletService.createTransactionWallet");
         createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.ATTEMPT_INSERT_WALLET_STATEMENT);
 
         // Row lock: serialises concurrent transactions on the same wallet (no lost balance updates).
@@ -200,7 +200,7 @@ public class WalletService {
         response.setBalance(wallet.getBalance());
 
         createMemberActivity(request.getPhoneNumber(), MemberActivityEvent.SUCCESS_INSERT_WALLET_STATEMENT);
-        log.info("[END] walletService.createTransactionWallet successfully. phoneNumber: {} ", request.getPhoneNumber());
+        log.info("[END] walletService.createTransactionWallet successfully");
 
         return new BaseResponse<>(
                 ErrorConstant.CREATE_TRANSACTION_WALLET_SUCCESS.getCode(),

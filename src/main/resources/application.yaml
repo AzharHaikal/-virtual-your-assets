@@ -74,8 +74,9 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    # SMTP (MAIL_PROVIDER=smtp, the default). Not used with MAIL_PROVIDER=brevo.
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -145,6 +146,15 @@ vyra:
       # Firebase service account JSON (the file content or a path to it). Empty = push disabled.
       credentials: ${FIREBASE_CREDENTIALS:}
       project-id: ${FIREBASE_PROJECT_ID:}
+  mail:
+    # smtp (spring.mail.*, e.g. Gmail app password) or brevo (Brevo HTTP API over port 443, free plan
+    # 300 e-mails/day; needed where outgoing SMTP is blocked, e.g. Render Free).
+    provider: ${MAIL_PROVIDER:smtp}
+    # Sender shown to members. Brevo: must be a sender verified in Brevo. SMTP: defaults to MAIL_USERNAME.
+    from-address: ${MAIL_FROM:${MAIL_USERNAME:}}
+    from-name: ${MAIL_FROM_NAME:VYRA}
+    brevo:
+      api-key: ${BREVO_API_KEY:}
   otp:
     # A WhatsApp OTP provider is wired in (WhatsAppClient). Until then WhatsApp OTP cannot be switched on.
     whatsapp-provider-available: ${VYRA_OTP_WHATSAPP_PROVIDER_AVAILABLE:false}
