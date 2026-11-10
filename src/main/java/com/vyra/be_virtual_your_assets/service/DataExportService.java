@@ -203,7 +203,7 @@ public class DataExportService {
         memberActivityService.createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.DATA_EXPORT_READY);
         try {
             emailClient.sendDataExportEmail(member.getFirstName(), member.getEmail(),
-                    publicBaseUrl + "/api/v1/exports/" + export.getId() + "/download?token=" + token, member.getLanguage());
+                    publicBaseUrl + "/api/v1/exports/" + export.getId() + "/download?token=" + token);
         } catch (RuntimeException e) {
             // The export stays downloadable from the app.
             log.warn("Data export e-mail failed. exportId: {}", exportId);

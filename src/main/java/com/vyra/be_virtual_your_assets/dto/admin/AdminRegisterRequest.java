@@ -12,7 +12,7 @@ public class AdminRegisterRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Please enter a valid email address")
-    @Size(max = 50, message = "Email address must not exceed 50 characters")
+    @Size(max = 100, message = "Email address must not exceed 100 characters")
     private String email;
 
     @NotBlank(message = "Phone number is required")

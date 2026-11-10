@@ -12,7 +12,7 @@ public class AdminUpdateRequest {
     private String name;
 
     @Email(message = "Please enter a valid email address")
-    @Size(max = 50, message = "Email address must not exceed 50 characters")
+    @Size(max = 100, message = "Email address must not exceed 100 characters")
     private String email;
 
     @Pattern(regexp = "^62\\d+$", message = "Phone number must start with 62")

@@ -96,7 +96,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public BaseResponse<List<TransactionHistoryResponse>> getTopTransactionHistory(String memberId) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] transactionService.getTopTransactionHistory phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] transactionService.getTopTransactionHistory memberId: {}", member.getId());
 
         List<Transaction> transactions = transactionRepository.findTransactionHistory(memberId);
         Map<String, FinanceCategory> categories = categoryService.byIds(
@@ -104,7 +104,7 @@ public class TransactionService {
         List<TransactionHistoryResponse> responses = transactions.stream()
                 .map(t -> mapToHistoryResponse(t, categories))
                 .toList();
-        log.info("[END] transactionService.getTopTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] transactionService.getTopTransactionHistory successfully memberId: {}", member.getId());
         return new BaseResponse<>(
                 ErrorConstant.GET_TOP_TRANSACTION_HISTORY_SUCCESS.getCode(),
                 ErrorConstant.GET_TOP_TRANSACTION_HISTORY_SUCCESS.getMessage(),
@@ -116,7 +116,7 @@ public class TransactionService {
     @Transactional(rollbackFor = Exception.class)
     public BaseResponse<CreateTransactionResponse> createTransaction(String memberId, CreateTransactionRequest request) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] transactionService.createTransaction phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] transactionService.createTransaction memberId: {}", member.getId());
         String referenceNumber = TransactionUtil.generateReferenceNumber();
 
         BigDecimal amount = request.getAmount();
@@ -139,7 +139,7 @@ public class TransactionService {
         publishChange(memberId, transaction.getCategoryId(), transaction.getLocalDate(), null, null);
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_CREATE_TRANSACTION);
-        log.info("[END] transactionService.createTransaction successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] transactionService.createTransaction successfully memberId: {}", member.getId());
 
         return new BaseResponse<>(
                 ErrorConstant.CREATE_TRANSACTION_SUCCESS.getCode(),
@@ -153,7 +153,7 @@ public class TransactionService {
             String startDate, String endDate, TransactionType type, int page, int size, String memberId
     ) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] transactionService.getTransactionHistory phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] transactionService.getTransactionHistory memberId: {}", member.getId());
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
 
@@ -166,7 +166,7 @@ public class TransactionService {
                 transactions.getContent().stream().map(Transaction::getCategoryId).toList());
         Page<TransactionHistoryResponse> responses = transactions.map(t -> mapToHistoryResponse(t, categories));
 
-        log.info("[END] transactionService.getTransactionHistory successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] transactionService.getTransactionHistory successfully memberId: {}", member.getId());
 
         return new BaseResponse<>(
                 ErrorConstant.GET_TRANSACTION_HISTORY_SUCCESS.getCode(),
@@ -203,7 +203,7 @@ public class TransactionService {
     private TransactionWalletResponse processWallet(Transaction transaction, CreateTransactionRequest request, String phoneNumber) {
         BaseResponse<TransactionWalletResponse> response;
         try {
-            log.info("Insert transaction into wallet. phoneNumber: {} ", phoneNumber);
+            log.info("Insert transaction into wallet");
             TransactionWalletRequest walletRequest = new TransactionWalletRequest();
             walletRequest.setTransactionId(transaction.getId());
             walletRequest.setPhoneNumber(phoneNumber);
@@ -212,17 +212,17 @@ public class TransactionService {
 
             response = walletService.createTransactionWallet(walletRequest);
             if (!ErrorConstant.CREATE_TRANSACTION_WALLET_SUCCESS.getCode().equals(response.getResponseStatus())) {
-                log.info("Failed when insert transaction in wallet service. phoneNumber: {}", phoneNumber);
+                log.info("Failed when insert transaction in wallet service");
                 throw new BusinessException(ErrorConstant.CREATE_TRANSACTION_WALLET_FAILED);
             }
 
         } catch (BusinessException e) {
-            log.warn("create transaction {} encountered an exception: {}", phoneNumber, e.getMessage());
+            log.warn("create transaction encountered an exception: {}", e.getMessage());
             createMemberActivity(phoneNumber, MemberActivityEvent.FAILED_CREATE_TRANSACTION);
             throw new BusinessException(ErrorConstant.BAD_REQUEST);
 
         } catch (Exception e) {
-            log.error("Unexpected error during create transaction {}, message: {}", phoneNumber, e.getMessage(), e);
+            log.error("Unexpected error during create transaction, message: {}{}", e.getMessage(), e);
             createMemberActivity(phoneNumber, MemberActivityEvent.FAILED_CREATE_TRANSACTION);
             throw new InternalException(ErrorConstant.INTERNAL_SERVER_ERROR.getMessage());
         }
@@ -239,7 +239,7 @@ public class TransactionService {
     public BaseResponse<TransactionMutationResponse> updateOwnTransaction(String memberId, String transactionId,
                                                                           UpdateTransactionRequest request) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] transactionService.updateOwnTransaction phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] transactionService.updateOwnTransaction memberId: {}", member.getId());
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.ATTEMPT_UPDATE_TRANSACTION);
 
         Transaction transaction = transactionRepository.findOwnedForUpdate(transactionId, memberId)
@@ -291,7 +291,7 @@ public class TransactionService {
         publishChange(memberId, transaction.getCategoryId(), transaction.getLocalDate(), oldCategoryId, oldLocalDate);
 
         createMemberActivity(member.getPhoneNumber(), MemberActivityEvent.SUCCESS_UPDATE_TRANSACTION);
-        log.info("[END] transactionService.updateOwnTransaction successfully phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[END] transactionService.updateOwnTransaction successfully memberId: {}", member.getId());
         return new BaseResponse<>(
                 ErrorConstant.UPDATE_TRANSACTION_SUCCESS.getCode(),
                 ErrorConstant.UPDATE_TRANSACTION_SUCCESS.getMessage(),
@@ -307,7 +307,7 @@ public class TransactionService {
     @Transactional(rollbackFor = Exception.class)
     public BaseResponse<TransactionMutationResponse> deleteOwnTransaction(String memberId, String transactionId) {
         Member member = validationService.getMemberById(memberId);
-        log.info("[START] transactionService.deleteOwnTransaction phoneNumber: {} ", member.getPhoneNumber());
+        log.info("[START] transactionService.deleteOwnTransaction memberId: {}", member.getId());
 
         Transaction transaction = transactionRepository.findOwnedForUpdate(transactionId, memberId)
                 .orElseThrow(() -> new NotFoundException(ErrorConstant.TRANSACTION_NOT_FOUND));
@@ -335,8 +335,7 @@ public class TransactionService {
         }
 
         GetMemberWalletResponse wallet = walletService.getMemberWallet(member.getPhoneNumber()).getData();
-        log.info("[END] transactionService.deleteOwnTransaction phoneNumber: {} alreadyDeleted: {}",
-                member.getPhoneNumber(), alreadyDeleted);
+        log.info("[END] transactionService.deleteOwnTransaction memberId: {} alreadyDeleted: {}", member.getId(), alreadyDeleted);
         return new BaseResponse<>(
                 ErrorConstant.DELETE_TRANSACTION_SUCCESS.getCode(),
                 ErrorConstant.DELETE_TRANSACTION_SUCCESS.getMessage(),
@@ -381,7 +380,7 @@ public class TransactionService {
     @NewSpan
     @Transactional
     public void updateTransaction(TransactionUpdateRequest request) {
-        log.info("[START] transactionService.updateTransaction searching by old phone: {} ", request.getOldPhoneNumber());
+        log.info("[START] transactionService.updateTransaction");
         List<Transaction> transactions = transactionRepository.findAllByUserPhoneNumber(request.getOldPhoneNumber());
         if (!transactions.isEmpty()) {
             for (Transaction transaction : transactions) {
