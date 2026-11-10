@@ -14,13 +14,6 @@ import java.util.Optional;
 @AllArgsConstructor
 public enum SystemConfigKey {
 
-    MEMBER_TRANSACTION_DETAIL_ENABLED(
-            "privacy.member_transaction_detail.enabled",
-            ValueType.BOOLEAN,
-            "true",
-            "Allow Super Admin to view member-level transactions and balances"
-    ),
-
     MAINTENANCE_ENABLED(
             "maintenance.enabled",
             ValueType.BOOLEAN,

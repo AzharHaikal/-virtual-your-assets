@@ -51,6 +51,7 @@ public class AuditService {
 
     public BaseResponse<PageResponse<AdminAuditItemResponse>> getUserAuditTrail(String keyword, LocalDate startDate, LocalDate endDate, int page, int size) {
         adminAuthorizationService.requirePermission(AdminPermission.AUDIT_VIEW);
+        adminAuthorizationService.requireExportIfBulk(size);
 
         String pattern = likePattern(keyword);
         Page<AdminActivity> activityPage = adminActivityRepository.search(
@@ -76,6 +77,7 @@ public class AuditService {
 
     public BaseResponse<PageResponse<MemberAuditItemResponse>> getMemberAuditTrail(String keyword, LocalDate startDate, LocalDate endDate, int page, int size) {
         adminAuthorizationService.requirePermission(AdminPermission.AUDIT_VIEW);
+        adminAuthorizationService.requireExportIfBulk(size);
 
         String pattern = likePattern(keyword);
         Page<MemberActivity> activityPage = memberActivityRepository.search(

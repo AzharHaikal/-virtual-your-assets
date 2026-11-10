@@ -31,6 +31,7 @@ public enum AdminActivityEvent {
     UPDATE_MEMBER_STATUS("Updated a member account status"),
     DELETE_MEMBER("Deleted a member account"),
     VIEW_MEMBER_TRANSACTIONS("Viewed member transactions"),
+    VIEW_MEMBER_WELLBEING("Viewed member wellbeing data"),
 
     // SETTINGS
     UPDATE_SYSTEM_CONFIG("Updated a system setting"),

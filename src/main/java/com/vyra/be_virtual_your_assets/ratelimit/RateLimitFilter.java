@@ -3,6 +3,7 @@ package com.vyra.be_virtual_your_assets.ratelimit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
 import com.vyra.be_virtual_your_assets.dto.BaseResponse;
+import com.vyra.be_virtual_your_assets.util.ApiLocale;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -80,7 +81,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
             objectMapper.writeValue(response.getWriter(),
-                    new BaseResponse<Void>(ex.getErrorConstant().getCode(), ex.getMessage(), null));
+                    new BaseResponse<Void>(ex.getErrorConstant().getCode(),
+                            ApiLocale.localize(ex.getErrorConstant().getCode(), ex.getMessage(), ApiLocale.of(request)),
+                            null));
             return;
         }
         chain.doFilter(request, response);

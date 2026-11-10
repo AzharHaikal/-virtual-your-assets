@@ -3,10 +3,7 @@ package com.vyra.be_virtual_your_assets.service;
 import com.vyra.be_virtual_your_assets.constant.AdminPermission;
 import com.vyra.be_virtual_your_assets.constant.AdminRole;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
-import com.vyra.be_virtual_your_assets.constant.SystemConfigKey;
-import com.vyra.be_virtual_your_assets.entity.SystemConfig;
 import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
-import com.vyra.be_virtual_your_assets.repository.SystemConfigRepository;
 import com.vyra.be_virtual_your_assets.security.model.CustomAdminDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -15,18 +12,14 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class AdminAuthorizationServiceTest {
 
-    private final SystemConfigRepository systemConfigRepository = mock(SystemConfigRepository.class);
-    private final AdminAuthorizationService adminAuthorizationService = new AdminAuthorizationService(systemConfigRepository);
+    private final AdminAuthorizationService adminAuthorizationService = new AdminAuthorizationService();
 
     @AfterEach
     void clearContext() {
@@ -112,43 +105,20 @@ class AdminAuthorizationServiceTest {
     }
 
     // =========================================================================
-    // member transaction access (SUPER_ADMIN only, configurable)
+    // member transaction access (SUPER_ADMIN only, never switched off)
     // =========================================================================
     @Test
-    void requireMemberTransactionAccess_superAdminAndEnabled_shouldNotThrow() {
+    void requireMemberTransactionAccess_superAdmin_isAlwaysAllowed() {
         authenticateAs(new CustomAdminDetails("admin-id-001", "token", AdminRole.SUPER_ADMIN));
-        setMemberTransactionDetail("true");
 
         assertDoesNotThrow(adminAuthorizationService::requireMemberTransactionAccess);
         assertThat(adminAuthorizationService.canViewMemberTransactions()).isTrue();
     }
 
-    @Test
-    void requireMemberTransactionAccess_settingMissing_shouldUseDefaultEnabled() {
-        authenticateAs(new CustomAdminDetails("admin-id-001", "token", AdminRole.SUPER_ADMIN));
-        when(systemConfigRepository.findById(SystemConfigKey.MEMBER_TRANSACTION_DETAIL_ENABLED.getKey()))
-                .thenReturn(Optional.empty());
-
-        assertDoesNotThrow(adminAuthorizationService::requireMemberTransactionAccess);
-    }
-
-    @Test
-    void requireMemberTransactionAccess_superAdminButDisabled_shouldThrowAccessDisabled() {
-        authenticateAs(new CustomAdminDetails("admin-id-001", "token", AdminRole.SUPER_ADMIN));
-        setMemberTransactionDetail("false");
-
-        ForbiddenException ex = assertThrows(ForbiddenException.class,
-                adminAuthorizationService::requireMemberTransactionAccess);
-
-        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.MEMBER_TRANSACTION_ACCESS_DISABLED);
-        assertThat(adminAuthorizationService.canViewMemberTransactions()).isFalse();
-    }
-
     @ParameterizedTest
     @EnumSource(value = AdminRole.class, names = {"ADMINISTRATOR", "OPERATOR", "VIEWER"})
-    void requireMemberTransactionAccess_otherRoles_shouldAlwaysThrowEvenWhenEnabled(AdminRole role) {
+    void requireMemberTransactionAccess_otherRoles_shouldAlwaysThrow(AdminRole role) {
         authenticateAs(new CustomAdminDetails("admin-id-005", "token", role));
-        setMemberTransactionDetail("true");
 
         ForbiddenException ex = assertThrows(ForbiddenException.class,
                 adminAuthorizationService::requireMemberTransactionAccess);
@@ -158,37 +128,43 @@ class AdminAuthorizationServiceTest {
     }
 
     @Test
-    void effectivePermissions_superAdmin_dropsMemberTransactionViewOnlyWhileDisabled() {
-        setMemberTransactionDetail("true");
+    void effectivePermissions_superAdmin_holdsEveryPermission() {
         assertThat(adminAuthorizationService.effectivePermissions(AdminRole.SUPER_ADMIN))
-                .contains(AdminPermission.MEMBER_TRANSACTION_VIEW, AdminPermission.SETTINGS_MANAGE);
-
-        setMemberTransactionDetail("false");
-        assertThat(adminAuthorizationService.effectivePermissions(AdminRole.SUPER_ADMIN))
-                .doesNotContain(AdminPermission.MEMBER_TRANSACTION_VIEW)
-                .contains(AdminPermission.SETTINGS_MANAGE);
+                .containsExactlyInAnyOrder(AdminPermission.values());
     }
 
     @ParameterizedTest
     @EnumSource(value = AdminRole.class, names = {"ADMINISTRATOR", "OPERATOR", "VIEWER"})
-    void effectivePermissions_otherRoles_neverIncludeMemberTransactionView(AdminRole role) {
-        setMemberTransactionDetail("true");
-
+    void effectivePermissions_otherRoles_neverIncludeMemberDataPermissions(AdminRole role) {
         assertThat(adminAuthorizationService.effectivePermissions(role))
-                .doesNotContain(AdminPermission.MEMBER_TRANSACTION_VIEW);
+                .doesNotContain(AdminPermission.MEMBER_TRANSACTION_VIEW, AdminPermission.MEMBER_WELLBEING_VIEW);
+    }
+
+    // =========================================================================
+    // bulk export (REPORT_EXPORT)
+    // =========================================================================
+    @ParameterizedTest
+    @EnumSource(value = AdminRole.class, names = {"SUPER_ADMIN", "ADMINISTRATOR"})
+    void requireExportIfBulk_rolesWithExport_mayDownloadBigPages(AdminRole role) {
+        authenticateAs(new CustomAdminDetails("admin-id-006", "token", role));
+
+        assertDoesNotThrow(() -> adminAuthorizationService.requireExportIfBulk(500));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = AdminRole.class, names = {"OPERATOR", "VIEWER"})
+    void requireExportIfBulk_rolesWithoutExport_onlyGetScreenSizedPages(AdminRole role) {
+        authenticateAs(new CustomAdminDetails("admin-id-007", "token", role));
+
+        assertDoesNotThrow(() -> adminAuthorizationService.requireExportIfBulk(AdminAuthorizationService.BULK_PAGE_SIZE));
+        ForbiddenException ex = assertThrows(ForbiddenException.class,
+                () -> adminAuthorizationService.requireExportIfBulk(AdminAuthorizationService.BULK_PAGE_SIZE + 1));
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_UNAUTHORIZED);
     }
 
     // =========================================================================
     // helpers
     // =========================================================================
-    private void setMemberTransactionDetail(String value) {
-        SystemConfig config = new SystemConfig();
-        config.setConfigKey(SystemConfigKey.MEMBER_TRANSACTION_DETAIL_ENABLED.getKey());
-        config.setConfigValue(value);
-        when(systemConfigRepository.findById(SystemConfigKey.MEMBER_TRANSACTION_DETAIL_ENABLED.getKey()))
-                .thenReturn(Optional.of(config));
-    }
-
     private void authenticateAs(CustomAdminDetails adminDetails) {
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(adminDetails, null, adminDetails.getAuthorities());

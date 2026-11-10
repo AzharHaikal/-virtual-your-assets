@@ -21,4 +21,13 @@ public interface GoalMilestoneRepository extends JpaRepository<GoalMilestone, St
 
     @Query("SELECT COALESCE(MAX(m.position), 0) FROM GoalMilestone m WHERE m.goalId = :goalId")
     int maxPosition(@Param("goalId") String goalId);
+
+    /** Per goal: [goalId, milestones, milestones completed]. */
+    @Query("""
+        SELECT m.goalId, COUNT(m), SUM(CASE WHEN m.completedAt IS NOT NULL THEN 1 ELSE 0 END)
+        FROM GoalMilestone m
+        WHERE m.goalId IN :goalIds
+        GROUP BY m.goalId
+        """)
+    List<Object[]> countByGoals(@Param("goalIds") Collection<String> goalIds);
 }

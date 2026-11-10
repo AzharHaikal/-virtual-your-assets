@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.filter;
 
+import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.entity.Member;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
@@ -111,7 +112,7 @@ class AuthTokenFilterTest {
 
     @Test
     void unknownToken_shouldReturn401() throws Exception {
-        when(memberTokenRepository.findByAccessToken("unknown")).thenReturn(Optional.empty());
+        when(memberTokenRepository.findByAccessToken(TokenUtil.hash("unknown"))).thenReturn(Optional.empty());
         MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer unknown");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -128,7 +129,7 @@ class AuthTokenFilterTest {
         token.setUserId("member-1");
         token.setAccessToken("expired");
         token.setAccessTokenExpiredAt(LocalDateTime.now().minusMinutes(1));
-        when(memberTokenRepository.findByAccessToken("expired")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByAccessToken(TokenUtil.hash("expired"))).thenReturn(Optional.of(token));
         MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer expired");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -145,7 +146,7 @@ class AuthTokenFilterTest {
         token.setUserId("member-1");
         token.setAccessToken("valid");
         token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(10));
-        when(memberTokenRepository.findByAccessToken("valid")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByAccessToken(TokenUtil.hash("valid"))).thenReturn(Optional.of(token));
         when(memberRepository.findById("member-1")).thenReturn(Optional.of(memberWith(ActiveStatus.SUSPENDED)));
         MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer valid");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -163,7 +164,7 @@ class AuthTokenFilterTest {
         token.setUserId("ghost");
         token.setAccessToken("valid");
         token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(10));
-        when(memberTokenRepository.findByAccessToken("valid")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByAccessToken(TokenUtil.hash("valid"))).thenReturn(Optional.of(token));
         when(memberRepository.findById("ghost")).thenReturn(Optional.empty());
         MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer valid");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -187,7 +188,7 @@ class AuthTokenFilterTest {
         token.setUserId("member-1");
         token.setAccessToken("valid");
         token.setAccessTokenExpiredAt(LocalDateTime.now().plusMinutes(10));
-        when(memberTokenRepository.findByAccessToken("valid")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByAccessToken(TokenUtil.hash("valid"))).thenReturn(Optional.of(token));
         when(memberRepository.findById("member-1")).thenReturn(Optional.of(memberWith(ActiveStatus.ACTIVE)));
         MockHttpServletRequest request = memberRequest("/api/v1/member", "Bearer valid");
         MockHttpServletResponse response = new MockHttpServletResponse();
