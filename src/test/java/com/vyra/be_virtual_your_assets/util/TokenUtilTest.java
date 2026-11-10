@@ -86,4 +86,17 @@ class TokenUtilTest {
         assertTrue(expiredAt.isAfter(before));
         assertTrue(expiredAt.isBefore(after));
     }
+
+    @Test
+    void hash_isDeterministicSha256AndNeverTheRawToken() {
+        String raw = TokenUtil.generateAccessToken();
+
+        String hashed = TokenUtil.hash(raw);
+
+        assertThat(hashed).isEqualTo(TokenUtil.hash(raw)).hasSize(43).isNotEqualTo(raw);
+        assertThat(TokenUtil.hash(raw + "x")).isNotEqualTo(hashed);
+        // SHA-256("abc"), Base64URL without padding
+        assertThat(TokenUtil.hash("abc")).isEqualTo("ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0");
+        assertThat(TokenUtil.hash(null)).isNull();
+    }
 }

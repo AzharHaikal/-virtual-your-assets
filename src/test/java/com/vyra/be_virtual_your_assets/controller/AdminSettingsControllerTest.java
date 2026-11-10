@@ -47,12 +47,12 @@ class AdminSettingsControllerTest {
         UpdateSystemConfigRequest request = new UpdateSystemConfigRequest();
         request.setValue("false");
         BaseResponse<SystemConfigResponse> expected = new BaseResponse<>("VYRA-CFG-UPD-000", "Success", new SystemConfigResponse());
-        when(systemConfigService.updateSetting("privacy.member_transaction_detail.enabled", request, admin)).thenReturn(expected);
+        when(systemConfigService.updateSetting("maintenance.enabled", request, admin)).thenReturn(expected);
 
         BaseResponse<SystemConfigResponse> result = adminSettingsController.updateSetting(
-                "privacy.member_transaction_detail.enabled", request, authentication);
+                "maintenance.enabled", request, authentication);
 
         assertThat(result).isSameAs(expected);
-        verify(systemConfigService).updateSetting("privacy.member_transaction_detail.enabled", request, admin);
+        verify(systemConfigService).updateSetting("maintenance.enabled", request, admin);
     }
 }

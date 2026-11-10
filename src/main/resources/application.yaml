@@ -14,6 +14,12 @@ spring:
   application:
     name: VIRTUAL_YOUR_ASSET
 
+  # API message texts: messages.properties (English) and messages_id.properties (Accept-Language: id).
+  # Never fall back to the server's own locale: a machine set to Indonesian must still answer English.
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/vyra_assets}
     username: ${DATABASE_USERNAME:postgres}
