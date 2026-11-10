@@ -418,4 +418,170 @@ class AdminServiceTest {
         assertThat(admin.getPhoneNumber()).isEqualTo("628000111222");
         assertThat(admin.getRole()).isEqualTo(roleBefore);
     }
+
+    // =========================================================================
+    // Role hierarchy: only roles below your own (SUPER_ADMIN: every role)
+    // =========================================================================
+    private final CustomAdminDetails administrator =
+            new CustomAdminDetails("administrator-id", "token", AdminRole.ADMINISTRATOR);
+
+    private Admin adminWithRole(String id, AdminRole role) {
+        Admin target = new Admin();
+        target.setId(id);
+        target.setName("Target");
+        target.setEmail(id + "@example.com");
+        target.setPhoneNumber("628333333333");
+        target.setRole(role);
+        target.setStatus(ActiveStatus.ACTIVE);
+        return target;
+    }
+
+    @Test
+    void registerAdmin_administratorCreatingSuperAdminOrPeer_shouldBeForbidden() {
+        for (AdminRole role : List.of(AdminRole.SUPER_ADMIN, AdminRole.ADMINISTRATOR)) {
+            AdminRegisterRequest request = buildRegisterRequest();
+            request.setRole(role);
+
+            ForbiddenException ex = assertThrows(ForbiddenException.class,
+                    () -> adminService.registerAdmin(request, administrator));
+
+            assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_ROLE_NOT_ALLOWED);
+        }
+        verify(adminRepository, never()).save(any(Admin.class));
+    }
+
+    @Test
+    void registerAdmin_administratorCreatingOperator_shouldSucceed() {
+        AdminRegisterRequest request = buildRegisterRequest();
+        request.setRole(AdminRole.OPERATOR);
+        when(adminRepository.save(any(Admin.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BaseResponse<AdminRegisterResponse> result = adminService.registerAdmin(request, administrator);
+
+        assertThat(result.getData().getRole()).isEqualTo(AdminRole.OPERATOR);
+    }
+
+    @Test
+    void updateAdmin_ownRoleChange_shouldBeForbiddenEvenForSuperAdmin() {
+        Admin self = adminWithRole("current-admin-id", AdminRole.SUPER_ADMIN);
+        when(adminRepository.findById("current-admin-id")).thenReturn(Optional.of(self));
+        AdminUpdateRequest request = new AdminUpdateRequest();
+        request.setRole(AdminRole.VIEWER);
+
+        ForbiddenException ex = assertThrows(ForbiddenException.class,
+                () -> adminService.updateAdmin("current-admin-id", request, currentAdmin));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_CANNOT_CHANGE_OWN_ROLE);
+        assertThat(self.getRole()).isEqualTo(AdminRole.SUPER_ADMIN);
+    }
+
+    @Test
+    void updateAdmin_administratorPromotingItselfToSuperAdmin_shouldBeForbidden() {
+        Admin self = adminWithRole("administrator-id", AdminRole.ADMINISTRATOR);
+        when(adminRepository.findById("administrator-id")).thenReturn(Optional.of(self));
+        AdminUpdateRequest request = new AdminUpdateRequest();
+        request.setRole(AdminRole.SUPER_ADMIN);
+
+        assertThrows(ForbiddenException.class, () -> adminService.updateAdmin("administrator-id", request, administrator));
+
+        assertThat(self.getRole()).isEqualTo(AdminRole.ADMINISTRATOR);
+        verify(adminRepository, never()).save(any(Admin.class));
+    }
+
+    @Test
+    void updateAdmin_administratorGrantingSuperAdminToOperator_shouldBeForbidden() {
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+        AdminUpdateRequest request = new AdminUpdateRequest();
+        request.setRole(AdminRole.SUPER_ADMIN);
+
+        ForbiddenException ex = assertThrows(ForbiddenException.class,
+                () -> adminService.updateAdmin("admin-id-001", request, administrator));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_ROLE_NOT_ALLOWED);
+        assertThat(admin.getRole()).isEqualTo(AdminRole.OPERATOR);
+    }
+
+    @Test
+    void updateAdmin_administratorChangingOperatorToViewer_shouldSucceed() {
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+        when(adminRepository.save(any(Admin.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminUpdateRequest request = new AdminUpdateRequest();
+        request.setRole(AdminRole.VIEWER);
+
+        adminService.updateAdmin("admin-id-001", request, administrator);
+
+        assertThat(admin.getRole()).isEqualTo(AdminRole.VIEWER);
+    }
+
+    @Test
+    void resetAdminPassword_administratorOnSuperAdmin_shouldBeForbidden() {
+        Admin superAdmin = adminWithRole("super-id", AdminRole.SUPER_ADMIN);
+        when(adminRepository.findById("super-id")).thenReturn(Optional.of(superAdmin));
+        AdminResetPasswordRequest request = new AdminResetPasswordRequest();
+        request.setNewPassword("Takeover123!");
+
+        assertThrows(ForbiddenException.class, () -> adminService.resetAdminPassword("super-id", request, administrator));
+
+        verify(passwordEncoder, never()).encode(any());
+        verify(adminTokenRepository, never()).deleteByAdminId(any());
+    }
+
+    @Test
+    void resetAdminPassword_ownAccount_shouldBeAllowed() {
+        Admin self = adminWithRole("administrator-id", AdminRole.ADMINISTRATOR);
+        when(adminRepository.findById("administrator-id")).thenReturn(Optional.of(self));
+        when(passwordEncoder.encode("NewPassword123!")).thenReturn("hashed");
+        AdminResetPasswordRequest request = new AdminResetPasswordRequest();
+        request.setNewPassword("NewPassword123!");
+
+        adminService.resetAdminPassword("administrator-id", request, administrator);
+
+        assertThat(self.getPassword()).isEqualTo("hashed");
+    }
+
+    @Test
+    void updateAdminStatusAndDelete_administratorOnPeerOrSuperAdmin_shouldBeForbidden() {
+        Admin peer = adminWithRole("peer-id", AdminRole.ADMINISTRATOR);
+        Admin superAdmin = adminWithRole("super-id", AdminRole.SUPER_ADMIN);
+        when(adminRepository.findById("peer-id")).thenReturn(Optional.of(peer));
+        when(adminRepository.findById("super-id")).thenReturn(Optional.of(superAdmin));
+        AdminUpdateStatusRequest suspend = new AdminUpdateStatusRequest();
+        suspend.setStatus(ActiveStatus.SUSPENDED);
+
+        assertThrows(ForbiddenException.class, () -> adminService.updateAdminStatus("super-id", suspend, administrator));
+        assertThrows(ForbiddenException.class, () -> adminService.updateAdminStatus("peer-id", suspend, administrator));
+        assertThrows(ForbiddenException.class, () -> adminService.deleteAdmin("super-id", administrator));
+        assertThrows(ForbiddenException.class, () -> adminService.deleteAdmin("peer-id", administrator));
+
+        assertThat(superAdmin.getStatus()).isEqualTo(ActiveStatus.ACTIVE);
+        assertThat(peer.getStatus()).isEqualTo(ActiveStatus.ACTIVE);
+        verify(adminTokenRepository, never()).deleteByAdminId(any());
+    }
+
+    @Test
+    void updateAdmin_emailOfAnotherAdmin_shouldBeRejectedInsteadOfFailingOnTheUniqueIndex() {
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+        when(adminRepository.existsByEmailIgnoreCase("taken@example.com")).thenReturn(true);
+        AdminUpdateRequest request = new AdminUpdateRequest();
+        request.setEmail("Taken@Example.com");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> adminService.updateAdmin("admin-id-001", request, currentAdmin));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_EMAIL_ALREADY_EXIST);
+        assertThat(admin.getEmail()).isEqualTo("budi@example.com");
+    }
+
+    @Test
+    void updateOwnProfile_phoneOfAnotherAdmin_shouldBeRejected() {
+        when(adminRepository.findById("admin-id-001")).thenReturn(Optional.of(admin));
+        when(adminRepository.existsByPhoneNumber("628999999999")).thenReturn(true);
+        AdminUpdateRequest request = new AdminUpdateRequest();
+        request.setPhoneNumber("628999999999");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> adminService.updateOwnProfile(request, new CustomAdminDetails("admin-id-001", "token", AdminRole.OPERATOR)));
+
+        assertThat(ex.getErrorConstant()).isEqualTo(ErrorConstant.ADMIN_PHONE_ALREADY_EXIST);
+    }
 }

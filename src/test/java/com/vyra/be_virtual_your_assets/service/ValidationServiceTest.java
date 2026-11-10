@@ -200,7 +200,7 @@ class ValidationServiceTest {
     @Test
     void verifyOtp_otpNotFound_shouldThrowOtpNotFound() {
         VerifyOtpRequest request = buildVerifyRequest("999999", OtpType.REGISTER);
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
+        when(memberOtpRepository.findLatestForUpdate(
                 member.getPhoneNumber(), OtpType.REGISTER))
                 .thenReturn(Optional.empty());
 
@@ -217,7 +217,7 @@ class ValidationServiceTest {
     void verifyOtp_otpExpired_shouldThrowOtpExpired() {
         VerifyOtpRequest request = buildVerifyRequest("123456", OtpType.REGISTER);
         MemberOtp otp = buildOtp("hashed", OtpType.REGISTER, LocalDateTime.now().minusMinutes(1), 0);
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
+        when(memberOtpRepository.findLatestForUpdate(
                 member.getPhoneNumber(), OtpType.REGISTER))
                 .thenReturn(Optional.of(otp));
 
@@ -234,7 +234,7 @@ class ValidationServiceTest {
     void verifyOtp_wrongOtp_attemptsLessThan4_shouldIncrementAndThrowOtpInvalid() {
         VerifyOtpRequest request = buildVerifyRequest("wrong", OtpType.REGISTER);
         MemberOtp otp = buildOtp("hashed", OtpType.REGISTER, LocalDateTime.now().plusMinutes(5), 1);
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
+        when(memberOtpRepository.findLatestForUpdate(
                 member.getPhoneNumber(), OtpType.REGISTER))
                 .thenReturn(Optional.of(otp));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
@@ -252,7 +252,7 @@ class ValidationServiceTest {
     void verifyOtp_wrongOtp_attemptsNullTreatedAsZero_shouldIncrementAndThrowOtpInvalid() {
         VerifyOtpRequest request = buildVerifyRequest("wrong", OtpType.REGISTER);
         MemberOtp otp = buildOtp("hashed", OtpType.REGISTER, LocalDateTime.now().plusMinutes(5), null);
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
+        when(memberOtpRepository.findLatestForUpdate(
                 member.getPhoneNumber(), OtpType.REGISTER))
                 .thenReturn(Optional.of(otp));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
@@ -271,7 +271,7 @@ class ValidationServiceTest {
     void verifyOtp_wrongOtp_attemptsReach4_shouldLockOtpTemporarilyAndThrowMaxAttempts() {
         VerifyOtpRequest request = buildVerifyRequest("wrong", OtpType.REGISTER);
         MemberOtp otp = buildOtp("hashed", OtpType.REGISTER, LocalDateTime.now().plusMinutes(5), 3);
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
+        when(memberOtpRepository.findLatestForUpdate(
                 member.getPhoneNumber(), OtpType.REGISTER))
                 .thenReturn(Optional.of(otp));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
@@ -295,7 +295,7 @@ class ValidationServiceTest {
     void verifyOtp_correctOtp_shouldReturnMemberOtp() {
         VerifyOtpRequest request = buildVerifyRequest("123456", OtpType.REGISTER);
         MemberOtp otp = buildOtp("hashed", OtpType.REGISTER, LocalDateTime.now().plusMinutes(5), 0);
-        when(memberOtpRepository.findTopByPhoneNumberAndOtpTypeOrderByCreatedAtDesc(
+        when(memberOtpRepository.findLatestForUpdate(
                 member.getPhoneNumber(), OtpType.REGISTER))
                 .thenReturn(Optional.of(otp));
         when(passwordEncoder.matches("123456", "hashed")).thenReturn(true);

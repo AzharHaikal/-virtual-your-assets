@@ -42,6 +42,7 @@ public class AdminService {
     @Transactional
     public BaseResponse<AdminRegisterResponse> registerAdmin(AdminRegisterRequest request, CustomAdminDetails currentAdmin) {
         adminAuthorizationService.requirePermission(AdminPermission.USER_MANAGE);
+        assertCanGrant(currentAdmin, request.getRole());
         log.info("[START] adminService.registerAdmin email: {}", request.getEmail());
 
         if (adminRepository.existsByEmailIgnoreCase(request.getEmail())) {
@@ -123,6 +124,16 @@ public class AdminService {
     public BaseResponse<AdminUpdateResponse> updateAdmin(String adminId, AdminUpdateRequest request, CustomAdminDetails currentAdmin) {
         adminAuthorizationService.requirePermission(AdminPermission.USER_MANAGE);
         Admin admin = getAdminOrThrow(adminId);
+        boolean self = admin.getId().equals(currentAdmin.getAdminId());
+        if (request.getRole() != null && request.getRole() != admin.getRole()) {
+            if (self) {
+                throw new ForbiddenException(ErrorConstant.ADMIN_CANNOT_CHANGE_OWN_ROLE);
+            }
+            assertCanGrant(currentAdmin, request.getRole());
+        }
+        if (!self) {
+            assertCanManage(currentAdmin, admin);
+        }
 
         applyUpdate(admin, request);
         admin.setModifiedBy(currentAdmin.getAdminId());
@@ -166,6 +177,7 @@ public class AdminService {
         }
 
         Admin admin = getAdminOrThrow(adminId);
+        assertCanManage(currentAdmin, admin);
         admin.setStatus(request.getStatus());
         if (request.getStatus() == ActiveStatus.ACTIVE) {
             // Re-activating also lifts a temporary login lock.
@@ -195,6 +207,9 @@ public class AdminService {
         adminAuthorizationService.requirePermission(AdminPermission.USER_MANAGE);
 
         Admin admin = getAdminOrThrow(adminId);
+        if (!admin.getId().equals(currentAdmin.getAdminId())) {
+            assertCanManage(currentAdmin, admin);
+        }
         admin.setPassword(passwordEncoder.encode(request.getNewPassword()));
         admin.setFailedLoginAttempts(0);
         admin.setLockedUntil(null);
@@ -223,6 +238,7 @@ public class AdminService {
         }
 
         Admin admin = getAdminOrThrow(adminId);
+        assertCanManage(currentAdmin, admin);
         admin.setDeletedAt(LocalDateTime.now());
         admin.setStatus(ActiveStatus.DELETED);
         admin.setModifiedBy(currentAdmin.getAdminId());
@@ -244,15 +260,38 @@ public class AdminService {
                 .orElseThrow(() -> new BusinessException(ErrorConstant.ADMIN_NOT_FOUND));
     }
 
-    /** Name / e-mail / phone: only non-blank values are applied. */
+    /**
+     * Role hierarchy: an admin may only grant, and act on accounts with, a role below its own; SUPER_ADMIN may
+     * do both for every role. Without it an ADMINISTRATOR (USER_MANAGE) could create a SUPER_ADMIN, promote
+     * itself or take over a SUPER_ADMIN account by resetting its password.
+     */
+    private void assertCanGrant(CustomAdminDetails currentAdmin, AdminRole role) {
+        if (currentAdmin.getRole() != AdminRole.SUPER_ADMIN && !currentAdmin.getRole().outranks(role)) {
+            throw new ForbiddenException(ErrorConstant.ADMIN_ROLE_NOT_ALLOWED);
+        }
+    }
+
+    private void assertCanManage(CustomAdminDetails currentAdmin, Admin target) {
+        assertCanGrant(currentAdmin, target.getRole());
+    }
+
+    /** Name / e-mail / phone: only non-blank values are applied; e-mail and phone must stay unique. */
     private void applyProfileFields(Admin admin, AdminUpdateRequest request) {
         if (StringUtils.isNotBlank(request.getName())) {
             admin.setName(request.getName().trim());
         }
         if (StringUtils.isNotBlank(request.getEmail())) {
-            admin.setEmail(request.getEmail().toLowerCase().trim());
+            String email = request.getEmail().toLowerCase().trim();
+            if (!email.equalsIgnoreCase(admin.getEmail()) && adminRepository.existsByEmailIgnoreCase(email)) {
+                throw new BusinessException(ErrorConstant.ADMIN_EMAIL_ALREADY_EXIST);
+            }
+            admin.setEmail(email);
         }
         if (StringUtils.isNotBlank(request.getPhoneNumber())) {
+            if (!request.getPhoneNumber().equals(admin.getPhoneNumber())
+                    && adminRepository.existsByPhoneNumber(request.getPhoneNumber())) {
+                throw new BusinessException(ErrorConstant.ADMIN_PHONE_ALREADY_EXIST);
+            }
             admin.setPhoneNumber(request.getPhoneNumber());
         }
     }

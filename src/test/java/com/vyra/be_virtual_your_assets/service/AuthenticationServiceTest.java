@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.service;
 
+import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import com.vyra.be_virtual_your_assets.config.SecurityPolicy;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
 import com.vyra.be_virtual_your_assets.constant.ErrorConstant;
@@ -21,6 +22,7 @@ import com.vyra.be_virtual_your_assets.repository.MemberTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -254,6 +256,21 @@ class AuthenticationServiceTest {
         verify(memberTokenRepository).save(any(MemberToken.class));
     }
 
+    @Test
+    void loginMember_withoutDeviceName_shouldStoreUnknownDeviceInsteadOfFailingOnTheNotNullColumn() {
+        member.setStatus(ActiveStatus.ACTIVE);
+        LoginRequest request = buildLoginRequest();
+        request.setDeviceName("  ");
+        when(validationService.getMemberByEmailOrPhoneNumber("budi@example.com", null)).thenReturn(member);
+        when(passwordEncoder.matches("123456", "hashed-pin")).thenReturn(true);
+        ArgumentCaptor<MemberToken> saved = ArgumentCaptor.forClass(MemberToken.class);
+        when(memberTokenRepository.save(saved.capture())).thenReturn(new MemberToken());
+
+        authenticationService.loginMember(request);
+
+        assertThat(saved.getValue().getDeviceName()).isEqualTo(AuthenticationService.UNKNOWN_DEVICE);
+    }
+
     // =========================================================================
     // loginMember — member not ACTIVE
     // =========================================================================
@@ -314,7 +331,7 @@ class AuthenticationServiceTest {
         token.setUserId("member-uuid-001");
         token.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(1));
         member.setStatus(ActiveStatus.ACTIVE);
-        when(memberTokenRepository.findByRefreshToken("valid-refresh")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByRefreshToken(TokenUtil.hash("valid-refresh"))).thenReturn(Optional.of(token));
         when(memberRepository.findById("member-uuid-001")).thenReturn(Optional.of(member));
         lenient().when(memberTokenRepository.save(any())).thenReturn(token);
 
@@ -333,7 +350,7 @@ class AuthenticationServiceTest {
         token.setUserId("member-uuid-001");
         token.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(20));
         member.setStatus(ActiveStatus.SUSPENDED);
-        when(memberTokenRepository.findByRefreshToken("valid-refresh")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByRefreshToken(TokenUtil.hash("valid-refresh"))).thenReturn(Optional.of(token));
         when(memberRepository.findById("member-uuid-001")).thenReturn(Optional.of(member));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> authenticationService.refreshToken(request));
@@ -349,7 +366,7 @@ class AuthenticationServiceTest {
         MemberToken token = new MemberToken();
         token.setUserId("gone");
         token.setRefreshTokenExpiredAt(LocalDateTime.now().plusDays(20));
-        when(memberTokenRepository.findByRefreshToken("valid-refresh")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByRefreshToken(TokenUtil.hash("valid-refresh"))).thenReturn(Optional.of(token));
         when(memberRepository.findById("gone")).thenReturn(Optional.empty());
 
         assertThrows(BusinessException.class, () -> authenticationService.refreshToken(request));
@@ -364,7 +381,7 @@ class AuthenticationServiceTest {
     void refreshToken_tokenNotFound_shouldThrowInvalidRefreshToken() {
         RefreshTokenRequest request = new RefreshTokenRequest();
         request.setRefreshToken("unknown-token");
-        when(memberTokenRepository.findByRefreshToken("unknown-token")).thenReturn(Optional.empty());
+        when(memberTokenRepository.findByRefreshToken(TokenUtil.hash("unknown-token"))).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> authenticationService.refreshToken(request));
@@ -382,7 +399,7 @@ class AuthenticationServiceTest {
 
         MemberToken token = new MemberToken();
         token.setRefreshTokenExpiredAt(LocalDateTime.now().minusMinutes(1));
-        when(memberTokenRepository.findByRefreshToken("expired-refresh")).thenReturn(Optional.of(token));
+        when(memberTokenRepository.findByRefreshToken(TokenUtil.hash("expired-refresh"))).thenReturn(Optional.of(token));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> authenticationService.refreshToken(request));

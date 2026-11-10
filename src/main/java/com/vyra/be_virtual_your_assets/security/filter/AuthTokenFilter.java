@@ -1,5 +1,6 @@
 package com.vyra.be_virtual_your_assets.security.filter;
 
+import com.vyra.be_virtual_your_assets.util.TokenUtil;
 import com.vyra.be_virtual_your_assets.constant.SecurityConstant;
 import com.vyra.be_virtual_your_assets.entity.MemberToken;
 import com.vyra.be_virtual_your_assets.constant.ActiveStatus;
@@ -56,7 +57,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
         String accessToken = authorizationHeader.substring(7);
 
-        MemberToken memberToken = memberTokenRepository.findByAccessToken(accessToken).orElse(null);
+        MemberToken memberToken = memberTokenRepository.findByAccessToken(TokenUtil.hash(accessToken)).orElse(null);
         if (memberToken == null) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid Token");
             return;

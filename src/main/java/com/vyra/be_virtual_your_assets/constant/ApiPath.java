@@ -216,6 +216,9 @@ public class ApiPath {
     public static final String REPORT_EXPENSE = "/expense";
     public static final String REPORT_TRANSACTION = "/transaction";
     public static final String REPORT_MEMBER = "/member";
+    public static final String REPORT_MOOD = "/mood";
+    public static final String REPORT_HABIT = "/habit";
+    public static final String REPORT_GOAL = "/goal";
     public static final String REPORT_EXPORT_CSV = "/export";
 
     // =========================================================================

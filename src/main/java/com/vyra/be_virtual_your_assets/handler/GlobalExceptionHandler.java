@@ -13,18 +13,32 @@ import org.springframework.dao.QueryTimeoutException;
 import com.vyra.be_virtual_your_assets.exception.TooManyRequestsException;
 import com.vyra.be_virtual_your_assets.exception.ForbiddenException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/**
+ * Errors as a BaseResponse. Messages are built in English here; {@link LocalizedResponseAdvice}
+ * translates ErrorConstant texts, and validation messages are looked up in messages_id.properties
+ * (key {@code Constraint.objectName.field}, e.g. {@code Size.registerRequest.firstName}).
+ */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    private final MessageSource messageSource;
+
+    public GlobalExceptionHandler(MessageSource messageSource) {
+        this.messageSource = messageSource;
+    }
 
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<BaseResponse<Void>> handleForbiddenException(ForbiddenException ex) {
@@ -169,10 +183,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<BaseResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult()
-                .getFieldErrors()
-                .get(0)
-                .getDefaultMessage();
+        FieldError error = ex.getBindingResult().getFieldErrors().get(0);
+        // The DTO's English message unless the request's language has its own text for this field.
+        String message = messageSource.getMessage(error, LocaleContextHolder.getLocale());
         return ResponseEntity.badRequest().body(
                 new BaseResponse<>(
                         ErrorConstant.BAD_REQUEST.getCode(),
@@ -186,15 +199,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<BaseResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.badRequest().body(
-                new BaseResponse<>(ErrorConstant.BAD_REQUEST.getCode(), "Invalid value for " + ex.getName(), null));
+                new BaseResponse<>(ErrorConstant.BAD_REQUEST.getCode(),
+                        text("request.invalid-value", "Invalid value for " + ex.getName(), ex.getName()), null));
     }
 
     /** Malformed JSON or a value of the wrong type in the body (the body is never echoed back or logged). */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<BaseResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException ex) {
         return ResponseEntity.badRequest().body(
-                new BaseResponse<>(ErrorConstant.BAD_REQUEST.getCode(), "Invalid request body", null));
+                new BaseResponse<>(ErrorConstant.BAD_REQUEST.getCode(),
+                        text("request.invalid-body", "Invalid request body"), null));
     }
 
-
+    private String text(String key, String english, Object... args) {
+        return messageSource.getMessage(key, args, english, LocaleContextHolder.getLocale());
+    }
 }

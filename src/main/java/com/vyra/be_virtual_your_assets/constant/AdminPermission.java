@@ -14,12 +14,21 @@ public enum AdminPermission {
     MEMBER_MANAGE,
     /**
      * Member-level financial data: a member's transactions, balance and the per-transaction
-     * report. SUPER_ADMIN only, and only while the system setting
-     * {@link SystemConfigKey#MEMBER_TRANSACTION_DETAIL_ENABLED} is on.
+     * report. SUPER_ADMIN only; no setting can switch it off for the SUPER_ADMIN.
      */
     MEMBER_TRANSACTION_VIEW,
+    /**
+     * Member-level wellbeing data: mood check-ins (including the journal note), habits and goals
+     * of each member (the Mood, Habit and Goal reports). SUPER_ADMIN only; every other role is
+     * denied.
+     */
+    MEMBER_WELLBEING_VIEW,
 
     REPORT_VIEW,
+    /**
+     * Bulk download (Excel/CSV): list endpoints called with a page size above
+     * {@code AdminAuthorizationService.BULK_PAGE_SIZE}. SUPER_ADMIN and ADMINISTRATOR.
+     */
     REPORT_EXPORT,
 
     AUDIT_VIEW,

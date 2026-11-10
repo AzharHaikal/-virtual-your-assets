@@ -78,11 +78,12 @@ public class AdminActivityService {
         return attributes instanceof ServletRequestAttributes servlet ? servlet.getRequest() : null;
     }
 
+    /**
+     * The client address as resolved by the container: with {@code server.forward-headers-strategy=native}
+     * Tomcat takes it from X-Forwarded-For only when the request came through a trusted proxy. Reading the
+     * header here would let any client write an address of its choice into the audit trail.
+     */
     private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (StringUtils.isNotBlank(forwarded)) {
-            return forwarded.split(",")[0].trim();
-        }
         return request.getRemoteAddr();
     }
 }

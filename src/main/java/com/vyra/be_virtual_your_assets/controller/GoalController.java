@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Goals & milestones. Only for the member themself (no admin access). */
+/** Goals & milestones. Member endpoints (own data only); the SUPER_ADMIN reads it via {@link WellbeingReportController}. */
 @RestController
 @RequiredArgsConstructor
 public class GoalController {

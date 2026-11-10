@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,4 +55,23 @@ public interface HabitCompletionRepository extends JpaRepository<HabitCompletion
     List<HabitCompletion> findByHabitIdAndLocalDateBetween(String habitId, LocalDate from, LocalDate to);
 
     Optional<HabitCompletion> findByHabitIdAndLocalDate(String habitId, LocalDate localDate);
+
+    /**
+     * Per habit in [from, to]: [habitId, days the target was reached, last day with progress].
+     * Uses the unique (habit_id, local_date) index.
+     */
+    @Query("""
+        SELECT c.habitId,
+               SUM(CASE WHEN c.count >= h.targetCount THEN 1 ELSE 0 END),
+               MAX(c.localDate)
+        FROM HabitCompletion c
+        JOIN Habit h ON h.id = c.habitId
+        WHERE c.habitId IN :habitIds
+          AND c.localDate >= :from
+          AND c.localDate <= :to
+        GROUP BY c.habitId
+        """)
+    List<Object[]> summarizeForReport(@Param("habitIds") Collection<String> habitIds,
+                                      @Param("from") LocalDate from,
+                                      @Param("to") LocalDate to);
 }

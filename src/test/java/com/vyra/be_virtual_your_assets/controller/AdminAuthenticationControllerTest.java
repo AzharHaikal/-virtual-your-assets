@@ -41,11 +41,12 @@ class AdminAuthenticationControllerTest {
     // login
     // =========================================================================
     @Test
-    void login_ipAddressProvided_shouldNotOverrideWithRemoteAddr() {
+    void login_ipAddressProvidedByClient_shouldBeReplacedByRemoteAddr() {
         AdminLoginRequest request = new AdminLoginRequest();
         request.setEmail("admin@example.com");
         request.setPassword("Secret123!");
-        request.setIpAddress("10.0.0.1");
+        request.setIpAddress("203.0.113.77");
+        when(httpServletRequest.getRemoteAddr()).thenReturn("10.0.0.1");
 
         BaseResponse<AdminLoginResponse> expected = new BaseResponse<>("VYRA-ADM-LGN-000", "Success", new AdminLoginResponse());
         when(adminAuthenticationService.login(request)).thenReturn(expected);
@@ -54,7 +55,6 @@ class AdminAuthenticationControllerTest {
 
         assertThat(result).isSameAs(expected);
         assertThat(request.getIpAddress()).isEqualTo("10.0.0.1");
-        verify(httpServletRequest, never()).getRemoteAddr();
     }
 
     @Test

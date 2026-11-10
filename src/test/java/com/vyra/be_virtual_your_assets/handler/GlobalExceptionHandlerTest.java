@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler(LocalizationTestSupport.messageSource());
 
     // =========================================================================
     // handleForbiddenException
