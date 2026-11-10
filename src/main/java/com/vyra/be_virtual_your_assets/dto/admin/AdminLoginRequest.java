@@ -12,7 +12,7 @@ public class AdminLoginRequest {
     @Email(message = "Please enter a valid email address")
     // Same limit as AdminRegisterRequest / AdminUpdateRequest: an admin created with a longer address
     // (up to 50) could otherwise never sign in.
-    @Size(max = 50, message = "Email address must not exceed 50 characters")
+    @Size(max = 100, message = "Email address must not exceed 100 characters")
     private String email;
 
     @NotNull(message = "Password is required")
