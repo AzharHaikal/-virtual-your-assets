@@ -169,10 +169,8 @@ public class AnnouncementService {
     }
 
     private int deliver(Announcement announcement) {
-        NotificationMessages.Message message = new NotificationMessages.Message(
-                StringUtils.abbreviate(announcement.getTitle(), NotificationMessages.MAX_TITLE),
-                StringUtils.abbreviate(announcement.getBody(), NotificationMessages.MAX_BODY));
-        Map<String, String> payload = Map.of("route", "announcement", "announcementId", announcement.getId());
+        NotificationMessages.Message message = messageOf(announcement);
+        Map<String, String> payload = payloadOf(announcement);
         int created = 0;
         int page = 0;
         Page<Member> members;
@@ -182,18 +180,59 @@ public class AnnouncementService {
                 if (!matchesLanguage(announcement, member)) {
                     continue;
                 }
-                try {
-                    if (notificationService.notify(member, NotificationType.ANNOUNCEMENT,
-                            "ANNOUNCEMENT:" + announcement.getId() + ":" + member.getId(), message, payload)) {
-                        created++;
-                    }
-                } catch (RuntimeException e) {
-                    log.warn("Announcement notification failed. memberId: {} reason: {}",
-                            member.getId(), e.getClass().getSimpleName());
+                if (notifySafely(member, announcement, message, payload)) {
+                    created++;
                 }
             }
         } while (members.hasNext());
         return created;
+    }
+
+    /**
+     * Puts the running announcements in the inbox of a member who joined after they were sent: the
+     * delivery job only reaches members that existed when it ran. Not yet sent ones are left to the job,
+     * which reaches this member too. Never throws, so it cannot fail the caller.
+     *
+     * @return notifications created
+     */
+    public int deliverActiveTo(Member member) {
+        try {
+            String language = member.getLanguage() != null ? member.getLanguage().name() : Announcement.ALL_LANGUAGES;
+            int created = 0;
+            for (Announcement announcement : announcementRepository.findActive(timeService.nowUtc(), language)) {
+                if (announcement.getDeliveredAt() != null
+                        && notifySafely(member, announcement, messageOf(announcement), payloadOf(announcement))) {
+                    created++;
+                }
+            }
+            return created;
+        } catch (RuntimeException e) {
+            log.warn("Announcements for new member failed. memberId: {} reason: {}",
+                    member.getId(), e.getClass().getSimpleName());
+            return 0;
+        }
+    }
+
+    private boolean notifySafely(Member member, Announcement announcement, NotificationMessages.Message message,
+                                 Map<String, String> payload) {
+        try {
+            return notificationService.notify(member, NotificationType.ANNOUNCEMENT,
+                    "ANNOUNCEMENT:" + announcement.getId() + ":" + member.getId(), message, payload);
+        } catch (RuntimeException e) {
+            log.warn("Announcement notification failed. memberId: {} reason: {}",
+                    member.getId(), e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    private static NotificationMessages.Message messageOf(Announcement announcement) {
+        return new NotificationMessages.Message(
+                StringUtils.abbreviate(announcement.getTitle(), NotificationMessages.MAX_TITLE),
+                StringUtils.abbreviate(announcement.getBody(), NotificationMessages.MAX_BODY));
+    }
+
+    private static Map<String, String> payloadOf(Announcement announcement) {
+        return Map.of("route", "announcement", "announcementId", announcement.getId());
     }
 
     static boolean matchesLanguage(Announcement announcement, Member member) {
