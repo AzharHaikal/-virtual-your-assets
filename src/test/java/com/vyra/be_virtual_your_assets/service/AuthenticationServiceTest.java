@@ -53,6 +53,7 @@ class AuthenticationServiceTest {
     @Mock private WalletService walletService;
     @Mock private BCryptPasswordEncoder passwordEncoder;
     @Mock private LockoutService lockoutService;
+    @Mock private AnnouncementService announcementService;
     @Spy private TimeService timeService = new TimeService(Clock.fixed(Instant.parse("2026-10-22T17:30:00Z"), ZoneOffset.UTC), "Asia/Jakarta");
     @Spy private SecurityPolicy securityPolicy = new SecurityPolicy();
 
@@ -233,6 +234,8 @@ class AuthenticationServiceTest {
         assertThat(member.getStatus()).isEqualTo(ActiveStatus.ACTIVE);
         verify(memberRepository).save(member);
         verify(memberOtpRepository).delete(otp);
+        // running announcements reach the new inbox
+        verify(announcementService).deliverActiveTo(member);
     }
 
     // =========================================================================
@@ -667,6 +670,7 @@ class AuthenticationServiceTest {
         verify(memberOtpRepository).save(otp);
         verify(memberOtpRepository, never()).delete(any(MemberOtp.class));
         verify(memberRepository, never()).save(any(Member.class));
+        verify(announcementService, never()).deliverActiveTo(any());
     }
 
     @Test

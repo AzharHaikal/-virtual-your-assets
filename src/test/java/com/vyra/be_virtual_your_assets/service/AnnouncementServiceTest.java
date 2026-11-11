@@ -148,6 +148,31 @@ class AnnouncementServiceTest {
         verify(announcementRepository).save(announcement);
     }
 
+    // A member who registers after an announcement went out still finds it in the inbox.
+    @Test
+    void deliverActiveTo_sendsOnlyAlreadyDeliveredAnnouncementsToTheNewMember() {
+        Member newcomer = member("m-9", AppLanguage.ID);
+        Announcement sent = announcement("a-1", "ID");
+        sent.setDeliveredAt(NOW.minusHours(1));
+        Announcement notYetSent = announcement("a-2", "ALL");
+        when(announcementRepository.findActive(NOW, "ID")).thenReturn(List.of(sent, notYetSent));
+        when(notificationService.notify(eq(newcomer), eq(NotificationType.ANNOUNCEMENT), eq("ANNOUNCEMENT:a-1:m-9"),
+                any(), eq(Map.of("route", "announcement", "announcementId", "a-1")))).thenReturn(true);
+
+        assertThat(service.deliverActiveTo(newcomer)).isEqualTo(1);
+
+        // the job still sends a-2, to this member as well
+        verify(notificationService, never()).notify(any(), any(), eq("ANNOUNCEMENT:a-2:m-9"), any(), any());
+    }
+
+    @Test
+    void deliverActiveTo_neverThrows() {
+        Member newcomer = member("m-9", AppLanguage.EN);
+        when(announcementRepository.findActive(NOW, "EN")).thenThrow(new IllegalStateException("db down"));
+
+        assertThat(service.deliverActiveTo(newcomer)).isZero();
+    }
+
     private static AnnouncementRequest request(String startsAt, String endsAt) {
         AnnouncementRequest request = new AnnouncementRequest();
         request.setTitle(" Fitur baru ");

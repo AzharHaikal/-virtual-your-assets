@@ -28,6 +28,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 
@@ -48,6 +50,7 @@ public class AuthenticationService {
     private final LockoutService lockoutService;
     private final SecurityPolicy securityPolicy;
     private final TimeService timeService;
+    private final AnnouncementService announcementService;
 
     @NewSpan
     @Transactional
@@ -192,6 +195,8 @@ public class AuthenticationService {
             if (OtpType.REGISTER == request.getOtpType()) {
                 member.setStatus(ActiveStatus.ACTIVE);
                 memberRepository.save(member);
+                // Announcements already running go to the new inbox too, once the account is saved.
+                afterCommit(() -> announcementService.deliverActiveTo(member));
             }
             memberOtpRepository.delete(memberOtp);
         }
@@ -459,5 +464,19 @@ public class AuthenticationService {
 
     private void createMemberActivity(String phoneNumber, MemberActivityEvent activityEvent) {
         memberActivityService.createMemberActivity(phoneNumber, activityEvent);
+    }
+
+    /** Runs after the current transaction commits (right away when there is none). */
+    static void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 }
